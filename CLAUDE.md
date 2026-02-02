@@ -67,6 +67,15 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 - `npm run format` - Format with Prettier
 - `npm run typecheck` - TypeScript type checking
 
+### Testing the Extension
+
+1. Run `npm run build` to compile everything
+2. Press **F5** to launch Extension Development Host
+3. Open a folder containing a `backlog/` directory with task files
+4. Click the **Backlog** icon in the activity bar to see views
+
+The extension activates when it detects `backlog/tasks/*.md` files.
+
 ### Architecture
 
 - `src/extension.ts` - Extension entry point
@@ -74,3 +83,8 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 - `src/providers/` - Webview providers (Kanban, TaskList, TaskDetail)
 - `src/webview/` - Webview UI (HTML/CSS/JS embedded in providers)
 - `src/test/` - Unit and integration tests
+
+### Known Issues / Tech Debt
+
+- Webviews use inline styles instead of external CSS (TASK-46)
+- Inline styles duplicate VS Code theme variable mappings
