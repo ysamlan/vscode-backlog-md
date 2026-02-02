@@ -1,0 +1,85 @@
+{
+  "name": "vscode-backlog-md",
+  "displayName": "Backlog.md",
+  "description": "Beautiful UI for browsing and managing Backlog.md tasks",
+  "version": "0.0.1",
+  "publisher": "backlog-md",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/backlog/tasks/*.md"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "backlog.openKanban",
+        "title": "Backlog: Open Kanban Board"
+      },
+      {
+        "command": "backlog.openTaskList",
+        "title": "Backlog: Open Task List"
+      },
+      {
+        "command": "backlog.openDashboard",
+        "title": "Backlog: Open Dashboard"
+      },
+      {
+        "command": "backlog.refresh",
+        "title": "Backlog: Refresh"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "backlog",
+          "title": "Backlog",
+          "icon": "$(checklist)"
+        }
+      ]
+    },
+    "views": {
+      "backlog": [
+        {
+          "type": "webview",
+          "id": "backlog.kanban",
+          "name": "Kanban Board"
+        },
+        {
+          "type": "webview",
+          "id": "backlog.taskList",
+          "name": "Task List"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "build:css": "npx @tailwindcss/cli -i ./src/webview/styles.css -o ./dist/webview/styles.css",
+    "build": "npm run build:css && npm run compile",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.0.0",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  },
+  "dependencies": {
+    "lucide": "^0.344.0"
+  }
+}

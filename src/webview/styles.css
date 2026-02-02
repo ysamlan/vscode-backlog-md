@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* VS Code theme variables integration */
+:root {
+  --bg-primary: var(--vscode-editor-background);
+  --bg-secondary: var(--vscode-sideBar-background);
+  --text-primary: var(--vscode-editor-foreground);
+  --text-secondary: var(--vscode-descriptionForeground);
+  --border-color: var(--vscode-widget-border);
+  --focus-color: var(--vscode-focusBorder);
+  --accent-color: var(--vscode-button-background);
+}
+
+/* Base styles */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Custom utility classes for VS Code theming */
+.bg-vscode-editor {
+  background: var(--vscode-editor-background);
+}
+
+.bg-vscode-sidebar {
+  background: var(--vscode-sideBar-background);
+}
+
+.text-vscode-primary {
+  color: var(--vscode-editor-foreground);
+}
+
+.text-vscode-secondary {
+  color: var(--vscode-descriptionForeground);
+}
+
+.border-vscode {
+  border-color: var(--vscode-widget-border);
+}
+
+.focus-vscode:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+}
+
+/* Scrollbar styling to match VS Code */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--vscode-scrollbarSlider-background);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--vscode-scrollbarSlider-activeBackground);
+}
