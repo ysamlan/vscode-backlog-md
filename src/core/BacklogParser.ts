@@ -18,7 +18,7 @@ export class BacklogParser {
       return [];
     }
 
-    const files = fs.readdirSync(tasksPath).filter(f => f.endsWith('.md'));
+    const files = fs.readdirSync(tasksPath).filter((f) => f.endsWith('.md'));
     const tasks: Task[] = [];
 
     for (const file of files) {
@@ -41,7 +41,7 @@ export class BacklogParser {
    */
   async getTask(taskId: string): Promise<Task | undefined> {
     const tasks = await this.getTasks();
-    return tasks.find(t => t.id === taskId);
+    return tasks.find((t) => t.id === taskId);
   }
 
   /**
@@ -100,9 +100,9 @@ export class BacklogParser {
     };
 
     let currentSection = '';
-    let descriptionLines: string[] = [];
-    let notesLines: string[] = [];
-    let summaryLines: string[] = [];
+    const descriptionLines: string[] = [];
+    const notesLines: string[] = [];
+    const summaryLines: string[] = [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -167,7 +167,10 @@ export class BacklogParser {
 
       // Parse sections
       if (trimmedLine.startsWith('## ') || trimmedLine.match(/^[A-Za-z ]+:$/)) {
-        const sectionName = trimmedLine.replace(/^##\s*/, '').replace(/:$/, '').toLowerCase();
+        const sectionName = trimmedLine
+          .replace(/^##\s*/, '')
+          .replace(/:$/, '')
+          .toLowerCase();
 
         if (sectionName.includes('description')) {
           currentSection = 'description';
@@ -240,8 +243,8 @@ export class BacklogParser {
     if (!value) return [];
     return value
       .split(/[,;]/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
   }
 
   private parseChecklistItem(line: string): ChecklistItem | undefined {

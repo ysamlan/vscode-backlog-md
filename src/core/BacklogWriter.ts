@@ -28,11 +28,7 @@ export class BacklogWriter {
   /**
    * Update a task with partial changes
    */
-  async updateTask(
-    taskId: string,
-    updates: Partial<Task>,
-    parser: BacklogParser
-  ): Promise<void> {
+  async updateTask(taskId: string, updates: Partial<Task>, parser: BacklogParser): Promise<void> {
     const task = await parser.getTask(taskId);
     if (!task) {
       throw new Error(`Task ${taskId} not found`);

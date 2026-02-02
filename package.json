@@ -64,19 +64,24 @@
     "build": "npm run build:css && npm run compile",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
     "package": "vsce package"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@tailwindcss/cli": "^4.0.0",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
     "esbuild": "^0.20.0",
-    "eslint": "^8.56.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.3.0",
+    "typescript-eslint": "^8.54.0",
     "vitest": "^1.2.0"
   },
   "dependencies": {

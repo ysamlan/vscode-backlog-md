@@ -19,7 +19,7 @@ async function main() {
       {
         name: 'watch-plugin',
         setup(build) {
-          build.onEnd(result => {
+          build.onEnd((result) => {
             if (result.errors.length === 0) {
               console.log('[esbuild] Build succeeded');
             }
@@ -38,7 +38,7 @@ async function main() {
   }
 }
 
-main().catch(e => {
+main().catch((e) => {
   console.error(e);
   process.exit(1);
 });

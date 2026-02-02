@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { BaseViewProvider } from './BaseViewProvider';
-import { WebviewMessage, Task } from '../core/types';
-import { BacklogWriter } from '../core/BacklogWriter';
+import { WebviewMessage } from '../core/types';
 
 /**
  * Provides the task list/table webview
@@ -348,12 +347,13 @@ export class TaskListProvider extends BaseViewProvider {
         await this.refresh();
         break;
 
-      case 'openTask':
+      case 'openTask': {
         const task = await this.parser.getTask(message.taskId);
         if (task) {
           vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
         }
         break;
+      }
     }
   }
 }

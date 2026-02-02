@@ -60,7 +60,12 @@ export type WebviewMessage =
   | { type: 'createTask'; task: Partial<Task> }
   | { type: 'archiveTask'; taskId: string }
   | { type: 'openFile'; filePath: string }
-  | { type: 'toggleChecklistItem'; taskId: string; listType: 'acceptanceCriteria' | 'definitionOfDone'; itemId: number };
+  | {
+      type: 'toggleChecklistItem';
+      taskId: string;
+      listType: 'acceptanceCriteria' | 'definitionOfDone';
+      itemId: number;
+    };
 
 /**
  * Message from extension to webview
