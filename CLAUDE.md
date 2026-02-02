@@ -1,4 +1,3 @@
-
 <!-- BACKLOG.MD MCP GUIDELINES START -->
 
 <CRITICAL_INSTRUCTION>
@@ -17,6 +16,7 @@ This project uses Backlog.md MCP for all task and project management activities.
 - **When to read it**: BEFORE creating tasks, or when you're unsure whether to track work
 
 These guides cover:
+
 - Decision framework for when to create tasks
 - Search-first workflow to avoid duplicates
 - Links to detailed guides for task creation, execution, and finalization
@@ -27,3 +27,50 @@ You MUST read the overview resource to understand the complete workflow. The inf
 </CRITICAL_INSTRUCTION>
 
 <!-- BACKLOG.MD MCP GUIDELINES END -->
+
+## Project: vscode-backlog-md
+
+VS Code extension providing a beautiful UI for browsing and managing Backlog.md tasks.
+
+### Development Workflow
+
+**One commit per task**: When a backlog task is self-contained and testable, commit it individually before moving to the next task. This keeps the git history clean and makes it easier to review/revert changes.
+
+```
+1. Mark task as In Progress
+2. Implement the task
+3. Verify it works (run tests, lint, compile)
+4. Commit with message referencing the task ID
+5. Mark task as Done
+6. Move to next task
+```
+
+**Commit message format**:
+```
+Short description of what was done
+
+- Bullet points for details if needed
+- Reference task ID
+
+Completes TASK-XX.
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+```
+
+### Commands
+
+- `npm run compile` - Build extension with esbuild
+- `npm run watch` - Watch mode for development
+- `npm run build` - Build CSS + extension
+- `npm test` - Run unit tests (vitest)
+- `npm run lint` - ESLint check
+- `npm run format` - Format with Prettier
+- `npm run typecheck` - TypeScript type checking
+
+### Architecture
+
+- `src/extension.ts` - Extension entry point
+- `src/core/` - Business logic (parser, writer, file watcher, types)
+- `src/providers/` - Webview providers (Kanban, TaskList, TaskDetail)
+- `src/webview/` - Webview UI (HTML/CSS/JS embedded in providers)
+- `src/test/` - Unit and integration tests

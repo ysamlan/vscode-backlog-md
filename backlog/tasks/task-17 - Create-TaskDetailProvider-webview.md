@@ -4,6 +4,7 @@ title: Create TaskDetailProvider webview
 status: To Do
 assignee: []
 created_date: '2026-02-02 23:22'
+updated_date: '2026-02-02 23:33'
 labels:
   - 'epic:task-detail'
   - 'phase:5'
