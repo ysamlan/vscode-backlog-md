@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { BacklogParser } from '../core/BacklogParser';
+import { BacklogWriter } from '../core/BacklogWriter';
 import { Task } from '../core/types';
 
 /**
@@ -7,6 +8,8 @@ import { Task } from '../core/types';
  */
 export class TaskDetailProvider {
   private static currentPanel: vscode.WebviewPanel | undefined;
+  private static currentTaskId: string | undefined;
+  private readonly writer = new BacklogWriter();
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -34,6 +37,7 @@ export class TaskDetailProvider {
     if (TaskDetailProvider.currentPanel) {
       TaskDetailProvider.currentPanel.reveal(column);
       TaskDetailProvider.currentPanel.title = `${task.id}: ${task.title}`;
+      TaskDetailProvider.currentTaskId = taskId;
       TaskDetailProvider.currentPanel.webview.html = this.getHtmlContent(
         TaskDetailProvider.currentPanel.webview,
         task
@@ -54,26 +58,68 @@ export class TaskDetailProvider {
     );
 
     TaskDetailProvider.currentPanel = panel;
+    TaskDetailProvider.currentTaskId = taskId;
     panel.webview.html = this.getHtmlContent(panel.webview, task);
 
     // Handle messages from the webview
     panel.webview.onDidReceiveMessage(async (message) => {
-      switch (message.type) {
-        case 'openFile':
-          if (task.filePath) {
-            vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
-          }
-          break;
-        case 'openTask':
-          await this.openTask(message.taskId);
-          break;
-      }
+      await this.handleMessage(message);
     });
 
     // Reset when the panel is closed
     panel.onDidDispose(() => {
       TaskDetailProvider.currentPanel = undefined;
+      TaskDetailProvider.currentTaskId = undefined;
     });
+  }
+
+  /**
+   * Handle messages from the webview
+   */
+  private async handleMessage(message: {
+    type: string;
+    taskId?: string;
+    listType?: 'acceptanceCriteria' | 'definitionOfDone';
+    itemId?: number;
+  }): Promise<void> {
+    switch (message.type) {
+      case 'openFile':
+        if (TaskDetailProvider.currentTaskId && this.parser) {
+          const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+          if (task?.filePath) {
+            vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
+          }
+        }
+        break;
+
+      case 'openTask':
+        if (message.taskId) {
+          await this.openTask(message.taskId);
+        }
+        break;
+
+      case 'toggleChecklistItem':
+        if (
+          TaskDetailProvider.currentTaskId &&
+          this.parser &&
+          message.listType &&
+          message.itemId !== undefined
+        ) {
+          try {
+            await this.writer.toggleChecklistItem(
+              TaskDetailProvider.currentTaskId,
+              message.listType,
+              message.itemId,
+              this.parser
+            );
+            // Refresh the view
+            await this.openTask(TaskDetailProvider.currentTaskId);
+          } catch (error) {
+            vscode.window.showErrorMessage(`Failed to toggle checklist item: ${error}`);
+          }
+        }
+        break;
+    }
   }
 
   /**
@@ -132,27 +178,35 @@ export class TaskDetailProvider {
       ? `<div class="description-content">${this.escapeHtml(task.description)}</div>`
       : '<span class="empty-value">No description</span>';
 
+    const acChecked = task.acceptanceCriteria.filter((i) => i.checked).length;
+    const acTotal = task.acceptanceCriteria.length;
+    const acProgress = acTotal > 0 ? `${acChecked} of ${acTotal} complete` : '';
+
     const acceptanceCriteriaHtml =
       task.acceptanceCriteria.length > 0
         ? `<ul class="checklist">${task.acceptanceCriteria
             .map(
               (item) =>
-                `<li class="${item.checked ? 'checked' : ''}">
+                `<li class="checklist-item ${item.checked ? 'checked' : ''}" data-list-type="acceptanceCriteria" data-item-id="${item.id}">
               <span class="checkbox">${item.checked ? '☑' : '☐'}</span>
-              ${this.escapeHtml(item.text)}
+              <span class="checklist-text">${this.escapeHtml(item.text)}</span>
             </li>`
             )
             .join('')}</ul>`
         : '<span class="empty-value">None defined</span>';
+
+    const dodChecked = task.definitionOfDone.filter((i) => i.checked).length;
+    const dodTotal = task.definitionOfDone.length;
+    const dodProgress = dodTotal > 0 ? `${dodChecked} of ${dodTotal} complete` : '';
 
     const definitionOfDoneHtml =
       task.definitionOfDone.length > 0
         ? `<ul class="checklist">${task.definitionOfDone
             .map(
               (item) =>
-                `<li class="${item.checked ? 'checked' : ''}">
+                `<li class="checklist-item ${item.checked ? 'checked' : ''}" data-list-type="definitionOfDone" data-item-id="${item.id}">
               <span class="checkbox">${item.checked ? '☑' : '☐'}</span>
-              ${this.escapeHtml(item.text)}
+              <span class="checklist-text">${this.escapeHtml(item.text)}</span>
             </li>`
             )
             .join('')}</ul>`
@@ -306,12 +360,42 @@ export class TaskDetailProvider {
         .checklist li:last-child {
             border-bottom: none;
         }
-        .checklist li.checked {
+        .checklist-item {
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .checklist-item:hover {
+            background: var(--vscode-list-hoverBackground);
+            margin: 0 -8px;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+        .checklist-item.checked {
             color: var(--vscode-descriptionForeground);
+        }
+        .checklist-item.checked .checklist-text {
             text-decoration: line-through;
         }
         .checkbox {
             font-size: 16px;
+            flex-shrink: 0;
+        }
+        .checklist-text {
+            flex: 1;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .progress-indicator {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            font-weight: normal;
+        }
+        .progress-indicator.complete {
+            color: #10b981;
         }
         .open-file-btn {
             display: inline-flex;
@@ -373,12 +457,18 @@ export class TaskDetailProvider {
     </div>
 
     <div class="section">
-        <div class="section-title">Acceptance Criteria</div>
+        <div class="section-header">
+            <div class="section-title">Acceptance Criteria</div>
+            ${acProgress ? `<span class="progress-indicator ${acChecked === acTotal ? 'complete' : ''}">${acProgress}</span>` : ''}
+        </div>
         ${acceptanceCriteriaHtml}
     </div>
 
     <div class="section">
-        <div class="section-title">Definition of Done</div>
+        <div class="section-header">
+            <div class="section-title">Definition of Done</div>
+            ${dodProgress ? `<span class="progress-indicator ${dodChecked === dodTotal ? 'complete' : ''}">${dodProgress}</span>` : ''}
+        </div>
         ${definitionOfDoneHtml}
     </div>
 
@@ -400,6 +490,18 @@ export class TaskDetailProvider {
                 e.preventDefault();
                 const taskId = link.dataset.taskId;
                 vscode.postMessage({ type: 'openTask', taskId });
+            });
+        });
+
+        document.querySelectorAll('.checklist-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const listType = item.dataset.listType;
+                const itemId = parseInt(item.dataset.itemId, 10);
+                vscode.postMessage({
+                    type: 'toggleChecklistItem',
+                    listType,
+                    itemId
+                });
             });
         });
     </script>
