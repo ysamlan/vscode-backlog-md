@@ -42,6 +42,50 @@ interface FrontmatterData {
  */
 export class BacklogWriter {
   /**
+   * Move a completed task to the completed/ folder
+   */
+  async completeTask(taskId: string, parser: BacklogParser): Promise<string> {
+    return this.moveTaskToFolder(taskId, 'completed', parser);
+  }
+
+  /**
+   * Archive a task (cancelled/duplicate) to the archive/tasks/ folder
+   */
+  async archiveTask(taskId: string, parser: BacklogParser): Promise<string> {
+    return this.moveTaskToFolder(taskId, 'archive/tasks', parser);
+  }
+
+  /**
+   * Move a task file to a destination folder
+   */
+  private async moveTaskToFolder(
+    taskId: string,
+    destFolder: string,
+    parser: BacklogParser
+  ): Promise<string> {
+    const task = await parser.getTask(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+
+    // Calculate destination path
+    const backlogPath = path.dirname(path.dirname(task.filePath)); // backlog/
+    const destDir = path.join(backlogPath, destFolder);
+    const fileName = path.basename(task.filePath);
+    const destPath = path.join(destDir, fileName);
+
+    // Ensure destination directory exists
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+    }
+
+    // Move the file
+    fs.renameSync(task.filePath, destPath);
+
+    return destPath;
+  }
+
+  /**
    * Update a task's status in its file
    */
   async updateTaskStatus(

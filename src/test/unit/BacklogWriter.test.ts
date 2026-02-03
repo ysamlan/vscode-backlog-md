@@ -13,6 +13,7 @@ vi.mock('fs', async () => {
     writeFileSync: vi.fn(),
     readdirSync: vi.fn(() => []),
     mkdirSync: vi.fn(),
+    renameSync: vi.fn(),
   };
 });
 
@@ -908,6 +909,141 @@ milestone: "v1.0-beta.1"
       // Should preserve the special characters
       expect(writtenContent).toContain('Test: with special chars (urgent!) & more');
       expect(writtenContent).toContain('v1.0-beta.1');
+    });
+  });
+
+  describe('Task Archiving', () => {
+    it('should move task to completed/ folder', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['task-1 - Test-Task.md']);
+
+      // Mock parser.getTask to return a task with file path
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test Task',
+        status: 'Done',
+        filePath: '/fake/backlog/tasks/task-1 - Test-Task.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      const result = await writer.completeTask('TASK-1', mockParser);
+
+      expect(fs.renameSync).toHaveBeenCalledWith(
+        '/fake/backlog/tasks/task-1 - Test-Task.md',
+        '/fake/backlog/completed/task-1 - Test-Task.md'
+      );
+      expect(result).toBe('/fake/backlog/completed/task-1 - Test-Task.md');
+    });
+
+    it('should move task to archive/tasks/ folder', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['task-2 - Cancelled-Task.md']);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-2',
+        title: 'Cancelled Task',
+        status: 'To Do',
+        filePath: '/fake/backlog/tasks/task-2 - Cancelled-Task.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      const result = await writer.archiveTask('TASK-2', mockParser);
+
+      expect(fs.renameSync).toHaveBeenCalledWith(
+        '/fake/backlog/tasks/task-2 - Cancelled-Task.md',
+        '/fake/backlog/archive/tasks/task-2 - Cancelled-Task.md'
+      );
+      expect(result).toBe('/fake/backlog/archive/tasks/task-2 - Cancelled-Task.md');
+    });
+
+    it('should create destination folder if it does not exist', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      mockReaddirSync(['task-1 - Test-Task.md']);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test Task',
+        status: 'Done',
+        filePath: '/fake/backlog/tasks/task-1 - Test-Task.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      await writer.completeTask('TASK-1', mockParser);
+
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/fake/backlog/completed', { recursive: true });
+    });
+
+    it('should throw error for non-existent task', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue(undefined);
+
+      await expect(writer.archiveTask('TASK-999', mockParser)).rejects.toThrow(
+        'Task TASK-999 not found'
+      );
+    });
+
+    it('should return new file path after move', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['task-5 - Feature.md']);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-5',
+        title: 'Feature',
+        status: 'Done',
+        filePath: '/fake/backlog/tasks/task-5 - Feature.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      const newPath = await writer.completeTask('TASK-5', mockParser);
+
+      expect(newPath).toBe('/fake/backlog/completed/task-5 - Feature.md');
+    });
+
+    it('should handle task file in nested backlog structure', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['task-1.md']);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test',
+        status: 'Done',
+        filePath: '/project/my-backlog/tasks/task-1.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      await writer.completeTask('TASK-1', mockParser);
+
+      expect(fs.renameSync).toHaveBeenCalledWith(
+        '/project/my-backlog/tasks/task-1.md',
+        '/project/my-backlog/completed/task-1.md'
+      );
     });
   });
 });
