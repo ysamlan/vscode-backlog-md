@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { KanbanViewProvider } from './providers/KanbanViewProvider';
 import { TaskListProvider } from './providers/TaskListProvider';
+import { TaskDetailProvider } from './providers/TaskDetailProvider';
 import { BacklogParser } from './core/BacklogParser';
 import { FileWatcher } from './core/FileWatcher';
 
@@ -52,6 +53,10 @@ export function activate(context: vscode.ExtensionContext) {
   );
   console.log('[Backlog.md] Task list view provider registered');
 
+  // Create Task Detail provider for opening task details in editor
+  const taskDetailProvider = new TaskDetailProvider(context.extensionUri, parser);
+  console.log('[Backlog.md] Task detail provider created');
+
   // Register commands
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.openKanban', () => {
@@ -69,6 +74,12 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('backlog.refresh', () => {
       kanbanProvider.refresh();
       taskListProvider.refresh();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.openTaskDetail', (taskId: string) => {
+      taskDetailProvider.openTask(taskId);
     })
   );
 

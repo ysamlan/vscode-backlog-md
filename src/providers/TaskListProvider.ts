@@ -368,11 +368,7 @@ export class TaskListProvider extends BaseViewProvider {
         break;
 
       case 'openTask': {
-        if (!this.parser) break;
-        const task = await this.parser.getTask(message.taskId);
-        if (task) {
-          vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
-        }
+        vscode.commands.executeCommand('backlog.openTaskDetail', message.taskId);
         break;
       }
     }

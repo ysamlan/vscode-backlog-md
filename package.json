@@ -31,6 +31,10 @@
       {
         "command": "backlog.refresh",
         "title": "Backlog: Refresh"
+      },
+      {
+        "command": "backlog.openTaskDetail",
+        "title": "Backlog: Open Task Detail"
       }
     ],
     "viewsContainers": {
