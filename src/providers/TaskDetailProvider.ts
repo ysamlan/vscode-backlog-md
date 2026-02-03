@@ -209,6 +209,12 @@ export class TaskDetailProvider {
     const nonce = this.getNonce();
     const styleUri = this.getResourceUri(webview, 'styles.css');
 
+    // Fetch unique labels and assignees for autocomplete
+    const [uniqueLabels, uniqueAssignees] = await Promise.all([
+      this.parser!.getUniqueLabels(),
+      this.parser!.getUniqueAssignees(),
+    ]);
+
     const priorityClass = task.priority ? `priority-${task.priority}` : '';
     const statusClass = task.status.toLowerCase().replace(/\s+/g, '-');
     const priorities = ['high', 'medium', 'low'];
@@ -241,10 +247,17 @@ export class TaskDetailProvider {
         : '';
     const labelsJson = JSON.stringify(task.labels);
 
+    // Assignees with remove buttons (editable like labels)
     const assigneesHtml =
       task.assignee.length > 0
-        ? task.assignee.map((a) => `<span class="assignee">${this.escapeHtml(a)}</span>`).join('')
-        : '<span class="empty-value">Unassigned</span>';
+        ? task.assignee
+            .map(
+              (a) =>
+                `<span class="assignee editable-assignee" data-assignee="${this.escapeHtml(a)}">${this.escapeHtml(a)} <span class="remove-assignee">×</span></span>`
+            )
+            .join('')
+        : '';
+    const assigneesJson = JSON.stringify(task.assignee);
 
     const dependenciesHtml =
       task.dependencies.length > 0
@@ -627,6 +640,41 @@ export class TaskDetailProvider {
         .add-label-input::placeholder {
             color: var(--vscode-descriptionForeground);
         }
+        .assignees-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
+        }
+        .editable-assignee {
+            cursor: default;
+        }
+        .remove-assignee {
+            cursor: pointer;
+            margin-left: 4px;
+            opacity: 0.6;
+        }
+        .remove-assignee:hover {
+            opacity: 1;
+        }
+        .add-assignee-input {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            border: 1px dashed var(--vscode-input-border);
+            background: transparent;
+            color: inherit;
+            width: 80px;
+        }
+        .add-assignee-input:focus {
+            outline: none;
+            border-style: solid;
+            border-color: var(--vscode-focusBorder);
+            background: var(--vscode-input-background);
+        }
+        .add-assignee-input::placeholder {
+            color: var(--vscode-descriptionForeground);
+        }
         /* Markdown content styles */
         .markdown-content {
             background: var(--vscode-sideBar-background);
@@ -757,12 +805,15 @@ export class TaskDetailProvider {
                 <div class="meta-label">Labels</div>
                 <div class="labels-container" id="labelsContainer" data-labels='${labelsJson}'>
                     ${labelsHtml}
-                    <input type="text" class="add-label-input" id="addLabelInput" placeholder="+ Add" />
+                    <input type="text" class="add-label-input" id="addLabelInput" placeholder="+ Add" list="labelSuggestions" />
                 </div>
             </div>
             <div class="meta-item">
                 <div class="meta-label">Assignees</div>
-                <div>${assigneesHtml}</div>
+                <div class="assignees-container" id="assigneesContainer" data-assignees='${assigneesJson}'>
+                    ${assigneesHtml}
+                    <input type="text" class="add-assignee-input" id="addAssigneeInput" placeholder="+ Add" list="assigneeSuggestions" />
+                </div>
             </div>
             <div class="meta-item">
                 <div class="meta-label">Milestone</div>
@@ -812,6 +863,14 @@ export class TaskDetailProvider {
             Archive Task
         </button>
     </div>
+
+    <!-- Autocomplete datalists -->
+    <datalist id="labelSuggestions">
+        ${uniqueLabels.map((l) => `<option value="${this.escapeHtml(l)}">`).join('')}
+    </datalist>
+    <datalist id="assigneeSuggestions">
+        ${uniqueAssignees.map((a) => `<option value="${this.escapeHtml(a)}">`).join('')}
+    </datalist>
 
     <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
@@ -952,6 +1011,37 @@ export class TaskDetailProvider {
             } else if (e.key === 'Escape') {
                 addLabelInput.value = '';
                 addLabelInput.blur();
+            }
+        });
+
+        // Assignees management
+        const assigneesContainer = document.getElementById('assigneesContainer');
+        const addAssigneeInput = document.getElementById('addAssigneeInput');
+        let currentAssignees = JSON.parse(assigneesContainer.dataset.assignees || '[]');
+
+        // Remove assignee
+        document.querySelectorAll('.remove-assignee').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const assigneeSpan = btn.parentElement;
+                const assigneeToRemove = assigneeSpan.dataset.assignee;
+                currentAssignees = currentAssignees.filter(a => a !== assigneeToRemove);
+                vscode.postMessage({ type: 'updateField', field: 'assignee', value: currentAssignees });
+            });
+        });
+
+        // Add assignee
+        addAssigneeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const newAssignee = addAssigneeInput.value.trim();
+                if (newAssignee && !currentAssignees.includes(newAssignee)) {
+                    currentAssignees.push(newAssignee);
+                    vscode.postMessage({ type: 'updateField', field: 'assignee', value: currentAssignees });
+                }
+                addAssigneeInput.value = '';
+            } else if (e.key === 'Escape') {
+                addAssigneeInput.value = '';
+                addAssigneeInput.blur();
             }
         });
 

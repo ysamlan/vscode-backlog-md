@@ -1,9 +1,10 @@
 ---
 id: TASK-30
 title: Add task archiving with confirmation dialog
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-02 23:22'
+updated_date: '2026-02-03 21:22'
 labels:
   - 'epic:task-crud'
   - 'phase:7'

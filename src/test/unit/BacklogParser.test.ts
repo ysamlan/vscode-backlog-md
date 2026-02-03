@@ -8,6 +8,7 @@ vi.mock('fs', async () => {
     ...actual,
     existsSync: vi.fn(),
     readFileSync: vi.fn(),
+    readdirSync: vi.fn(),
   };
 });
 
@@ -756,6 +757,130 @@ These are implementation notes.
       const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
       expect(task?.plan).toBe('This is the plan content.');
       expect(task?.implementationNotes).toBe('These are implementation notes.');
+    });
+  });
+
+  describe('getUniqueLabels', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return merged labels from config and all tasks, sorted', async () => {
+      const configContent = `labels: ["bug", "feature"]`;
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        const pathStr = String(p);
+        return pathStr.includes('config') || pathStr.includes('tasks');
+      });
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['task-1.md', 'task-2.md']);
+
+      const parser = new BacklogParser('/fake/backlog');
+      // Mock parseTaskFile to return tasks with labels
+      vi.spyOn(parser, 'parseTaskFile').mockImplementation(async (filePath: string) => {
+        if (filePath.includes('task-1')) {
+          return {
+            id: 'TASK-1',
+            title: 'Task 1',
+            status: 'To Do' as const,
+            labels: ['urgent', 'bug'],
+            assignee: [],
+            dependencies: [],
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath,
+          };
+        }
+        return {
+          id: 'TASK-2',
+          title: 'Task 2',
+          status: 'To Do' as const,
+          labels: ['enhancement'],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath,
+        };
+      });
+
+      const labels = await parser.getUniqueLabels();
+      expect(labels).toEqual(['bug', 'enhancement', 'feature', 'urgent']);
+    });
+
+    it('should return empty array when no config and no tasks', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const labels = await parser.getUniqueLabels();
+
+      expect(labels).toEqual([]);
+    });
+  });
+
+  describe('getUniqueAssignees', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return unique assignees from all tasks, sorted', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        return String(p).includes('tasks');
+      });
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['task-1.md', 'task-2.md']);
+
+      const parser = new BacklogParser('/fake/backlog');
+      vi.spyOn(parser, 'parseTaskFile').mockImplementation(async (filePath: string) => {
+        if (filePath.includes('task-1')) {
+          return {
+            id: 'TASK-1',
+            title: 'Task 1',
+            status: 'To Do' as const,
+            labels: [],
+            assignee: ['alice', 'bob'],
+            dependencies: [],
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath,
+          };
+        }
+        return {
+          id: 'TASK-2',
+          title: 'Task 2',
+          status: 'To Do' as const,
+          labels: [],
+          assignee: ['charlie', 'alice'],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath,
+        };
+      });
+
+      const assignees = await parser.getUniqueAssignees();
+      expect(assignees).toEqual(['alice', 'bob', 'charlie']);
+    });
+
+    it('should return empty array when no tasks have assignees', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        return String(p).includes('tasks');
+      });
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['task-1.md']);
+
+      const parser = new BacklogParser('/fake/backlog');
+      vi.spyOn(parser, 'parseTaskFile').mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Task 1',
+        status: 'To Do' as const,
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/fake/backlog/tasks/task-1.md',
+      });
+
+      const assignees = await parser.getUniqueAssignees();
+      expect(assignees).toEqual([]);
     });
   });
 

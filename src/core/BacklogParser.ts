@@ -113,6 +113,27 @@ export class BacklogParser {
   }
 
   /**
+   * Get all unique labels from config and all tasks (for autocomplete)
+   */
+  async getUniqueLabels(): Promise<string[]> {
+    const tasks = await this.getTasks();
+    const config = await this.getConfig();
+    const labelSet = new Set<string>(config.labels || []);
+    tasks.forEach((task) => task.labels.forEach((l) => labelSet.add(l)));
+    return Array.from(labelSet).sort();
+  }
+
+  /**
+   * Get all unique assignees from all tasks (for autocomplete)
+   */
+  async getUniqueAssignees(): Promise<string[]> {
+    const tasks = await this.getTasks();
+    const assigneeSet = new Set<string>();
+    tasks.forEach((task) => task.assignee.forEach((a) => assigneeSet.add(a)));
+    return Array.from(assigneeSet).sort();
+  }
+
+  /**
    * Parse a single task file
    */
   async parseTaskFile(filePath: string): Promise<Task | undefined> {
