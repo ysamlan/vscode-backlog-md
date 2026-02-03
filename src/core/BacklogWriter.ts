@@ -70,9 +70,52 @@ export class BacklogWriter {
     // Update the updated_date
     frontmatter.updated_date = new Date().toISOString().split('T')[0];
 
+    // Handle description update (stored in body, not frontmatter)
+    let updatedBody = body;
+    if (updates.description !== undefined) {
+      updatedBody = this.updateDescriptionInBody(body, updates.description);
+    }
+
     // Reconstruct the file
-    const updatedContent = this.reconstructFile(frontmatter, body);
+    const updatedContent = this.reconstructFile(frontmatter, updatedBody);
     fs.writeFileSync(task.filePath, updatedContent, 'utf-8');
+  }
+
+  /**
+   * Update description content in the markdown body
+   */
+  private updateDescriptionInBody(body: string, newDescription: string): string {
+    const beginMarker = '<!-- SECTION:DESCRIPTION:BEGIN -->';
+    const endMarker = '<!-- SECTION:DESCRIPTION:END -->';
+
+    const beginIndex = body.indexOf(beginMarker);
+    const endIndex = body.indexOf(endMarker);
+
+    if (beginIndex !== -1 && endIndex !== -1 && endIndex > beginIndex) {
+      // Replace content between markers
+      const before = body.substring(0, beginIndex + beginMarker.length);
+      const after = body.substring(endIndex);
+      return `${before}\n${newDescription}\n${after}`;
+    }
+
+    // No markers found - look for ## Description section and add markers
+    const descriptionHeaderRegex = /^## Description\s*$/m;
+    const match = body.match(descriptionHeaderRegex);
+
+    if (match && match.index !== undefined) {
+      // Find the next section header or end of file
+      const afterHeader = body.substring(match.index + match[0].length);
+      const nextSectionMatch = afterHeader.match(/^## /m);
+      const nextSectionIndex = nextSectionMatch?.index ?? afterHeader.length;
+
+      const before = body.substring(0, match.index + match[0].length);
+      const after = body.substring(match.index + match[0].length + nextSectionIndex);
+
+      return `${before}\n\n${beginMarker}\n${newDescription}\n${endMarker}\n${after}`;
+    }
+
+    // No description section - add one after frontmatter
+    return `\n## Description\n\n${beginMarker}\n${newDescription}\n${endMarker}\n${body}`;
   }
 
   /**

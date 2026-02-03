@@ -218,5 +218,34 @@ Important description text
       expect(writtenContent).toContain('## Acceptance Criteria');
       expect(writtenContent).toContain('- [ ] #1 First criterion');
     });
+
+    it('should update description with markers', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Old description
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+- [ ] #1 First criterion
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { description: 'New description text' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('<!-- SECTION:DESCRIPTION:BEGIN -->');
+      expect(writtenContent).toContain('New description text');
+      expect(writtenContent).toContain('<!-- SECTION:DESCRIPTION:END -->');
+      expect(writtenContent).not.toContain('Old description');
+      expect(writtenContent).toContain('## Acceptance Criteria');
+    });
   });
 });

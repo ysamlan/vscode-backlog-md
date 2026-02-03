@@ -31,6 +31,7 @@ export class TaskDetailProvider {
       return;
     }
 
+    const statuses = await this.parser.getStatuses();
     const column = vscode.ViewColumn.One;
 
     // If we already have a panel, show it and update content
@@ -40,7 +41,8 @@ export class TaskDetailProvider {
       TaskDetailProvider.currentTaskId = taskId;
       TaskDetailProvider.currentPanel.webview.html = this.getHtmlContent(
         TaskDetailProvider.currentPanel.webview,
-        task
+        task,
+        statuses
       );
       return;
     }
@@ -59,7 +61,7 @@ export class TaskDetailProvider {
 
     TaskDetailProvider.currentPanel = panel;
     TaskDetailProvider.currentTaskId = taskId;
-    panel.webview.html = this.getHtmlContent(panel.webview, task);
+    panel.webview.html = this.getHtmlContent(panel.webview, task, statuses);
 
     // Handle messages from the webview
     panel.webview.onDidReceiveMessage(async (message) => {
@@ -81,6 +83,8 @@ export class TaskDetailProvider {
     taskId?: string;
     listType?: 'acceptanceCriteria' | 'definitionOfDone';
     itemId?: number;
+    field?: string;
+    value?: string | string[];
   }): Promise<void> {
     switch (message.type) {
       case 'openFile':
@@ -119,6 +123,24 @@ export class TaskDetailProvider {
           }
         }
         break;
+
+      case 'updateField':
+        if (TaskDetailProvider.currentTaskId && this.parser && message.field) {
+          try {
+            const updates: Record<string, unknown> = {};
+            updates[message.field] = message.value;
+            await this.writer.updateTask(
+              TaskDetailProvider.currentTaskId,
+              updates,
+              this.parser
+            );
+            // Refresh the view
+            await this.openTask(TaskDetailProvider.currentTaskId);
+          } catch (error) {
+            vscode.window.showErrorMessage(`Failed to update task: ${error}`);
+          }
+        }
+        break;
     }
   }
 
@@ -143,17 +165,41 @@ export class TaskDetailProvider {
     );
   }
 
-  private getHtmlContent(webview: vscode.Webview, task: Task): string {
+  private getHtmlContent(webview: vscode.Webview, task: Task, statuses: string[]): string {
     const nonce = this.getNonce();
     const styleUri = this.getResourceUri(webview, 'styles.css');
 
     const priorityClass = task.priority ? `priority-${task.priority}` : '';
-    const statusClass = task.status.toLowerCase().replace(' ', '-');
+    const statusClass = task.status.toLowerCase().replace(/\s+/g, '-');
+    const priorities = ['high', 'medium', 'low'];
 
+    // Generate status options
+    const statusOptionsHtml = statuses
+      .map(
+        (s) =>
+          `<option value="${this.escapeHtml(s)}" ${s === task.status ? 'selected' : ''}>${this.escapeHtml(s)}</option>`
+      )
+      .join('');
+
+    // Generate priority options
+    const priorityOptionsHtml = priorities
+      .map(
+        (p) =>
+          `<option value="${p}" ${p === task.priority ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`
+      )
+      .join('');
+
+    // Labels with remove buttons
     const labelsHtml =
       task.labels.length > 0
-        ? task.labels.map((l) => `<span class="label">${this.escapeHtml(l)}</span>`).join('')
-        : '<span class="empty-value">None</span>';
+        ? task.labels
+            .map(
+              (l) =>
+                `<span class="label editable-label" data-label="${this.escapeHtml(l)}">${this.escapeHtml(l)} <span class="remove-label">×</span></span>`
+            )
+            .join('')
+        : '';
+    const labelsJson = JSON.stringify(task.labels);
 
     const assigneesHtml =
       task.assignee.length > 0
@@ -174,9 +220,7 @@ export class TaskDetailProvider {
       ? `<span class="milestone">${this.escapeHtml(task.milestone)}</span>`
       : '<span class="empty-value">None</span>';
 
-    const descriptionHtml = task.description
-      ? `<div class="description-content">${this.escapeHtml(task.description)}</div>`
-      : '<span class="empty-value">No description</span>';
+    const descriptionValue = task.description || '';
 
     const acChecked = task.acceptanceCriteria.filter((i) => i.checked).length;
     const acTotal = task.acceptanceCriteria.length;
@@ -417,15 +461,140 @@ export class TaskDetailProvider {
             padding-top: 16px;
             border-top: 1px solid var(--vscode-widget-border);
         }
+        /* Editable elements */
+        .editable-title {
+            font-size: 24px;
+            font-weight: 600;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            color: inherit;
+            width: 100%;
+            padding: 4px 8px;
+            margin: -4px -8px 8px -8px;
+            font-family: inherit;
+        }
+        .editable-title:hover {
+            border-color: var(--vscode-input-border);
+        }
+        .editable-title:focus {
+            outline: none;
+            border-color: var(--vscode-focusBorder);
+            background: var(--vscode-input-background);
+        }
+        .dropdown-select {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid transparent;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .dropdown-select:hover {
+            border-color: var(--vscode-input-border);
+        }
+        .dropdown-select:focus {
+            outline: none;
+            border-color: var(--vscode-focusBorder);
+        }
+        .status-select {
+            background: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+        }
+        .status-select.status-in-progress {
+            background: #3b82f620;
+            color: #3b82f6;
+        }
+        .status-select.status-done {
+            background: #10b98120;
+            color: #10b981;
+        }
+        .status-select.status-draft {
+            background: #6b728020;
+            color: #6b7280;
+        }
+        .priority-select {
+            text-transform: uppercase;
+        }
+        .priority-select.priority-high {
+            background: #dc262620;
+            color: #dc2626;
+        }
+        .priority-select.priority-medium {
+            background: #f59e0b20;
+            color: #f59e0b;
+        }
+        .priority-select.priority-low {
+            background: #10b98120;
+            color: #10b981;
+        }
+        .description-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 12px;
+            background: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 6px;
+            color: inherit;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: 1.5;
+            resize: vertical;
+        }
+        .description-textarea:focus {
+            outline: none;
+            border-color: var(--vscode-focusBorder);
+        }
+        .labels-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
+        }
+        .editable-label {
+            cursor: default;
+        }
+        .remove-label {
+            cursor: pointer;
+            margin-left: 4px;
+            opacity: 0.6;
+        }
+        .remove-label:hover {
+            opacity: 1;
+        }
+        .add-label-input {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            border: 1px dashed var(--vscode-input-border);
+            background: transparent;
+            color: inherit;
+            width: 80px;
+        }
+        .add-label-input:focus {
+            outline: none;
+            border-style: solid;
+            border-color: var(--vscode-focusBorder);
+            background: var(--vscode-input-background);
+        }
+        .add-label-input::placeholder {
+            color: var(--vscode-descriptionForeground);
+        }
     </style>
 </head>
 <body>
     <div class="task-header">
         <div class="task-id">${this.escapeHtml(task.id)}</div>
-        <h1 class="task-title">${this.escapeHtml(task.title)}</h1>
+        <input type="text" class="editable-title" id="titleInput" value="${this.escapeHtml(task.title)}" />
         <div class="task-badges">
-            <span class="status-badge status-${statusClass}">${this.escapeHtml(task.status)}</span>
-            ${task.priority ? `<span class="priority-badge ${priorityClass}">${this.escapeHtml(task.priority)}</span>` : ''}
+            <select class="dropdown-select status-select status-${statusClass}" id="statusSelect">
+                ${statusOptionsHtml}
+            </select>
+            <select class="dropdown-select priority-select ${priorityClass}" id="prioritySelect">
+                <option value="">No Priority</option>
+                ${priorityOptionsHtml}
+            </select>
         </div>
     </div>
 
@@ -434,7 +603,10 @@ export class TaskDetailProvider {
         <div class="meta-grid">
             <div class="meta-item">
                 <div class="meta-label">Labels</div>
-                <div>${labelsHtml}</div>
+                <div class="labels-container" id="labelsContainer" data-labels='${labelsJson}'>
+                    ${labelsHtml}
+                    <input type="text" class="add-label-input" id="addLabelInput" placeholder="+ Add" />
+                </div>
             </div>
             <div class="meta-item">
                 <div class="meta-label">Assignees</div>
@@ -453,7 +625,7 @@ export class TaskDetailProvider {
 
     <div class="section">
         <div class="section-title">Description</div>
-        ${descriptionHtml}
+        <textarea class="description-textarea" id="descriptionTextarea" placeholder="Add a description...">${this.escapeHtml(descriptionValue)}</textarea>
     </div>
 
     <div class="section">
@@ -481,10 +653,12 @@ export class TaskDetailProvider {
     <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
 
+        // Open raw markdown file
         document.getElementById('openFileBtn').addEventListener('click', () => {
             vscode.postMessage({ type: 'openFile' });
         });
 
+        // Navigate to dependency task
         document.querySelectorAll('.dependency-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -493,6 +667,7 @@ export class TaskDetailProvider {
             });
         });
 
+        // Toggle checklist items
         document.querySelectorAll('.checklist-item').forEach(item => {
             item.addEventListener('click', () => {
                 const listType = item.dataset.listType;
@@ -503,6 +678,83 @@ export class TaskDetailProvider {
                     itemId
                 });
             });
+        });
+
+        // Edit title
+        const titleInput = document.getElementById('titleInput');
+        let originalTitle = titleInput.value;
+        titleInput.addEventListener('blur', () => {
+            const newTitle = titleInput.value.trim();
+            if (newTitle && newTitle !== originalTitle) {
+                originalTitle = newTitle;
+                vscode.postMessage({ type: 'updateField', field: 'title', value: newTitle });
+            }
+        });
+        titleInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                titleInput.blur();
+            } else if (e.key === 'Escape') {
+                titleInput.value = originalTitle;
+                titleInput.blur();
+            }
+        });
+
+        // Status dropdown
+        const statusSelect = document.getElementById('statusSelect');
+        statusSelect.addEventListener('change', () => {
+            vscode.postMessage({ type: 'updateField', field: 'status', value: statusSelect.value });
+        });
+
+        // Priority dropdown
+        const prioritySelect = document.getElementById('prioritySelect');
+        prioritySelect.addEventListener('change', () => {
+            const value = prioritySelect.value || undefined;
+            vscode.postMessage({ type: 'updateField', field: 'priority', value });
+        });
+
+        // Description textarea
+        const descriptionTextarea = document.getElementById('descriptionTextarea');
+        let descriptionTimeout;
+        descriptionTextarea.addEventListener('input', () => {
+            clearTimeout(descriptionTimeout);
+            descriptionTimeout = setTimeout(() => {
+                vscode.postMessage({ type: 'updateField', field: 'description', value: descriptionTextarea.value });
+            }, 1000); // Debounce: save after 1s of no typing
+        });
+        descriptionTextarea.addEventListener('blur', () => {
+            clearTimeout(descriptionTimeout);
+            vscode.postMessage({ type: 'updateField', field: 'description', value: descriptionTextarea.value });
+        });
+
+        // Labels management
+        const labelsContainer = document.getElementById('labelsContainer');
+        const addLabelInput = document.getElementById('addLabelInput');
+        let currentLabels = JSON.parse(labelsContainer.dataset.labels || '[]');
+
+        // Remove label
+        document.querySelectorAll('.remove-label').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const labelSpan = btn.parentElement;
+                const labelToRemove = labelSpan.dataset.label;
+                currentLabels = currentLabels.filter(l => l !== labelToRemove);
+                vscode.postMessage({ type: 'updateField', field: 'labels', value: currentLabels });
+            });
+        });
+
+        // Add label
+        addLabelInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const newLabel = addLabelInput.value.trim();
+                if (newLabel && !currentLabels.includes(newLabel)) {
+                    currentLabels.push(newLabel);
+                    vscode.postMessage({ type: 'updateField', field: 'labels', value: currentLabels });
+                }
+                addLabelInput.value = '';
+            } else if (e.key === 'Escape') {
+                addLabelInput.value = '';
+                addLabelInput.blur();
+            }
         });
     </script>
 </body>
