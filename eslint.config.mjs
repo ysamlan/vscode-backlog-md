@@ -24,6 +24,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/', 'node_modules/', '*.js', '*.cjs'],
+    ignores: ['dist/', 'node_modules/', 'out/', '*.js', '*.cjs', 'src/test/e2e/'],
   }
 );
