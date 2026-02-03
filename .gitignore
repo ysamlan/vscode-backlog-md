@@ -4,3 +4,6 @@ dist/
 .vscode-test/
 .DS_Store
 .claude/settings.local.json
+
+# WebdriverIO VS Code service downloads VS Code binaries here
+.wdio-vscode-service/

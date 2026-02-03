@@ -74,4 +74,5 @@ export type ExtensionMessage =
   | { type: 'tasksUpdated'; tasks: Task[] }
   | { type: 'taskUpdated'; task: Task }
   | { type: 'milestonesUpdated'; milestones: Milestone[] }
+  | { type: 'noBacklogFolder' }
   | { type: 'error'; message: string };

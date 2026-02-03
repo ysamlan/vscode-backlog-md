@@ -258,6 +258,23 @@ export class KanbanViewProvider extends BaseViewProvider {
             });
         }
 
+        function renderNoBacklogState() {
+            const app = document.getElementById('app');
+            app.innerHTML = \`
+                <div class="empty-state" style="padding: 40px 20px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+                    <h3 style="margin: 0 0 8px 0; font-weight: 600;">No Backlog Found</h3>
+                    <p style="margin: 0 0 16px 0; color: var(--vscode-descriptionForeground);">
+                        This workspace doesn't have a <code>backlog/</code> folder.
+                    </p>
+                    <p style="margin: 0; font-size: 12px; color: var(--vscode-descriptionForeground);">
+                        To use Backlog.md, create a <code>backlog/tasks/</code> folder<br>
+                        in your project root with markdown task files.
+                    </p>
+                </div>
+            \`;
+        }
+
         window.addEventListener('message', event => {
             const message = event.data;
 
@@ -265,6 +282,9 @@ export class KanbanViewProvider extends BaseViewProvider {
                 case 'tasksUpdated':
                     tasks = message.tasks;
                     render();
+                    break;
+                case 'noBacklogFolder':
+                    renderNoBacklogState();
                     break;
                 case 'error':
                     console.error(message.message);
@@ -286,7 +306,7 @@ export class KanbanViewProvider extends BaseViewProvider {
         break;
 
       case 'openTask': {
-        // Open task detail - we'll implement this later
+        if (!this.parser) break;
         const task = await this.parser.getTask(message.taskId);
         if (task) {
           vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
@@ -295,6 +315,7 @@ export class KanbanViewProvider extends BaseViewProvider {
       }
 
       case 'updateTaskStatus':
+        if (!this.parser) break;
         try {
           const writer = new BacklogWriter();
           await writer.updateTaskStatus(message.taskId, message.status, this.parser);
