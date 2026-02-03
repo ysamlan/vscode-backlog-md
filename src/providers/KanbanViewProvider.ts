@@ -151,12 +151,11 @@ export class KanbanViewProvider extends BaseViewProvider {
     <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
         let tasks = [];
-
-        const columns = [
+        let columns = [
             { status: 'To Do', label: 'To Do' },
             { status: 'In Progress', label: 'In Progress' },
             { status: 'Done', label: 'Done' }
-        ];
+        ]; // Default columns, will be overwritten by config
 
         function render() {
             const app = document.getElementById('app');
@@ -279,6 +278,13 @@ export class KanbanViewProvider extends BaseViewProvider {
             const message = event.data;
 
             switch (message.type) {
+                case 'statusesUpdated':
+                    // Update columns from config
+                    columns = message.statuses.map(status => ({
+                        status: status,
+                        label: status
+                    }));
+                    break;
                 case 'tasksUpdated':
                     tasks = message.tasks;
                     render();
@@ -297,6 +303,33 @@ export class KanbanViewProvider extends BaseViewProvider {
     </script>
 </body>
 </html>`;
+  }
+
+  /**
+   * Override refresh to also send statuses from config
+   */
+  async refresh(): Promise<void> {
+    if (!this._view) return;
+
+    if (!this.parser) {
+      this.postMessage({ type: 'noBacklogFolder' });
+      return;
+    }
+
+    try {
+      // Get both tasks and statuses
+      const [tasks, statuses] = await Promise.all([
+        this.parser.getTasks(),
+        this.parser.getStatuses(),
+      ]);
+
+      // Send statuses first so columns are ready, then tasks
+      this.postMessage({ type: 'statusesUpdated', statuses });
+      this.postMessage({ type: 'tasksUpdated', tasks });
+    } catch (error) {
+      console.error('[Backlog.md] Error refreshing Kanban view:', error);
+      this.postMessage({ type: 'error', message: 'Failed to load tasks' });
+    }
   }
 
   protected async handleMessage(message: WebviewMessage): Promise<void> {
