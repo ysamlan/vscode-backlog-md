@@ -431,48 +431,15 @@ export class TaskDetailProvider {
             gap: 8px;
             flex-wrap: wrap;
         }
+        /* Status and priority badge styles are defined in styles.css for theme support.
+           Task detail uses larger padding for badges. */
         .status-badge {
-            display: inline-block;
             padding: 4px 12px;
-            border-radius: 4px;
             font-size: 12px;
-            font-weight: 600;
-        }
-        .status-to-do {
-            background: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-        }
-        .status-in-progress {
-            background: #3b82f620;
-            color: #3b82f6;
-        }
-        .status-done {
-            background: #10b98120;
-            color: #10b981;
-        }
-        .status-draft {
-            background: #6b728020;
-            color: #6b7280;
         }
         .priority-badge {
-            display: inline-block;
             padding: 4px 12px;
-            border-radius: 4px;
             font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .priority-high {
-            background: #dc262620;
-            color: #dc2626;
-        }
-        .priority-medium {
-            background: #f59e0b20;
-            color: #f59e0b;
-        }
-        .priority-low {
-            background: #10b98120;
-            color: #10b981;
         }
         .section {
             margin-bottom: 24px;
@@ -577,7 +544,7 @@ export class TaskDetailProvider {
             font-weight: normal;
         }
         .progress-indicator.complete {
-            color: #10b981;
+            color: var(--vscode-testing-iconPassed, #10b981);
         }
         .open-file-btn, .archive-btn {
             display: inline-flex;
@@ -623,6 +590,8 @@ export class TaskDetailProvider {
             border-color: var(--vscode-focusBorder);
             background: var(--vscode-input-background);
         }
+        /* Status and priority select dropdown styles are defined in styles.css for theme support.
+           The dropdown-select class provides base styles, status-select and priority-select add colors. */
         .dropdown-select {
             padding: 4px 8px;
             border-radius: 4px;
@@ -638,37 +607,6 @@ export class TaskDetailProvider {
         .dropdown-select:focus {
             outline: none;
             border-color: var(--vscode-focusBorder);
-        }
-        .status-select {
-            background: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-        }
-        .status-select.status-in-progress {
-            background: #3b82f620;
-            color: #3b82f6;
-        }
-        .status-select.status-done {
-            background: #10b98120;
-            color: #10b981;
-        }
-        .status-select.status-draft {
-            background: #6b728020;
-            color: #6b7280;
-        }
-        .priority-select {
-            text-transform: uppercase;
-        }
-        .priority-select.priority-high {
-            background: #dc262620;
-            color: #dc2626;
-        }
-        .priority-select.priority-medium {
-            background: #f59e0b20;
-            color: #f59e0b;
-        }
-        .priority-select.priority-low {
-            background: #10b98120;
-            color: #10b981;
         }
         .description-textarea {
             width: 100%;

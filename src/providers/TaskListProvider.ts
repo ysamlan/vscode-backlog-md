@@ -60,14 +60,14 @@ export class TaskListProvider extends BaseViewProvider {
         .filter-btn {
             padding: 4px 10px;
             font-size: 11px;
-            border: 1px solid var(--vscode-button-border);
-            background: transparent;
-            color: var(--vscode-button-foreground);
+            border: 1px solid var(--vscode-button-secondaryBackground, var(--vscode-widget-border));
+            background: var(--vscode-button-secondaryBackground, transparent);
+            color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
             border-radius: 4px;
             cursor: pointer;
         }
         .filter-btn:hover {
-            background: var(--vscode-button-hoverBackground);
+            background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
         }
         .filter-btn.active {
             background: var(--vscode-button-background);
@@ -101,44 +101,7 @@ export class TaskListProvider extends BaseViewProvider {
         .task-table tr {
             cursor: pointer;
         }
-        .status-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 600;
-        }
-        .status-todo {
-            background: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-        }
-        .status-in-progress {
-            background: #3b82f620;
-            color: #3b82f6;
-        }
-        .status-done {
-            background: #10b98120;
-            color: #10b981;
-        }
-        .priority-badge {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            font-weight: 600;
-        }
-        .priority-high {
-            background: #dc262620;
-            color: #dc2626;
-        }
-        .priority-medium {
-            background: #f59e0b20;
-            color: #f59e0b;
-        }
-        .priority-low {
-            background: #10b98120;
-            color: #10b981;
-        }
+        /* Status and priority badge styles are defined in styles.css for theme support */
         .empty-state {
             color: var(--vscode-descriptionForeground);
             text-align: center;

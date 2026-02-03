@@ -97,25 +97,7 @@ export class KanbanViewProvider extends BaseViewProvider {
             flex-wrap: wrap;
             align-items: center;
         }
-        .priority-badge {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            text-transform: uppercase;
-            font-weight: 600;
-        }
-        .priority-high {
-            background: #dc262620;
-            color: #dc2626;
-        }
-        .priority-medium {
-            background: #f59e0b20;
-            color: #f59e0b;
-        }
-        .priority-low {
-            background: #10b98120;
-            color: #10b981;
-        }
+        /* Priority badge styles are defined in styles.css for theme support */
         .task-label {
             font-size: 10px;
             padding: 2px 6px;

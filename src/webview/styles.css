@@ -69,3 +69,123 @@ body {
 ::-webkit-scrollbar-thumb:active {
   background: var(--vscode-scrollbarSlider-activeBackground);
 }
+
+/* Priority badge styles - theme-aware colors */
+.priority-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.priority-high {
+  background-color: var(--vscode-inputValidation-errorBackground, rgba(220, 38, 38, 0.15));
+  color: var(--vscode-errorForeground, #dc2626);
+  border: 1px solid var(--vscode-inputValidation-errorBorder, transparent);
+}
+
+.priority-medium {
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(245, 158, 11, 0.15));
+  color: var(--vscode-editorWarning-foreground, #f59e0b);
+  border: 1px solid var(--vscode-inputValidation-warningBorder, transparent);
+}
+
+.priority-low {
+  background-color: var(--vscode-inputValidation-infoBackground, rgba(16, 185, 129, 0.15));
+  color: var(--vscode-testing-iconPassed, #10b981);
+  border: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
+}
+
+/* Status badge styles - theme-aware colors */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.status-to-do,
+.status-todo {
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+
+.status-in-progress {
+  background-color: var(--vscode-progressBar-background, rgba(59, 130, 246, 0.15));
+  color: var(--vscode-textLink-foreground, #3b82f6);
+}
+
+.status-done {
+  background-color: var(--vscode-testing-iconPassed, rgba(16, 185, 129, 0.15));
+  color: var(--vscode-testing-iconPassed, #10b981);
+}
+
+.status-draft {
+  background-color: var(--vscode-disabledForeground, rgba(107, 114, 128, 0.15));
+  color: var(--vscode-disabledForeground, #6b7280);
+}
+
+/* Status and priority select dropdowns - theme-aware */
+.status-select,
+.priority-select {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.status-select:hover,
+.priority-select:hover {
+  border-color: var(--vscode-input-border);
+}
+
+.status-select:focus,
+.priority-select:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder);
+}
+
+.status-select {
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+
+.status-select.status-in-progress {
+  background-color: var(--vscode-progressBar-background, rgba(59, 130, 246, 0.15));
+  color: var(--vscode-textLink-foreground, #3b82f6);
+}
+
+.status-select.status-done {
+  background-color: var(--vscode-testing-iconPassed, rgba(16, 185, 129, 0.15));
+  color: var(--vscode-testing-iconPassed, #10b981);
+}
+
+.status-select.status-draft {
+  background-color: var(--vscode-disabledForeground, rgba(107, 114, 128, 0.15));
+  color: var(--vscode-disabledForeground, #6b7280);
+}
+
+.priority-select {
+  text-transform: uppercase;
+}
+
+.priority-select.priority-high {
+  background-color: var(--vscode-inputValidation-errorBackground, rgba(220, 38, 38, 0.15));
+  color: var(--vscode-errorForeground, #dc2626);
+}
+
+.priority-select.priority-medium {
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(245, 158, 11, 0.15));
+  color: var(--vscode-editorWarning-foreground, #f59e0b);
+}
+
+.priority-select.priority-low {
+  background-color: var(--vscode-inputValidation-infoBackground, rgba(16, 185, 129, 0.15));
+  color: var(--vscode-testing-iconPassed, #10b981);
+}
