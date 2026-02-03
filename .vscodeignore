@@ -1,0 +1,26 @@
+# Development files
+.vscode/**
+.vscode-test/**
+src/**
+out/**
+node_modules/**
+.gitignore
+.prettierignore
+.mocharc.json
+tsconfig.json
+tsconfig.e2e.json
+eslint.config.mjs
+esbuild.js
+vitest.config.ts
+*.vsix
+
+# Backlog (development task tracking)
+backlog/**
+
+# Documentation (not needed in extension)
+docs/**
+CLAUDE.md
+.claude/**
+
+# Test fixtures
+src/test/**
