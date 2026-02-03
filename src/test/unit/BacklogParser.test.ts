@@ -606,6 +606,159 @@ status: ${status}
     });
   });
 
+  describe('New Fields: references, documentation, type, plan', () => {
+    it('should parse references array from frontmatter', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test with references
+status: To Do
+references:
+  - https://github.com/org/repo/issues/123
+  - docs/design.md
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.references).toEqual([
+        'https://github.com/org/repo/issues/123',
+        'docs/design.md',
+      ]);
+    });
+
+    it('should parse documentation array from frontmatter', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test with documentation
+status: To Do
+documentation:
+  - https://docs.example.com/api
+  - README.md
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.documentation).toEqual(['https://docs.example.com/api', 'README.md']);
+    });
+
+    it('should parse type field from frontmatter', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test with type
+status: To Do
+type: feature
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.type).toBe('feature');
+    });
+
+    it('should parse ## Plan section content', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test with plan
+status: To Do
+---
+
+## Plan
+
+1. First step
+2. Second step
+3. Third step
+
+## Acceptance Criteria
+
+- [ ] #1 Test
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.plan).toBe('1. First step\n2. Second step\n3. Third step');
+    });
+
+    it('should parse ## Implementation Plan section as plan', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test with implementation plan
+status: To Do
+---
+
+## Implementation Plan
+
+- Step A
+- Step B
+
+## Description
+
+Some description
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.plan).toBe('- Step A\n- Step B');
+    });
+
+    it('should handle missing new fields gracefully', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Minimal task
+status: To Do
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.references).toBeUndefined();
+      expect(task?.documentation).toBeUndefined();
+      expect(task?.type).toBeUndefined();
+      expect(task?.plan).toBeUndefined();
+    });
+
+    it('should handle references as single string', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+references: https://example.com/single
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.references).toEqual(['https://example.com/single']);
+    });
+
+    it('should handle documentation as single string', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+documentation: docs/README.md
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.documentation).toEqual(['docs/README.md']);
+    });
+
+    it('should not confuse ## Plan with ## Implementation Notes', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Plan
+
+This is the plan content.
+
+## Implementation Notes
+
+These are implementation notes.
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.plan).toBe('This is the plan content.');
+      expect(task?.implementationNotes).toBe('These are implementation notes.');
+    });
+  });
+
   describe('Edge Cases: Section Parsing', () => {
     it('should handle description without markers', () => {
       const parser = new BacklogParser('/fake/path');

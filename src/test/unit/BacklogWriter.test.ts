@@ -758,6 +758,115 @@ With blank line above`;
     });
   });
 
+  describe('New Fields: references, documentation, type', () => {
+    it('should update references array', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask(
+        'TASK-1',
+        { references: ['https://github.com/issue/1', 'docs/spec.md'] },
+        mockParser
+      );
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.references).toEqual(['https://github.com/issue/1', 'docs/spec.md']);
+    });
+
+    it('should update documentation array', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask(
+        'TASK-1',
+        { documentation: ['https://docs.example.com', 'README.md'] },
+        mockParser
+      );
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.documentation).toEqual(['https://docs.example.com', 'README.md']);
+    });
+
+    it('should update type field', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { type: 'feature' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.type).toBe('feature');
+    });
+
+    it('should preserve existing references when updating other fields', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+references:
+  - existing-ref.md
+documentation:
+  - existing-doc.md
+type: bug
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.references).toEqual(['existing-ref.md']);
+      expect(frontmatter.documentation).toEqual(['existing-doc.md']);
+      expect(frontmatter.type).toBe('bug');
+    });
+
+    it('should handle empty references array', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+references:
+  - old-ref.md
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { references: [] }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.references).toEqual([]);
+    });
+  });
+
   describe('Edge Cases: YAML Serialization', () => {
     it('should handle empty arrays properly', async () => {
       const content = `---

@@ -176,6 +176,7 @@ export class BacklogParser {
     const descriptionLines: string[] = [];
     const notesLines: string[] = [];
     const summaryLines: string[] = [];
+    const planLines: string[] = [];
     let inDescriptionBlock = false;
 
     for (let i = lineIndex; i < lines.length; i++) {
@@ -211,8 +212,11 @@ export class BacklogParser {
           currentSection = 'acceptance';
         } else if (sectionName.includes('definition of done')) {
           currentSection = 'dod';
-        } else if (sectionName.includes('implementation') || sectionName.includes('notes')) {
+        } else if (sectionName.includes('implementation notes') || sectionName === 'notes') {
           currentSection = 'notes';
+        } else if (sectionName.includes('plan')) {
+          // "## Plan" or "## Implementation Plan" but NOT "## Implementation Notes"
+          currentSection = 'plan';
         } else if (sectionName.includes('final summary') || sectionName.includes('summary')) {
           currentSection = 'summary';
         } else {
@@ -242,12 +246,15 @@ export class BacklogParser {
         notesLines.push(line);
       } else if (currentSection === 'summary' && trimmedLine && !trimmedLine.startsWith('<!--')) {
         summaryLines.push(line);
+      } else if (currentSection === 'plan' && trimmedLine && !trimmedLine.startsWith('<!--')) {
+        planLines.push(line);
       }
     }
 
     task.description = descriptionLines.join('\n').trim() || undefined;
     task.implementationNotes = notesLines.join('\n').trim() || undefined;
     task.finalSummary = summaryLines.join('\n').trim() || undefined;
+    task.plan = planLines.join('\n').trim() || undefined;
 
     return task.title ? task : undefined;
   }
@@ -288,6 +295,15 @@ export class BacklogParser {
     }
     if (fm.parent) {
       task.parentTaskId = String(fm.parent);
+    }
+    if (fm.references) {
+      task.references = this.normalizeStringArray(fm.references);
+    }
+    if (fm.documentation) {
+      task.documentation = this.normalizeStringArray(fm.documentation);
+    }
+    if (fm.type) {
+      task.type = String(fm.type);
     }
   }
 

@@ -29,6 +29,9 @@ interface FrontmatterData {
   labels?: string[];
   assignee?: string[];
   dependencies?: string[];
+  references?: string[];
+  documentation?: string[];
+  type?: string;
   created_date?: string;
   updated_date?: string;
   [key: string]: unknown;
@@ -82,6 +85,15 @@ export class BacklogWriter {
     }
     if (updates.dependencies !== undefined) {
       frontmatter.dependencies = updates.dependencies;
+    }
+    if (updates.references !== undefined) {
+      frontmatter.references = updates.references;
+    }
+    if (updates.documentation !== undefined) {
+      frontmatter.documentation = updates.documentation;
+    }
+    if (updates.type !== undefined) {
+      frontmatter.type = updates.type;
     }
 
     // Update the updated_date
