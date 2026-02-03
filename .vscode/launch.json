@@ -6,8 +6,8 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "${workspaceFolder}",
-        "--extensionDevelopmentPath=${workspaceFolder}"
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--folder-uri=file://${workspaceFolder}"
       ],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "preLaunchTask": "npm: build"
@@ -17,8 +17,8 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "${workspaceFolder}/src/test/e2e/fixtures/test-workspace",
-        "--extensionDevelopmentPath=${workspaceFolder}"
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--folder-uri=file://${workspaceFolder}/src/test/e2e/fixtures/test-workspace"
       ],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "preLaunchTask": "npm: build"
