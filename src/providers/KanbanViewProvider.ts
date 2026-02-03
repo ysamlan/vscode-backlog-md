@@ -354,6 +354,27 @@ export class KanbanViewProvider extends BaseViewProvider {
           this.postMessage({ type: 'error', message: 'Failed to update task status' });
         }
         break;
+
+      case 'archiveTask': {
+        if (!this.parser || !message.taskId) break;
+        const task = await this.parser.getTask(message.taskId);
+        const confirmation = await vscode.window.showWarningMessage(
+          `Archive task "${task?.title}"?`,
+          { modal: true },
+          'Archive'
+        );
+
+        if (confirmation === 'Archive') {
+          try {
+            const writer = new BacklogWriter();
+            await writer.archiveTask(message.taskId, this.parser);
+            await this.refresh();
+          } catch (error) {
+            vscode.window.showErrorMessage(`Failed to archive: ${error}`);
+          }
+        }
+        break;
+      }
     }
   }
 }

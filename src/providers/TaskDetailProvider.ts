@@ -153,6 +153,30 @@ export class TaskDetailProvider {
           }
         }
         break;
+
+      case 'archiveTask': {
+        if (!TaskDetailProvider.currentTaskId || !this.parser) break;
+
+        const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        if (!task) break;
+
+        const confirmation = await vscode.window.showWarningMessage(
+          `Archive task "${task.title}"? It will be moved to backlog/archive/tasks/`,
+          { modal: true },
+          'Archive'
+        );
+
+        if (confirmation === 'Archive') {
+          try {
+            await this.writer.archiveTask(TaskDetailProvider.currentTaskId, this.parser);
+            vscode.window.showInformationMessage(`Task ${TaskDetailProvider.currentTaskId} archived`);
+            TaskDetailProvider.currentPanel?.dispose();
+          } catch (error) {
+            vscode.window.showErrorMessage(`Failed to archive task: ${error}`);
+          }
+        }
+        break;
+      }
     }
   }
 
@@ -460,7 +484,7 @@ export class TaskDetailProvider {
         .progress-indicator.complete {
             color: #10b981;
         }
-        .open-file-btn {
+        .open-file-btn, .archive-btn {
             display: inline-flex;
             align-items: center;
             gap: 6px;
@@ -474,6 +498,9 @@ export class TaskDetailProvider {
         }
         .open-file-btn:hover {
             background: var(--vscode-button-hoverBackground);
+        }
+        .archive-btn:hover {
+            background: var(--vscode-button-secondaryHoverBackground);
         }
         .actions {
             margin-top: 24px;
@@ -777,7 +804,12 @@ export class TaskDetailProvider {
 
     <div class="actions">
         <button class="open-file-btn" id="openFileBtn">
-            📄 Open Raw Markdown
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            Open Raw Markdown
+        </button>
+        <button class="archive-btn" id="archiveBtn" style="background-color: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); margin-left: 8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+            Archive Task
         </button>
     </div>
 
@@ -921,6 +953,11 @@ export class TaskDetailProvider {
                 addLabelInput.value = '';
                 addLabelInput.blur();
             }
+        });
+
+        // Archive task
+        document.getElementById('archiveBtn').addEventListener('click', () => {
+            vscode.postMessage({ type: 'archiveTask', taskId: '${task.id}' });
         });
     </script>
 </body>

@@ -116,6 +116,13 @@ The extension activates when it detects `backlog/tasks/*.md` files.
 - `src/webview/` - Webview UI (HTML/CSS/JS embedded in providers)
 - `src/test/` - Unit and integration tests
 
+### UI Guidelines
+
+**Icons**: Use Lucide icons (inline SVG) instead of emojis in webviews. The `lucide` package is already a dependency. Example:
+```html
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">...</svg>
+```
+
 ### Known Issues / Tech Debt
 
 - Webviews use inline styles instead of external CSS (TASK-46)
