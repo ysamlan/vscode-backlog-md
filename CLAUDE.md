@@ -74,11 +74,32 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 - `npm run watch` - Watch mode for development
 - `npm run build` - Build CSS + extension
 - `npm test` - Run unit tests (vitest)
+- `npm run test:webview` - Run Cypress webview UI tests
+- `npm run test:webview:open` - Open Cypress interactive mode
+- `npm run test:e2e` - Run VS Code extension e2e tests
 - `npm run lint` - ESLint check
 - `npm run format` - Format with Prettier
 - `npm run typecheck` - TypeScript type checking
 
-### Testing the Extension
+### Testing Strategy
+
+**Three-tier approach:**
+
+1. **Unit tests** (`npm test`) - Vitest with vscode API mocking for core logic
+2. **Webview UI tests** (`npm run test:webview`) - Cypress standalone for webview interactions
+3. **Extension e2e tests** (`npm run test:e2e`) - vscode-extension-tester for extension activation
+
+**Webview testing pattern** (based on Nx Console approach):
+- Webview HTML is served standalone via Vite (`npm run webview:serve`)
+- `acquireVsCodeApi()` is mocked to capture postMessage calls
+- Tests verify UI interactions send correct messages to extension
+
+Reference repos for webview testing patterns:
+- [Nx Console](https://github.com/nrwl/nx-console/tree/master/apps/generate-ui-v2-e2e) - Cypress standalone
+- [wdio-vscode-service](https://github.com/webdriverio-community/wdio-vscode-service) - Frame switching
+- [Marquee](https://github.com/stateful/marquee) - vscode API mocking
+
+### Testing the Extension Manually
 
 1. Run `npm run build` to compile everything
 2. Press **F5** to launch Extension Development Host

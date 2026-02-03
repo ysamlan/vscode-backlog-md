@@ -20,6 +20,27 @@ npm run build
 
 Press **F5** to launch the Extension Development Host and test the extension.
 
+### Testing
+
+```bash
+# Unit tests (core logic)
+npm test
+
+# Webview UI tests (Cypress)
+npm run test:webview
+
+# Interactive Cypress mode
+npm run test:webview:open
+
+# Extension e2e tests
+npm run test:e2e
+```
+
+The project uses a three-tier testing strategy:
+1. **Unit tests** - Vitest for parser, writer, and business logic
+2. **Webview UI tests** - Cypress standalone for testing webview interactions
+3. **Extension e2e tests** - vscode-extension-tester for full integration
+
 ## Requirements
 
 - VS Code 1.85.0 or later

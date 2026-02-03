@@ -88,6 +88,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build && tsc -p tsconfig.e2e.json && fnm exec --using=22 -- npx extest setup-and-run 'out/test/e2e/*.test.js' --mocha_config .mocharc.json",
+    "test:webview": "concurrently --kill-others --success first \"vite\" \"wait-on http://localhost:5173 && cypress run\"",
+    "test:webview:open": "concurrently --kill-others \"vite\" \"wait-on http://localhost:5173 && cypress open\"",
+    "webview:serve": "vite",
     "lint": "eslint src",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -103,6 +106,8 @@
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
     "chai": "^6.2.2",
+    "concurrently": "^9.2.1",
+    "cypress": "^15.9.0",
     "esbuild": "^0.20.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
@@ -110,8 +115,10 @@
     "tailwindcss": "^4.0.0",
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.54.0",
+    "vite": "^5.4.21",
     "vitest": "^1.2.0",
-    "vscode-extension-tester": "^8.11.1"
+    "vscode-extension-tester": "^8.11.1",
+    "wait-on": "^9.0.3"
   },
   "dependencies": {
     "js-yaml": "^4.1.1",
