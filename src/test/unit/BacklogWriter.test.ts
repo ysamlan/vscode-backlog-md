@@ -317,5 +317,416 @@ Old description
 
       expect(result.filePath).toContain('task-1 - Fix-bug-123-urgent.md');
     });
+
+    it('should handle task ID generation with gaps', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      // Files with gaps: 1, 3, 5, 10 - should create task-11
+      mockReaddirSync(['task-1.md', 'task-3.md', 'task-5.md', 'task-10.md']);
+
+      const result = await writer.createTask('/fake/backlog', {
+        title: 'Gap Test',
+      });
+
+      expect(result.id).toBe('TASK-11');
+    });
+
+    it('should handle empty tasks directory', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createTask('/fake/backlog', {
+        title: 'First Task',
+      });
+
+      expect(result.id).toBe('TASK-1');
+    });
+
+    it('should handle title with only special characters', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createTask('/fake/backlog', {
+        title: '!@#$%^&*()',
+      });
+
+      // Should still create a file with sanitized (possibly empty) title portion
+      expect(result.filePath).toContain('task-1');
+    });
+
+    it('should handle title with unicode characters', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      await writer.createTask('/fake/backlog', {
+        title: '🚀 Feature with émojis and café',
+      });
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('🚀 Feature with émojis and café');
+    });
+
+    it('should handle very long title by truncating filename', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const longTitle = 'A'.repeat(200);
+      const result = await writer.createTask('/fake/backlog', {
+        title: longTitle,
+      });
+
+      // Filename should be truncated but full title preserved in content
+      expect(result.filePath.length).toBeLessThan(200);
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain(longTitle);
+    });
+  });
+
+  describe('Edge Cases: updateTask', () => {
+    it('should throw error when task not found', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      await expect(
+        writer.updateTask('TASK-999', { status: 'Done' }, mockParser)
+      ).rejects.toThrow('Task TASK-999 not found');
+    });
+
+    it('should preserve all fields when updating single field', async () => {
+      const content = `---
+id: TASK-1
+title: Original Title
+status: To Do
+priority: high
+labels:
+  - bug
+  - urgent
+milestone: v1.0
+assignee:
+  - alice
+---
+
+## Description
+
+Original description
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+
+      expect(frontmatter.status).toBe('Done');
+      expect(frontmatter.title).toBe('Original Title');
+      expect(frontmatter.priority).toBe('high');
+      expect(frontmatter.labels).toEqual(['bug', 'urgent']);
+      expect(frontmatter.milestone).toBe('v1.0');
+    });
+
+    it('should add description markers when updating description without markers', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+Old description without markers
+
+## Acceptance Criteria
+
+- [ ] #1 Test
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { description: 'New description' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('<!-- SECTION:DESCRIPTION:BEGIN -->');
+      expect(writtenContent).toContain('New description');
+      expect(writtenContent).toContain('<!-- SECTION:DESCRIPTION:END -->');
+    });
+
+    it('should handle task file without frontmatter', async () => {
+      const content = `# TASK-1 - No Frontmatter Task
+
+## Description
+
+Just a plain markdown file
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      // Parser can find task by extracting title from heading
+      // The update should succeed and add frontmatter
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      // Should write the updated content (frontmatter may be added)
+      expect(fs.writeFileSync).toHaveBeenCalled();
+      // The file content should still contain the description
+      expect(writtenContent).toContain('Just a plain markdown file');
+    });
+
+    it('should handle file with malformed frontmatter', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: {malformed: yaml:
+---
+
+## Description
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      // Should handle gracefully - parser might return undefined for malformed YAML
+      await expect(
+        writer.updateTask('TASK-1', { status: 'Done' }, mockParser)
+      ).rejects.toThrow(); // Will throw because parser returns undefined for malformed YAML
+    });
+  });
+
+  describe('Edge Cases: toggleChecklistItem', () => {
+    it('should handle toggle of non-existent item ID gracefully', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Acceptance Criteria
+
+- [ ] #1 First item
+- [ ] #2 Second item
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      // Toggle non-existent #999 - should not throw, just not change anything
+      await writer.toggleChecklistItem('TASK-1', 'acceptanceCriteria', 999, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      // Original items should be unchanged
+      expect(writtenContent).toContain('- [ ] #1 First item');
+      expect(writtenContent).toContain('- [ ] #2 Second item');
+    });
+
+    it('should handle checklist item with special regex characters', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Acceptance Criteria
+
+- [ ] #1 Fix $100.00 bug (urgent!)
+- [ ] #2 Test [link](url) and *bold*
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.toggleChecklistItem('TASK-1', 'acceptanceCriteria', 1, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('- [x] #1 Fix $100.00 bug (urgent!)');
+    });
+
+    it('should toggle definition of done items', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Definition of Done
+
+- [ ] #1 Code reviewed
+- [ ] #2 Tests passing
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.toggleChecklistItem('TASK-1', 'definitionOfDone', 2, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('- [ ] #1 Code reviewed');
+      expect(writtenContent).toContain('- [x] #2 Tests passing');
+    });
+
+    it('should handle multiple items with same ID gracefully', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Acceptance Criteria
+
+- [ ] #1 First with ID 1
+- [ ] #1 Second with same ID 1
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.toggleChecklistItem('TASK-1', 'acceptanceCriteria', 1, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      // Both should be toggled since they have the same ID
+      expect(writtenContent).toContain('- [x] #1 First with ID 1');
+      expect(writtenContent).toContain('- [x] #1 Second with same ID 1');
+    });
+  });
+
+  describe('Edge Cases: Description Updates', () => {
+    it('should handle updating description with nested markers', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Old content with <!-- nested comment -->
+<!-- SECTION:DESCRIPTION:END -->
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { description: 'New clean description' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('New clean description');
+      expect(writtenContent).not.toContain('Old content');
+    });
+
+    it('should handle description with code blocks containing markers', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Here is some code:
+\`\`\`html
+<!-- SECTION:DESCRIPTION:BEGIN -->
+This is inside a code block
+<!-- SECTION:DESCRIPTION:END -->
+\`\`\`
+<!-- SECTION:DESCRIPTION:END -->
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { description: 'Updated description' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('Updated description');
+    });
+
+    it('should add description section when file has no description header', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Acceptance Criteria
+
+- [ ] #1 Test
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { description: 'Added description' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('## Description');
+      expect(writtenContent).toContain('Added description');
+    });
+
+    it('should handle description with multiline content', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Old
+<!-- SECTION:DESCRIPTION:END -->
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      const multilineDesc = `Line 1
+Line 2
+Line 3
+
+With blank line above`;
+
+      await writer.updateTask('TASK-1', { description: multilineDesc }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('Line 1');
+      expect(writtenContent).toContain('Line 2');
+      expect(writtenContent).toContain('With blank line above');
+    });
+  });
+
+  describe('Edge Cases: YAML Serialization', () => {
+    it('should handle empty arrays properly', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+labels: []
+assignee: []
+dependencies: []
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+
+      expect(frontmatter.labels).toEqual([]);
+      expect(frontmatter.assignee).toEqual([]);
+    });
+
+    it('should handle special characters in string fields', async () => {
+      const content = `---
+id: TASK-1
+title: "Test: with special chars (urgent!) & more"
+status: To Do
+milestone: "v1.0-beta.1"
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      // Should preserve the special characters
+      expect(writtenContent).toContain('Test: with special chars (urgent!) & more');
+      expect(writtenContent).toContain('v1.0-beta.1');
+    });
   });
 });
