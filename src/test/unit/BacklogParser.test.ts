@@ -1,5 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { BacklogParser } from '../../core/BacklogParser';
+import * as fs from 'fs';
+
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+  };
+});
 
 describe('BacklogParser', () => {
   describe('parseTaskContent', () => {
@@ -153,6 +163,74 @@ status: To Do
         '/fake/path/task-42 - Some-Task-Name.md'
       );
       expect(task?.id).toBe('TASK-42');
+    });
+  });
+
+  describe('getConfig', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should parse config.yml and return BacklogConfig', async () => {
+      const configContent = `
+project_name: "Test Project"
+statuses: ["To Do", "In Progress", "Review", "Done"]
+labels: ["bug", "feature"]
+`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config.project_name).toBe('Test Project');
+      expect(config.statuses).toEqual(['To Do', 'In Progress', 'Review', 'Done']);
+      expect(config.labels).toEqual(['bug', 'feature']);
+    });
+
+    it('should return empty config when no config file exists', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config).toEqual({});
+    });
+
+    it('should handle malformed YAML gracefully', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('invalid: yaml: content: [');
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config).toEqual({});
+    });
+  });
+
+  describe('getStatuses', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return statuses from config', async () => {
+      const configContent = `statuses: ["Backlog", "Active", "Complete"]`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const statuses = await parser.getStatuses();
+
+      expect(statuses).toEqual(['Backlog', 'Active', 'Complete']);
+    });
+
+    it('should return default statuses when config has none', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const statuses = await parser.getStatuses();
+
+      expect(statuses).toEqual(['To Do', 'In Progress', 'Done']);
     });
   });
 });

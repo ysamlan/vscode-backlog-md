@@ -1,6 +1,24 @@
 import * as fs from 'fs';
+import * as yaml from 'js-yaml';
 import { Task, TaskStatus } from './types';
 import { BacklogParser } from './BacklogParser';
+
+/**
+ * Raw frontmatter structure for YAML serialization
+ */
+interface FrontmatterData {
+  id?: string;
+  title?: string;
+  status?: string;
+  priority?: string;
+  milestone?: string;
+  labels?: string[];
+  assignee?: string[];
+  dependencies?: string[];
+  created_date?: string;
+  updated_date?: string;
+  [key: string]: unknown;
+}
 
 /**
  * Writes changes back to Backlog.md task files
@@ -14,15 +32,7 @@ export class BacklogWriter {
     newStatus: TaskStatus,
     parser: BacklogParser
   ): Promise<void> {
-    const task = await parser.getTask(taskId);
-    if (!task) {
-      throw new Error(`Task ${taskId} not found`);
-    }
-
-    const content = fs.readFileSync(task.filePath, 'utf-8');
-    const updatedContent = this.replaceStatus(content, newStatus);
-
-    fs.writeFileSync(task.filePath, updatedContent, 'utf-8');
+    await this.updateTask(taskId, { status: newStatus }, parser);
   }
 
   /**
@@ -34,21 +44,35 @@ export class BacklogWriter {
       throw new Error(`Task ${taskId} not found`);
     }
 
-    let content = fs.readFileSync(task.filePath, 'utf-8');
+    const content = fs.readFileSync(task.filePath, 'utf-8');
+    const { frontmatter, body } = this.extractFrontmatter(content);
 
+    // Apply updates to frontmatter
     if (updates.status !== undefined) {
-      content = this.replaceStatus(content, updates.status);
+      frontmatter.status = updates.status;
     }
-
     if (updates.priority !== undefined) {
-      content = this.replacePriority(content, updates.priority);
+      frontmatter.priority = updates.priority;
     }
-
     if (updates.title !== undefined) {
-      content = this.replaceTitle(content, task.id, updates.title);
+      frontmatter.title = updates.title;
+    }
+    if (updates.labels !== undefined) {
+      frontmatter.labels = updates.labels;
+    }
+    if (updates.milestone !== undefined) {
+      frontmatter.milestone = updates.milestone;
+    }
+    if (updates.assignee !== undefined) {
+      frontmatter.assignee = updates.assignee;
     }
 
-    fs.writeFileSync(task.filePath, content, 'utf-8');
+    // Update the updated_date
+    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+
+    // Reconstruct the file
+    const updatedContent = this.reconstructFile(frontmatter, body);
+    fs.writeFileSync(task.filePath, updatedContent, 'utf-8');
   }
 
   /**
@@ -56,7 +80,7 @@ export class BacklogWriter {
    */
   async toggleChecklistItem(
     taskId: string,
-    listType: 'acceptanceCriteria' | 'definitionOfDone',
+    _listType: 'acceptanceCriteria' | 'definitionOfDone',
     itemId: number,
     parser: BacklogParser
   ): Promise<void> {
@@ -67,9 +91,10 @@ export class BacklogWriter {
 
     let content = fs.readFileSync(task.filePath, 'utf-8');
 
-    // Find and toggle the specific checklist item
+    // Find and toggle the specific checklist item by its #id
+    // This is in the markdown body, not YAML, so regex is appropriate here
     const regex = new RegExp(`^(- \\[)([ xX])(\\]\\s*#${itemId}\\s+.*)$`, 'gm');
-    content = content.replace(regex, (match, prefix, check, suffix) => {
+    content = content.replace(regex, (_match, prefix, check, suffix) => {
       const newCheck = check === ' ' ? 'x' : ' ';
       return `${prefix}${newCheck}${suffix}`;
     });
@@ -77,68 +102,54 @@ export class BacklogWriter {
     fs.writeFileSync(task.filePath, content, 'utf-8');
   }
 
-  private replaceStatus(content: string, newStatus: TaskStatus): string {
-    // Replace status line with appropriate symbol
-    const statusSymbol = this.getStatusSymbol(newStatus);
-    const statusRegex = /^(Status:\s*)[○◒●◑]?\s*.*$/m;
+  /**
+   * Extract YAML frontmatter and body from file content
+   */
+  private extractFrontmatter(content: string): { frontmatter: FrontmatterData; body: string } {
+    const lines = content.split('\n');
 
-    if (statusRegex.test(content)) {
-      return content.replace(statusRegex, `$1${statusSymbol} ${newStatus}`);
+    if (lines[0]?.trim() !== '---') {
+      // No frontmatter, return empty object and full content as body
+      return { frontmatter: {}, body: content };
     }
 
-    // If no status line found, add one after the title
-    const lines = content.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].startsWith('# ')) {
-        lines.splice(i + 1, 0, '', `Status: ${statusSymbol} ${newStatus}`);
+    // Find closing ---
+    let endIndex = -1;
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i]?.trim() === '---') {
+        endIndex = i;
         break;
       }
     }
-    return lines.join('\n');
-  }
 
-  private replacePriority(content: string, newPriority: string | undefined): string {
-    const priorityRegex = /^(Priority:\s*).*$/m;
-    const capitalizedPriority = newPriority
-      ? newPriority.charAt(0).toUpperCase() + newPriority.slice(1)
-      : '';
-
-    if (priorityRegex.test(content)) {
-      if (newPriority) {
-        return content.replace(priorityRegex, `$1${capitalizedPriority}`);
-      } else {
-        // Remove priority line if setting to undefined
-        return content.replace(/^Priority:\s*.*\n?/m, '');
-      }
+    if (endIndex === -1) {
+      // Malformed frontmatter
+      return { frontmatter: {}, body: content };
     }
 
-    // If no priority line found and we want to add one
-    if (newPriority) {
-      const statusRegex = /^(Status:\s*.*)$/m;
-      return content.replace(statusRegex, `$1\nPriority: ${capitalizedPriority}`);
-    }
+    const frontmatterYaml = lines.slice(1, endIndex).join('\n');
+    const body = lines.slice(endIndex + 1).join('\n');
 
-    return content;
+    try {
+      const frontmatter = (yaml.load(frontmatterYaml) as FrontmatterData) || {};
+      return { frontmatter, body };
+    } catch {
+      return { frontmatter: {}, body: content };
+    }
   }
 
-  private replaceTitle(content: string, taskId: string, newTitle: string): string {
-    // Replace the title in the heading
-    const titleRegex = new RegExp(`^(#\\s+(?:${taskId}\\s*-\\s*)?).*$`, 'mi');
-    return content.replace(titleRegex, `$1${newTitle}`);
-  }
+  /**
+   * Reconstruct file from frontmatter and body
+   */
+  private reconstructFile(frontmatter: FrontmatterData, body: string): string {
+    // Use yaml.dump with specific options for clean output
+    const yamlContent = yaml.dump(frontmatter, {
+      lineWidth: -1, // Don't wrap lines
+      quotingType: "'", // Use single quotes for strings
+      forceQuotes: false, // Only quote when necessary
+      sortKeys: false, // Preserve key order
+    });
 
-  private getStatusSymbol(status: TaskStatus): string {
-    switch (status) {
-      case 'To Do':
-        return '○';
-      case 'In Progress':
-        return '◒';
-      case 'Done':
-        return '●';
-      case 'Draft':
-        return '◑';
-      default:
-        return '○';
-    }
+    return `---\n${yamlContent}---${body}`;
   }
 }

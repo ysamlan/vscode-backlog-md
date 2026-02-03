@@ -34,16 +34,27 @@ VS Code extension providing a beautiful UI for browsing and managing Backlog.md 
 
 ### Development Workflow
 
-**One commit per task**: When a backlog task is self-contained and testable, commit it individually before moving to the next task. This keeps the git history clean and makes it easier to review/revert changes.
+**Test-Driven Development (TDD)**: Write tests BEFORE or alongside implementation, not after.
 
 ```
 1. Mark task as In Progress
-2. Implement the task
-3. Verify it works (run tests, lint, compile)
-4. Commit with message referencing the task ID
-5. Mark task as Done
-6. Move to next task
+2. Write failing tests for the new functionality
+3. Implement the feature to make tests pass
+4. Run ALL tests (`npm test`) to verify nothing broke
+5. Run lint and typecheck
+6. Commit with message referencing the task ID
+7. Mark task as Done
+8. Move to next task
 ```
+
+**When TDD doesn't apply**:
+- UI-only changes (webview HTML/CSS) - document why in commit
+- Pure refactoring with existing test coverage
+- Configuration changes
+
+**CRITICAL**: Always run `npm test && npm run lint && npm run typecheck` before marking a task as Done. Never skip this step.
+
+**One commit per task**: When a backlog task is self-contained and testable, commit it individually before moving to the next task. This keeps the git history clean and makes it easier to review/revert changes.
 
 **Commit message format**:
 ```
