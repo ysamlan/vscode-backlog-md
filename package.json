@@ -115,6 +115,7 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.1",
-    "lucide": "^0.344.0"
+    "lucide": "^0.344.0",
+    "marked": "^17.0.1"
   }
 }

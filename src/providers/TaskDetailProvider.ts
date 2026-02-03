@@ -3,6 +3,18 @@ import { BacklogParser } from '../core/BacklogParser';
 import { BacklogWriter } from '../core/BacklogWriter';
 import { Task } from '../core/types';
 
+// Dynamic import for marked (ESM module)
+let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
+async function parseMarkdown(markdown: string): Promise<string> {
+  if (!markedParse) {
+    const { marked } = await import('marked');
+    marked.setOptions({ gfm: true, breaks: true });
+    markedParse = marked.parse;
+  }
+  const result = markedParse(markdown);
+  return typeof result === 'string' ? result : await result;
+}
+
 /**
  * Provides a webview panel for displaying task details
  */
@@ -39,7 +51,7 @@ export class TaskDetailProvider {
       TaskDetailProvider.currentPanel.reveal(column);
       TaskDetailProvider.currentPanel.title = `${task.id}: ${task.title}`;
       TaskDetailProvider.currentTaskId = taskId;
-      TaskDetailProvider.currentPanel.webview.html = this.getHtmlContent(
+      TaskDetailProvider.currentPanel.webview.html = await this.getHtmlContent(
         TaskDetailProvider.currentPanel.webview,
         task,
         statuses
@@ -61,7 +73,7 @@ export class TaskDetailProvider {
 
     TaskDetailProvider.currentPanel = panel;
     TaskDetailProvider.currentTaskId = taskId;
-    panel.webview.html = this.getHtmlContent(panel.webview, task, statuses);
+    panel.webview.html = await this.getHtmlContent(panel.webview, task, statuses);
 
     // Handle messages from the webview
     panel.webview.onDidReceiveMessage(async (message) => {
@@ -165,7 +177,11 @@ export class TaskDetailProvider {
     );
   }
 
-  private getHtmlContent(webview: vscode.Webview, task: Task, statuses: string[]): string {
+  private async getHtmlContent(
+    webview: vscode.Webview,
+    task: Task,
+    statuses: string[]
+  ): Promise<string> {
     const nonce = this.getNonce();
     const styleUri = this.getResourceUri(webview, 'styles.css');
 
@@ -221,6 +237,9 @@ export class TaskDetailProvider {
       : '<span class="empty-value">None</span>';
 
     const descriptionValue = task.description || '';
+    const descriptionHtml = descriptionValue
+      ? await parseMarkdown(descriptionValue)
+      : '<em class="empty-value">No description</em>';
 
     const acChecked = task.acceptanceCriteria.filter((i) => i.checked).length;
     const acTotal = task.acceptanceCriteria.length;
@@ -581,6 +600,112 @@ export class TaskDetailProvider {
         .add-label-input::placeholder {
             color: var(--vscode-descriptionForeground);
         }
+        /* Markdown content styles */
+        .markdown-content {
+            background: var(--vscode-sideBar-background);
+            padding: 16px;
+            border-radius: 6px;
+            line-height: 1.6;
+        }
+        .markdown-content h1, .markdown-content h2, .markdown-content h3,
+        .markdown-content h4, .markdown-content h5, .markdown-content h6 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            font-weight: 600;
+        }
+        .markdown-content h1 { font-size: 1.5em; }
+        .markdown-content h2 { font-size: 1.3em; }
+        .markdown-content h3 { font-size: 1.1em; }
+        .markdown-content p {
+            margin: 0.5em 0;
+        }
+        .markdown-content ul, .markdown-content ol {
+            margin: 0.5em 0;
+            padding-left: 2em;
+        }
+        .markdown-content li {
+            margin: 0.25em 0;
+        }
+        .markdown-content code {
+            background: var(--vscode-textCodeBlock-background);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: var(--vscode-editor-font-family, monospace);
+            font-size: 0.9em;
+        }
+        .markdown-content pre {
+            background: var(--vscode-textCodeBlock-background);
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
+        }
+        .markdown-content a {
+            color: var(--vscode-textLink-foreground);
+            text-decoration: none;
+        }
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+        .markdown-content blockquote {
+            border-left: 3px solid var(--vscode-textBlockQuote-border);
+            margin: 0.5em 0;
+            padding-left: 1em;
+            color: var(--vscode-textBlockQuote-foreground);
+        }
+        .markdown-content table {
+            border-collapse: collapse;
+            margin: 0.5em 0;
+        }
+        .markdown-content th, .markdown-content td {
+            border: 1px solid var(--vscode-widget-border);
+            padding: 6px 12px;
+        }
+        .markdown-content th {
+            background: var(--vscode-editor-background);
+            font-weight: 600;
+        }
+        .description-container {
+            position: relative;
+        }
+        .description-view {
+            cursor: pointer;
+        }
+        .description-view:hover {
+            outline: 1px dashed var(--vscode-input-border);
+            outline-offset: 4px;
+        }
+        .description-edit-hint {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .description-view:hover + .description-edit-hint,
+        .description-edit-hint:hover {
+            opacity: 1;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .edit-btn {
+            background: none;
+            border: none;
+            color: var(--vscode-textLink-foreground);
+            cursor: pointer;
+            font-size: 12px;
+            padding: 4px 8px;
+        }
+        .edit-btn:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -624,8 +749,14 @@ export class TaskDetailProvider {
     </div>
 
     <div class="section">
-        <div class="section-title">Description</div>
-        <textarea class="description-textarea" id="descriptionTextarea" placeholder="Add a description...">${this.escapeHtml(descriptionValue)}</textarea>
+        <div class="section-header">
+            <div class="section-title">Description</div>
+            <button class="edit-btn" id="editDescriptionBtn">Edit</button>
+        </div>
+        <div class="description-container">
+            <div class="markdown-content description-view" id="descriptionView">${descriptionHtml}</div>
+            <textarea class="description-textarea hidden" id="descriptionTextarea" placeholder="Add a description...">${this.escapeHtml(descriptionValue)}</textarea>
+        </div>
     </div>
 
     <div class="section">
@@ -712,18 +843,53 @@ export class TaskDetailProvider {
             vscode.postMessage({ type: 'updateField', field: 'priority', value });
         });
 
-        // Description textarea
+        // Description view/edit toggle
+        const descriptionView = document.getElementById('descriptionView');
         const descriptionTextarea = document.getElementById('descriptionTextarea');
+        const editDescriptionBtn = document.getElementById('editDescriptionBtn');
+        let isEditingDescription = false;
         let descriptionTimeout;
+
+        function toggleDescriptionEdit(editing) {
+            isEditingDescription = editing;
+            if (editing) {
+                descriptionView.classList.add('hidden');
+                descriptionTextarea.classList.remove('hidden');
+                descriptionTextarea.focus();
+                editDescriptionBtn.textContent = 'Done';
+            } else {
+                descriptionView.classList.remove('hidden');
+                descriptionTextarea.classList.add('hidden');
+                editDescriptionBtn.textContent = 'Edit';
+            }
+        }
+
+        editDescriptionBtn.addEventListener('click', () => {
+            if (isEditingDescription) {
+                // Save and switch to view mode
+                vscode.postMessage({ type: 'updateField', field: 'description', value: descriptionTextarea.value });
+            } else {
+                toggleDescriptionEdit(true);
+            }
+        });
+
+        // Also allow clicking the view to edit
+        descriptionView.addEventListener('click', () => {
+            toggleDescriptionEdit(true);
+        });
+
         descriptionTextarea.addEventListener('input', () => {
             clearTimeout(descriptionTimeout);
             descriptionTimeout = setTimeout(() => {
                 vscode.postMessage({ type: 'updateField', field: 'description', value: descriptionTextarea.value });
             }, 1000); // Debounce: save after 1s of no typing
         });
-        descriptionTextarea.addEventListener('blur', () => {
-            clearTimeout(descriptionTimeout);
-            vscode.postMessage({ type: 'updateField', field: 'description', value: descriptionTextarea.value });
+
+        // Escape to cancel, blur to save
+        descriptionTextarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                toggleDescriptionEdit(false);
+            }
         });
 
         // Labels management
