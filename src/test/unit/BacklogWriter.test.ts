@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BacklogWriter } from '../../core/BacklogWriter';
+import {
+  BacklogWriter,
+  computeContentHash,
+  FileConflictError,
+} from '../../core/BacklogWriter';
 import { BacklogParser } from '../../core/BacklogParser';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
@@ -1044,6 +1048,148 @@ milestone: "v1.0-beta.1"
         '/project/my-backlog/tasks/task-1.md',
         '/project/my-backlog/completed/task-1.md'
       );
+    });
+  });
+
+  describe('Conflict Detection', () => {
+    describe('computeContentHash', () => {
+      it('should return consistent hash for same content', () => {
+        const content = 'test content';
+        const hash1 = computeContentHash(content);
+        const hash2 = computeContentHash(content);
+        expect(hash1).toBe(hash2);
+      });
+
+      it('should return different hash for different content', () => {
+        const hash1 = computeContentHash('content A');
+        const hash2 = computeContentHash('content B');
+        expect(hash1).not.toBe(hash2);
+      });
+
+      it('should return valid MD5 hash format', () => {
+        const hash = computeContentHash('test');
+        expect(hash).toMatch(/^[a-f0-9]{32}$/);
+      });
+
+      it('should handle empty content', () => {
+        const hash = computeContentHash('');
+        expect(hash).toMatch(/^[a-f0-9]{32}$/);
+      });
+
+      it('should handle unicode content', () => {
+        const hash = computeContentHash('Hello World');
+        expect(hash).toMatch(/^[a-f0-9]{32}$/);
+      });
+    });
+
+    describe('updateTask with expectedHash', () => {
+      it('should succeed when hash matches', async () => {
+        const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+`;
+        vi.mocked(fs.readFileSync).mockReturnValue(content);
+        mockReaddirSync(['task-1.md']);
+
+        const expectedHash = computeContentHash(content);
+        await writer.updateTask('TASK-1', { status: 'Done' }, mockParser, expectedHash);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+      });
+
+      it('should throw FileConflictError when hash does not match', async () => {
+        const originalContent = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+`;
+        const modifiedContent = `---
+id: TASK-1
+title: Test Modified Externally
+status: To Do
+---
+`;
+        vi.mocked(fs.readFileSync).mockReturnValue(modifiedContent);
+        mockReaddirSync(['task-1.md']);
+
+        const originalHash = computeContentHash(originalContent);
+
+        await expect(
+          writer.updateTask('TASK-1', { status: 'Done' }, mockParser, originalHash)
+        ).rejects.toThrow(FileConflictError);
+      });
+
+      it('should include current content in FileConflictError', async () => {
+        const originalContent = `---
+id: TASK-1
+title: Original
+status: To Do
+---
+`;
+        const modifiedContent = `---
+id: TASK-1
+title: Modified
+status: To Do
+---
+`;
+        vi.mocked(fs.readFileSync).mockReturnValue(modifiedContent);
+        mockReaddirSync(['task-1.md']);
+
+        const originalHash = computeContentHash(originalContent);
+
+        try {
+          await writer.updateTask('TASK-1', { status: 'Done' }, mockParser, originalHash);
+          expect.fail('Should have thrown FileConflictError');
+        } catch (error) {
+          expect(error).toBeInstanceOf(FileConflictError);
+          expect((error as FileConflictError).currentContent).toBe(modifiedContent);
+          expect((error as FileConflictError).code).toBe('CONFLICT');
+        }
+      });
+
+      it('should skip conflict check when expectedHash is not provided', async () => {
+        const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+`;
+        vi.mocked(fs.readFileSync).mockReturnValue(content);
+        mockReaddirSync(['task-1.md']);
+
+        // No expectedHash provided - should succeed regardless
+        await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+        expect(fs.writeFileSync).toHaveBeenCalled();
+      });
+
+      it('should detect conflict for whitespace-only changes', async () => {
+        const originalContent = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+`;
+        // Added extra newline at the end - this is a real difference
+        const modifiedContent = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+`;
+        vi.mocked(fs.readFileSync).mockReturnValue(modifiedContent);
+        mockReaddirSync(['task-1.md']);
+
+        const originalHash = computeContentHash(originalContent);
+
+        await expect(
+          writer.updateTask('TASK-1', { status: 'Done' }, mockParser, originalHash)
+        ).rejects.toThrow(FileConflictError);
+      });
     });
   });
 });

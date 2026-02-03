@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { BacklogParser } from '../core/BacklogParser';
-import { BacklogWriter } from '../core/BacklogWriter';
+import { BacklogWriter, computeContentHash, FileConflictError } from '../core/BacklogWriter';
 import { Task } from '../core/types';
 
 // Dynamic import for marked (ESM module)
@@ -21,6 +22,7 @@ async function parseMarkdown(markdown: string): Promise<string> {
 export class TaskDetailProvider {
   private static currentPanel: vscode.WebviewPanel | undefined;
   private static currentTaskId: string | undefined;
+  private static currentFileHash: string | undefined;
   private readonly writer = new BacklogWriter();
 
   constructor(
@@ -41,6 +43,14 @@ export class TaskDetailProvider {
     if (!task) {
       vscode.window.showErrorMessage(`Task ${taskId} not found`);
       return;
+    }
+
+    // Capture file state for conflict detection
+    if (task.filePath && fs.existsSync(task.filePath)) {
+      const fileContent = fs.readFileSync(task.filePath, 'utf-8');
+      TaskDetailProvider.currentFileHash = computeContentHash(fileContent);
+    } else {
+      TaskDetailProvider.currentFileHash = undefined;
     }
 
     const statuses = await this.parser.getStatuses();
@@ -84,6 +94,7 @@ export class TaskDetailProvider {
     panel.onDidDispose(() => {
       TaskDetailProvider.currentPanel = undefined;
       TaskDetailProvider.currentTaskId = undefined;
+      TaskDetailProvider.currentFileHash = undefined;
     });
   }
 
@@ -138,18 +149,39 @@ export class TaskDetailProvider {
 
       case 'updateField':
         if (TaskDetailProvider.currentTaskId && this.parser && message.field) {
+          // Check if file still exists before attempting update
+          const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+          if (!task?.filePath || !fs.existsSync(task.filePath)) {
+            const choice = await vscode.window.showErrorMessage(
+              'The task file has been deleted or moved.',
+              'Close Panel'
+            );
+            if (choice === 'Close Panel') {
+              TaskDetailProvider.currentPanel?.dispose();
+            }
+            return;
+          }
+
           try {
             const updates: Record<string, unknown> = {};
             updates[message.field] = message.value;
             await this.writer.updateTask(
               TaskDetailProvider.currentTaskId,
               updates,
-              this.parser
+              this.parser,
+              TaskDetailProvider.currentFileHash
             );
+            // Update stored hash after successful write
+            const newContent = fs.readFileSync(task.filePath, 'utf-8');
+            TaskDetailProvider.currentFileHash = computeContentHash(newContent);
             // Refresh the view
             await this.openTask(TaskDetailProvider.currentTaskId);
           } catch (error) {
-            vscode.window.showErrorMessage(`Failed to update task: ${error}`);
+            if (error instanceof FileConflictError) {
+              await this.handleConflict(message.field, message.value);
+            } else {
+              vscode.window.showErrorMessage(`Failed to update task: ${error}`);
+            }
           }
         }
         break;
@@ -157,11 +189,11 @@ export class TaskDetailProvider {
       case 'archiveTask': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
 
-        const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
-        if (!task) break;
+        const archiveTask = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        if (!archiveTask) break;
 
         const confirmation = await vscode.window.showWarningMessage(
-          `Archive task "${task.title}"? It will be moved to backlog/archive/tasks/`,
+          `Archive task "${archiveTask.title}"? It will be moved to backlog/archive/tasks/`,
           { modal: true },
           'Archive'
         );
@@ -177,6 +209,56 @@ export class TaskDetailProvider {
         }
         break;
       }
+    }
+  }
+
+  /**
+   * Handle file conflict when saving changes
+   */
+  private async handleConflict(field: string, value: unknown): Promise<void> {
+    const choice = await vscode.window.showWarningMessage(
+      'This file has been modified externally since you opened it.',
+      { modal: true },
+      'Reload from Disk',
+      'Overwrite Anyway',
+      'View Diff'
+    );
+
+    const taskId = TaskDetailProvider.currentTaskId;
+    if (!taskId || !this.parser) return;
+
+    const task = await this.parser.getTask(taskId);
+
+    switch (choice) {
+      case 'Reload from Disk':
+        // Re-open task with fresh content (discards pending changes)
+        await this.openTask(taskId);
+        break;
+
+      case 'Overwrite Anyway': {
+        // Force write by passing no expectedHash
+        try {
+          const updates: Record<string, unknown> = {};
+          updates[field] = value;
+          await this.writer.updateTask(taskId, updates, this.parser);
+          // Update hash after successful write
+          if (task?.filePath && fs.existsSync(task.filePath)) {
+            const newContent = fs.readFileSync(task.filePath, 'utf-8');
+            TaskDetailProvider.currentFileHash = computeContentHash(newContent);
+          }
+          await this.openTask(taskId);
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to overwrite task: ${error}`);
+        }
+        break;
+      }
+
+      case 'View Diff':
+        // Open the file in VS Code's editor so user can see current state
+        if (task?.filePath) {
+          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
+        }
+        break;
     }
   }
 

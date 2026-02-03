@@ -1,8 +1,30 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import * as yaml from 'js-yaml';
 import { Task, TaskStatus } from './types';
 import { BacklogParser } from './BacklogParser';
+
+/**
+ * Compute an MD5 hash of file content for conflict detection
+ */
+export function computeContentHash(content: string): string {
+  return crypto.createHash('md5').update(content).digest('hex');
+}
+
+/**
+ * Error thrown when a file has been modified externally
+ */
+export class FileConflictError extends Error {
+  code = 'CONFLICT' as const;
+  currentContent: string;
+
+  constructor(message: string, currentContent: string) {
+    super(message);
+    this.name = 'FileConflictError';
+    this.currentContent = currentContent;
+  }
+}
 
 /**
  * Options for creating a new task
@@ -98,14 +120,34 @@ export class BacklogWriter {
 
   /**
    * Update a task with partial changes
+   * @param taskId - The ID of the task to update
+   * @param updates - Partial task fields to update
+   * @param parser - BacklogParser instance
+   * @param expectedHash - Optional hash of the file content when it was loaded.
+   *                       If provided, the update will fail with FileConflictError
+   *                       if the file has been modified externally.
    */
-  async updateTask(taskId: string, updates: Partial<Task>, parser: BacklogParser): Promise<void> {
+  async updateTask(
+    taskId: string,
+    updates: Partial<Task>,
+    parser: BacklogParser,
+    expectedHash?: string
+  ): Promise<void> {
     const task = await parser.getTask(taskId);
     if (!task) {
       throw new Error(`Task ${taskId} not found`);
     }
 
     const content = fs.readFileSync(task.filePath, 'utf-8');
+
+    // Conflict detection: if expectedHash is provided, verify file hasn't changed
+    if (expectedHash) {
+      const currentHash = computeContentHash(content);
+      if (currentHash !== expectedHash) {
+        throw new FileConflictError('File has been modified externally', content);
+      }
+    }
+
     const { frontmatter, body } = this.extractFrontmatter(content);
 
     // Apply updates to frontmatter
