@@ -1,7 +1,7 @@
 ---
 id: TASK-41
 title: Prepare for VS Code Marketplace publishing
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-02-02 23:23'
 updated_date: '2026-02-02 23:24'

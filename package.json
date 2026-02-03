@@ -4,6 +4,10 @@
   "description": "Beautiful UI for browsing and managing Backlog.md tasks",
   "version": "0.0.1",
   "publisher": "backlog-md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ysamlan/vscode-backlog-md"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -117,7 +121,7 @@
     "typescript-eslint": "^8.54.0",
     "vite": "^5.4.21",
     "vitest": "^1.2.0",
-    "vscode-extension-tester": "^8.11.1",
+    "vscode-extension-tester": "^8.21.0",
     "wait-on": "^9.0.3"
   },
   "dependencies": {

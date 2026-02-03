@@ -24,10 +24,7 @@ describe('Task Detail Webview', () => {
     });
 
     it('should update title on blur and send message', () => {
-      cy.get('[data-cy="title-input"]')
-        .clear()
-        .type('Updated Title')
-        .blur();
+      cy.get('[data-cy="title-input"]').clear().type('Updated Title').blur();
 
       cy.getLastPostedMessage().then((message) => {
         expect(message).to.deep.equal({
@@ -39,9 +36,7 @@ describe('Task Detail Webview', () => {
     });
 
     it('should update title on Enter key', () => {
-      cy.get('[data-cy="title-input"]')
-        .clear()
-        .type('New Title{enter}');
+      cy.get('[data-cy="title-input"]').clear().type('New Title{enter}');
 
       cy.getLastPostedMessage().then((message) => {
         expect(message).to.deep.equal({
@@ -53,9 +48,7 @@ describe('Task Detail Webview', () => {
     });
 
     it('should revert title on Escape key', () => {
-      cy.get('[data-cy="title-input"]')
-        .clear()
-        .type('Temporary Title{esc}');
+      cy.get('[data-cy="title-input"]').clear().type('Temporary Title{esc}');
 
       cy.get('[data-cy="title-input"]').should('have.value', 'Sample Task Title');
     });
@@ -116,8 +109,7 @@ describe('Task Detail Webview', () => {
     });
 
     it('should add a new label on Enter', () => {
-      cy.get('[data-cy="add-label-input"]')
-        .type('new-label{enter}');
+      cy.get('[data-cy="add-label-input"]').type('new-label{enter}');
 
       cy.getLastPostedMessage().then((message) => {
         expect(message).to.deep.equal({
@@ -152,9 +144,7 @@ describe('Task Detail Webview', () => {
       cy.get('[data-cy="edit-description-btn"]').click();
 
       cy.get('[data-cy="description-view"]').should('not.be.visible');
-      cy.get('[data-cy="description-textarea"]')
-        .should('be.visible')
-        .and('be.focused');
+      cy.get('[data-cy="description-textarea"]').should('be.visible').and('be.focused');
       cy.get('[data-cy="edit-description-btn"]').should('have.text', 'Done');
     });
 
@@ -174,9 +164,7 @@ describe('Task Detail Webview', () => {
 
     it('should send message when clicking Done', () => {
       cy.get('[data-cy="edit-description-btn"]').click();
-      cy.get('[data-cy="description-textarea"]')
-        .clear()
-        .type('New description');
+      cy.get('[data-cy="description-textarea"]').clear().type('New description');
       cy.get('[data-cy="edit-description-btn"]').click();
 
       cy.getLastPostedMessage().then((message) => {

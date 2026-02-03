@@ -48,6 +48,7 @@ VS Code extension providing a beautiful UI for browsing and managing Backlog.md 
 ```
 
 **When TDD doesn't apply**:
+
 - UI-only changes (webview HTML/CSS) - document why in commit
 - Pure refactoring with existing test coverage
 - Configuration changes
@@ -57,6 +58,7 @@ VS Code extension providing a beautiful UI for browsing and managing Backlog.md 
 **One commit per task**: When a backlog task is self-contained and testable, commit it individually before moving to the next task. This keeps the git history clean and makes it easier to review/revert changes.
 
 **Commit message format**:
+
 ```
 Short description of what was done
 
@@ -90,11 +92,13 @@ Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 3. **Extension e2e tests** (`npm run test:e2e`) - vscode-extension-tester for extension activation
 
 **Webview testing pattern** (based on Nx Console approach):
+
 - Webview HTML is served standalone via Vite (`npm run webview:serve`)
 - `acquireVsCodeApi()` is mocked to capture postMessage calls
 - Tests verify UI interactions send correct messages to extension
 
 Reference repos for webview testing patterns:
+
 - [Nx Console](https://github.com/nrwl/nx-console/tree/master/apps/generate-ui-v2-e2e) - Cypress standalone
 - [wdio-vscode-service](https://github.com/webdriverio-community/wdio-vscode-service) - Frame switching
 - [Marquee](https://github.com/stateful/marquee) - vscode API mocking
@@ -119,8 +123,21 @@ The extension activates when it detects `backlog/tasks/*.md` files.
 ### UI Guidelines
 
 **Icons**: Use Lucide icons (inline SVG) instead of emojis in webviews. The `lucide` package is already a dependency. Example:
+
 ```html
-<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">...</svg>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="14"
+  height="14"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  ...
+</svg>
 ```
 
 ### Known Issues / Tech Debt

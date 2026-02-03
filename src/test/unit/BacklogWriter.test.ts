@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  BacklogWriter,
-  computeContentHash,
-  FileConflictError,
-} from '../../core/BacklogWriter';
+import { BacklogWriter, computeContentHash, FileConflictError } from '../../core/BacklogWriter';
 import { BacklogParser } from '../../core/BacklogParser';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
@@ -463,9 +459,9 @@ Old description
       vi.mocked(fs.existsSync).mockReturnValue(true);
       mockReaddirSync([]);
 
-      await expect(
-        writer.updateTask('TASK-999', { status: 'Done' }, mockParser)
-      ).rejects.toThrow('Task TASK-999 not found');
+      await expect(writer.updateTask('TASK-999', { status: 'Done' }, mockParser)).rejects.toThrow(
+        'Task TASK-999 not found'
+      );
     });
 
     it('should preserve all fields when updating single field', async () => {
@@ -562,9 +558,7 @@ status: {malformed: yaml:
       mockReaddirSync(['task-1.md']);
 
       // Should handle gracefully - parser might return undefined for malformed YAML
-      await expect(
-        writer.updateTask('TASK-1', { status: 'Done' }, mockParser)
-      ).rejects.toThrow(); // Will throw because parser returns undefined for malformed YAML
+      await expect(writer.updateTask('TASK-1', { status: 'Done' }, mockParser)).rejects.toThrow(); // Will throw because parser returns undefined for malformed YAML
     });
   });
 

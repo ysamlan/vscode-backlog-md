@@ -7,6 +7,7 @@ This document captures our investigation into e2e testing approaches for the vsc
 ## What We Tried: wdio-vscode-service
 
 ### Setup
+
 - WebdriverIO v8.46.0 with wdio-vscode-service v6.1.4
 - TypeScript test files with Mocha framework
 - Test workspace with sample backlog tasks
@@ -14,6 +15,7 @@ This document captures our investigation into e2e testing approaches for the vsc
 ### Issues Encountered
 
 #### 1. TypeScript/ESM Module Compilation Error
+
 **Symptom:** `error TS1479: The current file is a CommonJS module whose imports will produce 'require' calls; however, the referenced file is an ECMAScript module`
 
 **Root Cause:** `@wdio/globals` is ESM-only, but ts-node was treating `.ts` files as CommonJS because `package.json` lacks `"type": "module"`.
@@ -21,25 +23,30 @@ This document captures our investigation into e2e testing approaches for the vsc
 **Solution:** Renamed test files to `.mts` extension and used `"module": "NodeNext"` in tsconfig.e2e.json. This resolved the compilation error.
 
 #### 2. Session Creation Timeout
+
 **Symptom:** `TimeoutError: Timeout awaiting 'response' for 30000ms` when creating WebDriver session. VSCode launches (DevTools listening message appears) but chromedriver session never connects.
 
 **What we observed:**
+
 - Proxy server starts on a port (e.g., 62764)
 - ChromeDriver starts successfully
 - VSCode binary launches multiple times at 30-second intervals
 - Session creation POST request times out
 
 **What we tried:**
+
 - Using Node.js 20.18.0 via fnm (based on [reported Node 20.19+ ESM issues](https://github.com/zowe/zowe-explorer-vscode/issues/3529)) - **Did not help**
 - Increasing connection timeout - Not recommended, masked underlying issue
 - Clearing cached VSCode download - Did not help
 
 **Possible root causes we didn't fully investigate:**
+
 - The wdio-vscode-service proxy communication between VSCode extension host and test harness may be failing silently
 - VSCode 1.108.2 may have compatibility issues with wdio-vscode-service v6
 - The `--disable-extensions` flag combined with `--extension-development-path` may have interaction issues
 
 ### wdio-vscode-service Status (as of Feb 2026)
+
 - Latest version: 6.1.4 (requires WebdriverIO ^8.32.2)
 - [PR #130 for WebdriverIO v9 support](https://github.com/webdriverio-community/wdio-vscode-service/pull/130) has been open since July 2024, maintainer lacks bandwidth
 - Several open issues about session timeouts and VSCode version compatibility (#152, #153)
@@ -47,18 +54,21 @@ This document captures our investigation into e2e testing approaches for the vsc
 ## Decision: Switch to vscode-extension-tester
 
 ### Reasons
+
 1. **Active maintenance**: Red Hat maintains it for their extensions
 2. **Simpler architecture**: Uses Selenium WebDriver directly, fewer abstraction layers
 3. **Better documentation**: Comprehensive wiki with examples
 4. **Proven track record**: Used by major extensions
 
 ### vscode-extension-tester Overview
+
 - **Repository**: https://github.com/redhat-developer/vscode-extension-tester
 - **Installation**: `npm install --save-dev vscode-extension-tester`
 - **Node.js**: 20, 22 LTS supported
 - **VSCode**: 1.106.x - 1.108.x supported
 
 ### Key Features
+
 - Automated VSCode and ChromeDriver downloads
 - Extension packaging and installation
 - Selenium WebDriver-based UI automation
@@ -132,6 +142,7 @@ module.exports = defineConfig({ files: 'out/test/**/*.test.js' });
 ### Test Results
 
 All 3 tests passing:
+
 - ✅ should load VS Code successfully
 - ✅ should have the Backlog activity bar item
 - ✅ should open the Backlog sidebar
@@ -143,6 +154,7 @@ npm run test:e2e
 ```
 
 This will:
+
 1. Build the extension
 2. Compile e2e tests with TypeScript
 3. Download VS Code and ChromeDriver (cached after first run)
@@ -151,7 +163,7 @@ This will:
 
 ### Node.js Version
 
-The `test:e2e` script uses `fnm exec --using=22` to run with Node 22.x (the latest supported version). This avoids compatibility warnings from vscode-extension-tester.
+The `test:e2e` script uses `fnm exec --using=22` to run with Node 22.x for vscode-extension-tester compatibility. The project uses a `.node-version` file for fnm to automatically select the correct version.
 
 ## How Claude Can Run Exploratory UI Tests
 

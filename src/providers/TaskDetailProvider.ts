@@ -201,7 +201,9 @@ export class TaskDetailProvider {
         if (confirmation === 'Archive') {
           try {
             await this.writer.archiveTask(TaskDetailProvider.currentTaskId, this.parser);
-            vscode.window.showInformationMessage(`Task ${TaskDetailProvider.currentTaskId} archived`);
+            vscode.window.showInformationMessage(
+              `Task ${TaskDetailProvider.currentTaskId} archived`
+            );
             TaskDetailProvider.currentPanel?.dispose();
           } catch (error) {
             vscode.window.showErrorMessage(`Failed to archive task: ${error}`);

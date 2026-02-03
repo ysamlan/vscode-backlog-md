@@ -159,10 +159,7 @@ status: To Do
 ---
 `;
 
-      const task = parser.parseTaskContent(
-        content,
-        '/fake/path/task-42 - Some-Task-Name.md'
-      );
+      const task = parser.parseTaskContent(content, '/fake/path/task-42 - Some-Task-Name.md');
       expect(task?.id).toBe('TASK-42');
     });
   });

@@ -86,10 +86,7 @@ export function getLastPostedMessage(): VsCodeMessage | undefined {
 /**
  * Wait for a message of a specific type to be posted
  */
-export function waitForMessage(
-  type: string,
-  timeout = 5000
-): Promise<VsCodeMessage> {
+export function waitForMessage(type: string, timeout = 5000): Promise<VsCodeMessage> {
   return new Promise((resolve, reject) => {
     const startLength = postedMessages.length;
     const checkInterval = setInterval(() => {

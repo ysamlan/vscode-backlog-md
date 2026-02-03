@@ -1,10 +1,5 @@
 import { expect } from 'chai';
-import {
-  ActivityBar,
-  SideBarView,
-  VSBrowser,
-  Workbench,
-} from 'vscode-extension-tester';
+import { ActivityBar, SideBarView, VSBrowser, Workbench } from 'vscode-extension-tester';
 
 describe('Backlog.md Extension', function () {
   // Extension tests can be slow

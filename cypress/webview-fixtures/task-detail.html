@@ -1,498 +1,558 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="/vscode-theme.css" rel="stylesheet">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="/vscode-theme.css" rel="stylesheet" />
     <title>TASK-1: Sample Task</title>
     <style>
-        body {
-            padding: 20px;
-            margin: 0;
-            font-family: var(--vscode-font-family);
-            background: var(--vscode-editor-background);
-            color: var(--vscode-editor-foreground);
-            line-height: 1.5;
-        }
-        .task-header {
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--vscode-widget-border);
-        }
-        .task-id {
-            font-size: 12px;
-            color: var(--vscode-descriptionForeground);
-            margin-bottom: 4px;
-        }
-        .editable-title {
-            font-size: 24px;
-            font-weight: 600;
-            background: transparent;
-            border: 1px solid transparent;
-            border-radius: 4px;
-            color: inherit;
-            width: 100%;
-            padding: 4px 8px;
-            margin: -4px -8px 8px -8px;
-            font-family: inherit;
-        }
-        .editable-title:hover {
-            border-color: var(--vscode-input-border);
-        }
-        .editable-title:focus {
-            outline: none;
-            border-color: var(--vscode-focusBorder);
-            background: var(--vscode-input-background);
-        }
-        .task-badges {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .dropdown-select {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            border: 1px solid transparent;
-            cursor: pointer;
-            font-family: inherit;
-        }
-        .dropdown-select:hover {
-            border-color: var(--vscode-input-border);
-        }
-        .dropdown-select:focus {
-            outline: none;
-            border-color: var(--vscode-focusBorder);
-        }
-        .status-select {
-            background: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-        }
-        .priority-select {
-            text-transform: uppercase;
-        }
-        .priority-high {
-            background: #dc262620;
-            color: #dc2626;
-        }
-        .priority-medium {
-            background: #f59e0b20;
-            color: #f59e0b;
-        }
-        .priority-low {
-            background: #10b98120;
-            color: #10b981;
-        }
-        .section {
-            margin-bottom: 24px;
-        }
-        .section-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--vscode-descriptionForeground);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .progress-indicator {
-            font-size: 12px;
-            color: var(--vscode-descriptionForeground);
-            font-weight: normal;
-        }
-        .progress-indicator.complete {
-            color: #10b981;
-        }
-        .meta-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-        }
-        .meta-item {
-            background: var(--vscode-sideBar-background);
-            padding: 12px;
-            border-radius: 6px;
-        }
-        .meta-label {
-            font-size: 11px;
-            color: var(--vscode-descriptionForeground);
-            text-transform: uppercase;
-            margin-bottom: 4px;
-        }
-        .label {
-            display: inline-block;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            background: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-            margin-right: 4px;
-        }
-        .remove-label {
-            cursor: pointer;
-            margin-left: 4px;
-            opacity: 0.6;
-        }
-        .remove-label:hover {
-            opacity: 1;
-        }
-        .add-label-input {
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            border: 1px dashed var(--vscode-input-border);
-            background: transparent;
-            color: inherit;
-            width: 80px;
-        }
-        .add-label-input:focus {
-            outline: none;
-            border-style: solid;
-            border-color: var(--vscode-focusBorder);
-            background: var(--vscode-input-background);
-        }
-        .empty-value {
-            color: var(--vscode-descriptionForeground);
-            font-style: italic;
-        }
-        .markdown-content {
-            background: var(--vscode-sideBar-background);
-            padding: 16px;
-            border-radius: 6px;
-            line-height: 1.6;
-        }
-        .description-textarea {
-            width: 100%;
-            min-height: 120px;
-            padding: 12px;
-            background: var(--vscode-input-background);
-            border: 1px solid var(--vscode-input-border);
-            border-radius: 6px;
-            color: inherit;
-            font-family: inherit;
-            font-size: inherit;
-            line-height: 1.5;
-            resize: vertical;
-            box-sizing: border-box;
-        }
-        .description-textarea:focus {
-            outline: none;
-            border-color: var(--vscode-focusBorder);
-        }
-        .checklist {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .checklist-item {
-            padding: 8px 0;
-            border-bottom: 1px solid var(--vscode-widget-border);
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .checklist-item:last-child {
-            border-bottom: none;
-        }
-        .checklist-item:hover {
-            background: var(--vscode-list-hoverBackground);
-            margin: 0 -8px;
-            padding-left: 8px;
-            padding-right: 8px;
-        }
-        .checklist-item.checked {
-            color: var(--vscode-descriptionForeground);
-        }
-        .checklist-item.checked .checklist-text {
-            text-decoration: line-through;
-        }
-        .checkbox {
-            font-size: 16px;
-            flex-shrink: 0;
-        }
-        .checklist-text {
-            flex: 1;
-        }
-        .open-file-btn, .edit-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        .open-file-btn:hover, .edit-btn:hover {
-            background: var(--vscode-button-hoverBackground);
-        }
-        .edit-btn {
-            background: none;
-            color: var(--vscode-textLink-foreground);
-            padding: 4px 8px;
-        }
-        .edit-btn:hover {
-            text-decoration: underline;
-            background: none;
-        }
-        .actions {
-            margin-top: 24px;
-            padding-top: 16px;
-            border-top: 1px solid var(--vscode-widget-border);
-        }
-        .hidden {
-            display: none !important;
-        }
-        .labels-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            align-items: center;
-        }
-        .dependency-link {
-            color: var(--vscode-textLink-foreground);
-            text-decoration: none;
-            cursor: pointer;
-        }
-        .dependency-link:hover {
-            text-decoration: underline;
-        }
+      body {
+        padding: 20px;
+        margin: 0;
+        font-family: var(--vscode-font-family);
+        background: var(--vscode-editor-background);
+        color: var(--vscode-editor-foreground);
+        line-height: 1.5;
+      }
+      .task-header {
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--vscode-widget-border);
+      }
+      .task-id {
+        font-size: 12px;
+        color: var(--vscode-descriptionForeground);
+        margin-bottom: 4px;
+      }
+      .editable-title {
+        font-size: 24px;
+        font-weight: 600;
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 4px;
+        color: inherit;
+        width: 100%;
+        padding: 4px 8px;
+        margin: -4px -8px 8px -8px;
+        font-family: inherit;
+      }
+      .editable-title:hover {
+        border-color: var(--vscode-input-border);
+      }
+      .editable-title:focus {
+        outline: none;
+        border-color: var(--vscode-focusBorder);
+        background: var(--vscode-input-background);
+      }
+      .task-badges {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .dropdown-select {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid transparent;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .dropdown-select:hover {
+        border-color: var(--vscode-input-border);
+      }
+      .dropdown-select:focus {
+        outline: none;
+        border-color: var(--vscode-focusBorder);
+      }
+      .status-select {
+        background: var(--vscode-badge-background);
+        color: var(--vscode-badge-foreground);
+      }
+      .priority-select {
+        text-transform: uppercase;
+      }
+      .priority-high {
+        background: #dc262620;
+        color: #dc2626;
+      }
+      .priority-medium {
+        background: #f59e0b20;
+        color: #f59e0b;
+      }
+      .priority-low {
+        background: #10b98120;
+        color: #10b981;
+      }
+      .section {
+        margin-bottom: 24px;
+      }
+      .section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--vscode-descriptionForeground);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+      }
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .progress-indicator {
+        font-size: 12px;
+        color: var(--vscode-descriptionForeground);
+        font-weight: normal;
+      }
+      .progress-indicator.complete {
+        color: #10b981;
+      }
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+      }
+      .meta-item {
+        background: var(--vscode-sideBar-background);
+        padding: 12px;
+        border-radius: 6px;
+      }
+      .meta-label {
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        text-transform: uppercase;
+        margin-bottom: 4px;
+      }
+      .label {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        background: var(--vscode-badge-background);
+        color: var(--vscode-badge-foreground);
+        margin-right: 4px;
+      }
+      .remove-label {
+        cursor: pointer;
+        margin-left: 4px;
+        opacity: 0.6;
+      }
+      .remove-label:hover {
+        opacity: 1;
+      }
+      .add-label-input {
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        border: 1px dashed var(--vscode-input-border);
+        background: transparent;
+        color: inherit;
+        width: 80px;
+      }
+      .add-label-input:focus {
+        outline: none;
+        border-style: solid;
+        border-color: var(--vscode-focusBorder);
+        background: var(--vscode-input-background);
+      }
+      .empty-value {
+        color: var(--vscode-descriptionForeground);
+        font-style: italic;
+      }
+      .markdown-content {
+        background: var(--vscode-sideBar-background);
+        padding: 16px;
+        border-radius: 6px;
+        line-height: 1.6;
+      }
+      .description-textarea {
+        width: 100%;
+        min-height: 120px;
+        padding: 12px;
+        background: var(--vscode-input-background);
+        border: 1px solid var(--vscode-input-border);
+        border-radius: 6px;
+        color: inherit;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: 1.5;
+        resize: vertical;
+        box-sizing: border-box;
+      }
+      .description-textarea:focus {
+        outline: none;
+        border-color: var(--vscode-focusBorder);
+      }
+      .checklist {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .checklist-item {
+        padding: 8px 0;
+        border-bottom: 1px solid var(--vscode-widget-border);
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .checklist-item:last-child {
+        border-bottom: none;
+      }
+      .checklist-item:hover {
+        background: var(--vscode-list-hoverBackground);
+        margin: 0 -8px;
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+      .checklist-item.checked {
+        color: var(--vscode-descriptionForeground);
+      }
+      .checklist-item.checked .checklist-text {
+        text-decoration: line-through;
+      }
+      .checkbox {
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+      .checklist-text {
+        flex: 1;
+      }
+      .open-file-btn,
+      .edit-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .open-file-btn:hover,
+      .edit-btn:hover {
+        background: var(--vscode-button-hoverBackground);
+      }
+      .edit-btn {
+        background: none;
+        color: var(--vscode-textLink-foreground);
+        padding: 4px 8px;
+      }
+      .edit-btn:hover {
+        text-decoration: underline;
+        background: none;
+      }
+      .actions {
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--vscode-widget-border);
+      }
+      .hidden {
+        display: none !important;
+      }
+      .labels-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        align-items: center;
+      }
+      .dependency-link {
+        color: var(--vscode-textLink-foreground);
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .dependency-link:hover {
+        text-decoration: underline;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="task-header">
-        <div class="task-id" data-cy="task-id">TASK-1</div>
-        <input type="text" class="editable-title" id="titleInput" data-cy="title-input" value="Sample Task Title" />
-        <div class="task-badges">
-            <select class="dropdown-select status-select" id="statusSelect" data-cy="status-select">
-                <option value="To Do">To Do</option>
-                <option value="In Progress" selected>In Progress</option>
-                <option value="Done">Done</option>
-            </select>
-            <select class="dropdown-select priority-select priority-medium" id="prioritySelect" data-cy="priority-select">
-                <option value="">No Priority</option>
-                <option value="high">High</option>
-                <option value="medium" selected>Medium</option>
-                <option value="low">Low</option>
-            </select>
-        </div>
+      <div class="task-id" data-cy="task-id">TASK-1</div>
+      <input
+        type="text"
+        class="editable-title"
+        id="titleInput"
+        data-cy="title-input"
+        value="Sample Task Title"
+      />
+      <div class="task-badges">
+        <select class="dropdown-select status-select" id="statusSelect" data-cy="status-select">
+          <option value="To Do">To Do</option>
+          <option value="In Progress" selected>In Progress</option>
+          <option value="Done">Done</option>
+        </select>
+        <select
+          class="dropdown-select priority-select priority-medium"
+          id="prioritySelect"
+          data-cy="priority-select"
+        >
+          <option value="">No Priority</option>
+          <option value="high">High</option>
+          <option value="medium" selected>Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
     </div>
 
     <div class="section">
-        <div class="section-title">Details</div>
-        <div class="meta-grid">
-            <div class="meta-item">
-                <div class="meta-label">Labels</div>
-                <div class="labels-container" id="labelsContainer" data-labels='["bug", "urgent"]'>
-                    <span class="label editable-label" data-label="bug">bug <span class="remove-label" data-cy="remove-label-bug">×</span></span>
-                    <span class="label editable-label" data-label="urgent">urgent <span class="remove-label" data-cy="remove-label-urgent">×</span></span>
-                    <input type="text" class="add-label-input" id="addLabelInput" data-cy="add-label-input" placeholder="+ Add" />
-                </div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-label">Dependencies</div>
-                <div>
-                    <a href="#" class="dependency-link" data-task-id="TASK-2" data-cy="dependency-link">TASK-2</a>
-                </div>
-            </div>
+      <div class="section-title">Details</div>
+      <div class="meta-grid">
+        <div class="meta-item">
+          <div class="meta-label">Labels</div>
+          <div class="labels-container" id="labelsContainer" data-labels='["bug", "urgent"]'>
+            <span class="label editable-label" data-label="bug"
+              >bug <span class="remove-label" data-cy="remove-label-bug">×</span></span
+            >
+            <span class="label editable-label" data-label="urgent"
+              >urgent <span class="remove-label" data-cy="remove-label-urgent">×</span></span
+            >
+            <input
+              type="text"
+              class="add-label-input"
+              id="addLabelInput"
+              data-cy="add-label-input"
+              placeholder="+ Add"
+            />
+          </div>
         </div>
+        <div class="meta-item">
+          <div class="meta-label">Dependencies</div>
+          <div>
+            <a href="#" class="dependency-link" data-task-id="TASK-2" data-cy="dependency-link"
+              >TASK-2</a
+            >
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="section">
-        <div class="section-header">
-            <div class="section-title">Description</div>
-            <button class="edit-btn" id="editDescriptionBtn" data-cy="edit-description-btn">Edit</button>
+      <div class="section-header">
+        <div class="section-title">Description</div>
+        <button class="edit-btn" id="editDescriptionBtn" data-cy="edit-description-btn">
+          Edit
+        </button>
+      </div>
+      <div class="description-container">
+        <div
+          class="markdown-content description-view"
+          id="descriptionView"
+          data-cy="description-view"
+        >
+          <p>This is a sample task description with <strong>markdown</strong> formatting.</p>
         </div>
-        <div class="description-container">
-            <div class="markdown-content description-view" id="descriptionView" data-cy="description-view">
-                <p>This is a sample task description with <strong>markdown</strong> formatting.</p>
-            </div>
-            <textarea class="description-textarea hidden" id="descriptionTextarea" data-cy="description-textarea" placeholder="Add a description...">This is a sample task description with **markdown** formatting.</textarea>
-        </div>
+        <textarea
+          class="description-textarea hidden"
+          id="descriptionTextarea"
+          data-cy="description-textarea"
+          placeholder="Add a description..."
+        >
+This is a sample task description with **markdown** formatting.</textarea
+        >
+      </div>
     </div>
 
     <div class="section">
-        <div class="section-header">
-            <div class="section-title">Acceptance Criteria</div>
-            <span class="progress-indicator" data-cy="ac-progress">1 of 2 complete</span>
-        </div>
-        <ul class="checklist" data-cy="acceptance-criteria-list">
-            <li class="checklist-item checked" data-list-type="acceptanceCriteria" data-item-id="1" data-cy="ac-item-1">
-                <span class="checkbox">☑</span>
-                <span class="checklist-text">First acceptance criterion</span>
-            </li>
-            <li class="checklist-item" data-list-type="acceptanceCriteria" data-item-id="2" data-cy="ac-item-2">
-                <span class="checkbox">☐</span>
-                <span class="checklist-text">Second acceptance criterion</span>
-            </li>
-        </ul>
+      <div class="section-header">
+        <div class="section-title">Acceptance Criteria</div>
+        <span class="progress-indicator" data-cy="ac-progress">1 of 2 complete</span>
+      </div>
+      <ul class="checklist" data-cy="acceptance-criteria-list">
+        <li
+          class="checklist-item checked"
+          data-list-type="acceptanceCriteria"
+          data-item-id="1"
+          data-cy="ac-item-1"
+        >
+          <span class="checkbox">☑</span>
+          <span class="checklist-text">First acceptance criterion</span>
+        </li>
+        <li
+          class="checklist-item"
+          data-list-type="acceptanceCriteria"
+          data-item-id="2"
+          data-cy="ac-item-2"
+        >
+          <span class="checkbox">☐</span>
+          <span class="checklist-text">Second acceptance criterion</span>
+        </li>
+      </ul>
     </div>
 
     <div class="section">
-        <div class="section-header">
-            <div class="section-title">Definition of Done</div>
-            <span class="progress-indicator" data-cy="dod-progress">0 of 1 complete</span>
-        </div>
-        <ul class="checklist" data-cy="definition-of-done-list">
-            <li class="checklist-item" data-list-type="definitionOfDone" data-item-id="1" data-cy="dod-item-1">
-                <span class="checkbox">☐</span>
-                <span class="checklist-text">Tests pass</span>
-            </li>
-        </ul>
+      <div class="section-header">
+        <div class="section-title">Definition of Done</div>
+        <span class="progress-indicator" data-cy="dod-progress">0 of 1 complete</span>
+      </div>
+      <ul class="checklist" data-cy="definition-of-done-list">
+        <li
+          class="checklist-item"
+          data-list-type="definitionOfDone"
+          data-item-id="1"
+          data-cy="dod-item-1"
+        >
+          <span class="checkbox">☐</span>
+          <span class="checklist-text">Tests pass</span>
+        </li>
+      </ul>
     </div>
 
     <div class="actions">
-        <button class="open-file-btn" id="openFileBtn" data-cy="open-file-btn">
-            📄 Open Raw Markdown
-        </button>
+      <button class="open-file-btn" id="openFileBtn" data-cy="open-file-btn">
+        📄 Open Raw Markdown
+      </button>
     </div>
 
     <script>
-        const vscode = acquireVsCodeApi();
+      const vscode = acquireVsCodeApi();
 
-        // Open raw markdown file
-        document.getElementById('openFileBtn').addEventListener('click', () => {
-            vscode.postMessage({ type: 'openFile' });
+      // Open raw markdown file
+      document.getElementById('openFileBtn').addEventListener('click', () => {
+        vscode.postMessage({ type: 'openFile' });
+      });
+
+      // Navigate to dependency task
+      document.querySelectorAll('.dependency-link').forEach((link) => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const taskId = link.dataset.taskId;
+          vscode.postMessage({ type: 'openTask', taskId });
         });
+      });
 
-        // Navigate to dependency task
-        document.querySelectorAll('.dependency-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const taskId = link.dataset.taskId;
-                vscode.postMessage({ type: 'openTask', taskId });
-            });
+      // Toggle checklist items
+      document.querySelectorAll('.checklist-item').forEach((item) => {
+        item.addEventListener('click', () => {
+          const listType = item.dataset.listType;
+          const itemId = parseInt(item.dataset.itemId, 10);
+          vscode.postMessage({
+            type: 'toggleChecklistItem',
+            listType,
+            itemId,
+          });
         });
+      });
 
-        // Toggle checklist items
-        document.querySelectorAll('.checklist-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const listType = item.dataset.listType;
-                const itemId = parseInt(item.dataset.itemId, 10);
-                vscode.postMessage({
-                    type: 'toggleChecklistItem',
-                    listType,
-                    itemId
-                });
-            });
-        });
-
-        // Edit title
-        const titleInput = document.getElementById('titleInput');
-        let originalTitle = titleInput.value;
-        titleInput.addEventListener('blur', () => {
-            const newTitle = titleInput.value.trim();
-            if (newTitle && newTitle !== originalTitle) {
-                originalTitle = newTitle;
-                vscode.postMessage({ type: 'updateField', field: 'title', value: newTitle });
-            }
-        });
-        titleInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                titleInput.blur();
-            } else if (e.key === 'Escape') {
-                titleInput.value = originalTitle;
-                titleInput.blur();
-            }
-        });
-
-        // Status dropdown
-        const statusSelect = document.getElementById('statusSelect');
-        statusSelect.addEventListener('change', () => {
-            vscode.postMessage({ type: 'updateField', field: 'status', value: statusSelect.value });
-        });
-
-        // Priority dropdown
-        const prioritySelect = document.getElementById('prioritySelect');
-        prioritySelect.addEventListener('change', () => {
-            const value = prioritySelect.value || undefined;
-            vscode.postMessage({ type: 'updateField', field: 'priority', value });
-        });
-
-        // Description view/edit toggle
-        const descriptionView = document.getElementById('descriptionView');
-        const descriptionTextarea = document.getElementById('descriptionTextarea');
-        const editDescriptionBtn = document.getElementById('editDescriptionBtn');
-        let isEditingDescription = false;
-        let descriptionTimeout;
-
-        function toggleDescriptionEdit(editing) {
-            isEditingDescription = editing;
-            if (editing) {
-                descriptionView.classList.add('hidden');
-                descriptionTextarea.classList.remove('hidden');
-                descriptionTextarea.focus();
-                editDescriptionBtn.textContent = 'Done';
-            } else {
-                descriptionView.classList.remove('hidden');
-                descriptionTextarea.classList.add('hidden');
-                editDescriptionBtn.textContent = 'Edit';
-            }
+      // Edit title
+      const titleInput = document.getElementById('titleInput');
+      let originalTitle = titleInput.value;
+      titleInput.addEventListener('blur', () => {
+        const newTitle = titleInput.value.trim();
+        if (newTitle && newTitle !== originalTitle) {
+          originalTitle = newTitle;
+          vscode.postMessage({ type: 'updateField', field: 'title', value: newTitle });
         }
+      });
+      titleInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          titleInput.blur();
+        } else if (e.key === 'Escape') {
+          titleInput.value = originalTitle;
+          titleInput.blur();
+        }
+      });
 
-        editDescriptionBtn.addEventListener('click', () => {
-            if (isEditingDescription) {
-                vscode.postMessage({ type: 'updateField', field: 'description', value: descriptionTextarea.value });
-            } else {
-                toggleDescriptionEdit(true);
-            }
+      // Status dropdown
+      const statusSelect = document.getElementById('statusSelect');
+      statusSelect.addEventListener('change', () => {
+        vscode.postMessage({ type: 'updateField', field: 'status', value: statusSelect.value });
+      });
+
+      // Priority dropdown
+      const prioritySelect = document.getElementById('prioritySelect');
+      prioritySelect.addEventListener('change', () => {
+        const value = prioritySelect.value || undefined;
+        vscode.postMessage({ type: 'updateField', field: 'priority', value });
+      });
+
+      // Description view/edit toggle
+      const descriptionView = document.getElementById('descriptionView');
+      const descriptionTextarea = document.getElementById('descriptionTextarea');
+      const editDescriptionBtn = document.getElementById('editDescriptionBtn');
+      let isEditingDescription = false;
+      let descriptionTimeout;
+
+      function toggleDescriptionEdit(editing) {
+        isEditingDescription = editing;
+        if (editing) {
+          descriptionView.classList.add('hidden');
+          descriptionTextarea.classList.remove('hidden');
+          descriptionTextarea.focus();
+          editDescriptionBtn.textContent = 'Done';
+        } else {
+          descriptionView.classList.remove('hidden');
+          descriptionTextarea.classList.add('hidden');
+          editDescriptionBtn.textContent = 'Edit';
+        }
+      }
+
+      editDescriptionBtn.addEventListener('click', () => {
+        if (isEditingDescription) {
+          vscode.postMessage({
+            type: 'updateField',
+            field: 'description',
+            value: descriptionTextarea.value,
+          });
+        } else {
+          toggleDescriptionEdit(true);
+        }
+      });
+
+      descriptionView.addEventListener('click', () => {
+        toggleDescriptionEdit(true);
+      });
+
+      descriptionTextarea.addEventListener('input', () => {
+        clearTimeout(descriptionTimeout);
+        descriptionTimeout = setTimeout(() => {
+          vscode.postMessage({
+            type: 'updateField',
+            field: 'description',
+            value: descriptionTextarea.value,
+          });
+        }, 1000);
+      });
+
+      descriptionTextarea.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          toggleDescriptionEdit(false);
+        }
+      });
+
+      // Labels management
+      const labelsContainer = document.getElementById('labelsContainer');
+      const addLabelInput = document.getElementById('addLabelInput');
+      let currentLabels = JSON.parse(labelsContainer.dataset.labels || '[]');
+
+      document.querySelectorAll('.remove-label').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const labelSpan = btn.parentElement;
+          const labelToRemove = labelSpan.dataset.label;
+          currentLabels = currentLabels.filter((l) => l !== labelToRemove);
+          vscode.postMessage({ type: 'updateField', field: 'labels', value: currentLabels });
         });
+      });
 
-        descriptionView.addEventListener('click', () => {
-            toggleDescriptionEdit(true);
-        });
-
-        descriptionTextarea.addEventListener('input', () => {
-            clearTimeout(descriptionTimeout);
-            descriptionTimeout = setTimeout(() => {
-                vscode.postMessage({ type: 'updateField', field: 'description', value: descriptionTextarea.value });
-            }, 1000);
-        });
-
-        descriptionTextarea.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                toggleDescriptionEdit(false);
-            }
-        });
-
-        // Labels management
-        const labelsContainer = document.getElementById('labelsContainer');
-        const addLabelInput = document.getElementById('addLabelInput');
-        let currentLabels = JSON.parse(labelsContainer.dataset.labels || '[]');
-
-        document.querySelectorAll('.remove-label').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const labelSpan = btn.parentElement;
-                const labelToRemove = labelSpan.dataset.label;
-                currentLabels = currentLabels.filter(l => l !== labelToRemove);
-                vscode.postMessage({ type: 'updateField', field: 'labels', value: currentLabels });
-            });
-        });
-
-        addLabelInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const newLabel = addLabelInput.value.trim();
-                if (newLabel && !currentLabels.includes(newLabel)) {
-                    currentLabels.push(newLabel);
-                    vscode.postMessage({ type: 'updateField', field: 'labels', value: currentLabels });
-                }
-                addLabelInput.value = '';
-            } else if (e.key === 'Escape') {
-                addLabelInput.value = '';
-                addLabelInput.blur();
-            }
-        });
+      addLabelInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const newLabel = addLabelInput.value.trim();
+          if (newLabel && !currentLabels.includes(newLabel)) {
+            currentLabels.push(newLabel);
+            vscode.postMessage({ type: 'updateField', field: 'labels', value: currentLabels });
+          }
+          addLabelInput.value = '';
+        } else if (e.key === 'Escape') {
+          addLabelInput.value = '';
+          addLabelInput.blur();
+        }
+      });
     </script>
-</body>
+  </body>
 </html>
