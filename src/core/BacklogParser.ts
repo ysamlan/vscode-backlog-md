@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { Task, TaskStatus, TaskPriority, ChecklistItem, Milestone } from './types';
+import { Task, TaskStatus, TaskPriority, ChecklistItem, Milestone, BacklogConfig } from './types';
 
 /**
  * Raw frontmatter structure from YAML parsing
@@ -73,22 +73,43 @@ export class BacklogParser {
   }
 
   /**
-   * Get all milestones
+   * Get the backlog configuration from config.yml
    */
-  async getMilestones(): Promise<Milestone[]> {
-    const configPath = path.join(this.backlogPath, 'config.json');
+  async getConfig(): Promise<BacklogConfig> {
+    // Try both .yml and .yaml extensions
+    const ymlPath = path.join(this.backlogPath, 'config.yml');
+    const yamlPath = path.join(this.backlogPath, 'config.yaml');
+    const configPath = fs.existsSync(ymlPath) ? ymlPath : yamlPath;
 
     if (!fs.existsSync(configPath)) {
-      return [];
+      console.log(`[Backlog.md Parser] No config file found at ${ymlPath} or ${yamlPath}`);
+      return {};
     }
 
     try {
       const content = fs.readFileSync(configPath, 'utf-8');
-      const config = JSON.parse(content);
-      return config.milestones || [];
-    } catch {
-      return [];
+      const config = yaml.load(content) as BacklogConfig | null;
+      return config || {};
+    } catch (error) {
+      console.error(`[Backlog.md Parser] Error parsing config file:`, error);
+      return {};
     }
+  }
+
+  /**
+   * Get all milestones from config
+   */
+  async getMilestones(): Promise<Milestone[]> {
+    const config = await this.getConfig();
+    return config.milestones || [];
+  }
+
+  /**
+   * Get configured statuses (for Kanban columns)
+   */
+  async getStatuses(): Promise<string[]> {
+    const config = await this.getConfig();
+    return config.statuses || ['To Do', 'In Progress', 'Done'];
   }
 
   /**

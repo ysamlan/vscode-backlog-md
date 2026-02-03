@@ -50,6 +50,27 @@ export interface Milestone {
 }
 
 /**
+ * Backlog.md configuration from config.yml
+ */
+export interface BacklogConfig {
+  project_name?: string;
+  default_status?: string;
+  statuses?: string[];
+  labels?: string[];
+  milestones?: Milestone[];
+  date_format?: string;
+  max_column_width?: number;
+  auto_open_browser?: boolean;
+  default_port?: number;
+  remote_operations?: boolean;
+  auto_commit?: boolean;
+  bypass_git_hooks?: boolean;
+  check_active_branches?: boolean;
+  active_branch_days?: number;
+  task_prefix?: string;
+}
+
+/**
  * Message types for webview communication
  */
 export type WebviewMessage =
