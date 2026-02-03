@@ -80,6 +80,9 @@ export class BacklogWriter {
     if (updates.assignee !== undefined) {
       frontmatter.assignee = updates.assignee;
     }
+    if (updates.dependencies !== undefined) {
+      frontmatter.dependencies = updates.dependencies;
+    }
 
     // Update the updated_date
     frontmatter.updated_date = new Date().toISOString().split('T')[0];
@@ -97,10 +100,14 @@ export class BacklogWriter {
 
   /**
    * Create a new task file
+   * @param backlogPath - Path to the backlog directory
+   * @param options - Task creation options
+   * @param parser - Optional parser to read config for task_prefix
    */
   async createTask(
     backlogPath: string,
-    options: CreateTaskOptions
+    options: CreateTaskOptions,
+    parser?: BacklogParser
   ): Promise<{ id: string; filePath: string }> {
     const tasksDir = path.join(backlogPath, 'tasks');
 
@@ -111,7 +118,14 @@ export class BacklogWriter {
 
     // Generate next task ID
     const nextId = this.getNextTaskId(tasksDir);
-    const taskId = `TASK-${nextId}`;
+
+    // Get task prefix from config, default to "TASK"
+    let taskPrefix = 'TASK';
+    if (parser) {
+      const config = await parser.getConfig();
+      taskPrefix = config.task_prefix || 'TASK';
+    }
+    const taskId = `${taskPrefix}-${nextId}`;
 
     // Sanitize title for filename
     const sanitizedTitle = options.title

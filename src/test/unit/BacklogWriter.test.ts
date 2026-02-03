@@ -195,6 +195,25 @@ labels: []
       expect(frontmatter.labels).toEqual(['bug', 'urgent']);
     });
 
+    it('should update dependencies array', async () => {
+      const content = `---
+id: TASK-2
+title: Test
+status: To Do
+dependencies: []
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-2.md']);
+
+      await writer.updateTask('TASK-2', { dependencies: ['TASK-1', 'TASK-3'] }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.dependencies).toEqual(['TASK-1', 'TASK-3']);
+    });
+
     it('should preserve body content', async () => {
       const content = `---
 id: TASK-1
@@ -378,6 +397,59 @@ Old description
       expect(result.filePath.length).toBeLessThan(200);
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
       expect(writtenContent).toContain(longTitle);
+    });
+
+    it('should use default TASK prefix when no parser provided', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createTask('/fake/backlog', {
+        title: 'Test Task',
+      });
+
+      expect(result.id).toBe('TASK-1');
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('id: TASK-1');
+    });
+
+    it('should use custom task_prefix from config when parser provided', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      // Create a mock parser with custom config
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ task_prefix: 'ISSUE' }),
+      } as unknown as BacklogParser;
+
+      const result = await writer.createTask(
+        '/fake/backlog',
+        { title: 'Test Issue' },
+        mockParserWithConfig
+      );
+
+      expect(result.id).toBe('ISSUE-1');
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('id: ISSUE-1');
+    });
+
+    it('should fallback to TASK prefix when config has no task_prefix', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      // Create a mock parser with config that lacks task_prefix
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ project_name: 'My Project' }),
+      } as unknown as BacklogParser;
+
+      const result = await writer.createTask(
+        '/fake/backlog',
+        { title: 'Test Task' },
+        mockParserWithConfig
+      );
+
+      expect(result.id).toBe('TASK-1');
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('id: TASK-1');
     });
   });
 
