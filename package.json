@@ -74,6 +74,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@tailwindcss/cli": "^4.0.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.10",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
@@ -95,6 +96,7 @@
     "wdio-vscode-service": "^6.1.4"
   },
   "dependencies": {
+    "js-yaml": "^4.1.1",
     "lucide": "^0.344.0"
   }
 }

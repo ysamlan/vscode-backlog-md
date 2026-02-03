@@ -1,6 +1,30 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 import { Task, TaskStatus, TaskPriority, ChecklistItem, Milestone } from './types';
+
+/**
+ * Raw frontmatter structure from YAML parsing
+ */
+interface RawFrontmatter {
+  id?: string;
+  title?: string;
+  status?: string;
+  priority?: string;
+  milestone?: string;
+  labels?: string[] | string;
+  assignee?: string[] | string;
+  assignees?: string[] | string;
+  dependencies?: string[] | string;
+  references?: string[] | string;
+  documentation?: string[] | string;
+  type?: string;
+  parent?: string;
+  created_date?: string;
+  created?: string;
+  updated_date?: string;
+  updated?: string;
+}
 
 /**
  * Parses Backlog.md task files from the filesystem
@@ -107,12 +131,23 @@ export class BacklogParser {
     let lineIndex = 0;
     if (lines[0]?.trim() === '---') {
       lineIndex = 1;
+      const frontmatterLines: string[] = [];
       while (lineIndex < lines.length && lines[lineIndex]?.trim() !== '---') {
-        const line = lines[lineIndex].trim();
-        this.parseFrontmatterLine(line, task, lines, lineIndex);
+        frontmatterLines.push(lines[lineIndex]);
         lineIndex++;
       }
       lineIndex++; // Skip closing ---
+
+      // Parse frontmatter using js-yaml
+      try {
+        const frontmatterYaml = frontmatterLines.join('\n');
+        const frontmatter = yaml.load(frontmatterYaml) as RawFrontmatter | null;
+        if (frontmatter) {
+          this.applyFrontmatter(frontmatter, task);
+        }
+      } catch (error) {
+        console.error(`[Backlog.md Parser] Error parsing YAML frontmatter in ${filePath}:`, error);
+      }
     }
 
     // Parse rest of content for sections
@@ -197,115 +232,53 @@ export class BacklogParser {
   }
 
   /**
-   * Parse a single line from YAML frontmatter
+   * Apply parsed YAML frontmatter to task object
    */
-  private parseFrontmatterLine(
-    line: string,
-    task: Task,
-    allLines: string[],
-    currentIndex: number
-  ): void {
-    // Handle key: value pairs
-    const colonIndex = line.indexOf(':');
-    if (colonIndex === -1) return;
-
-    const key = line.substring(0, colonIndex).trim().toLowerCase();
-    let value = line.substring(colonIndex + 1).trim();
-
-    // Remove quotes from values
-    if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
-      value = value.slice(1, -1);
+  private applyFrontmatter(fm: RawFrontmatter, task: Task): void {
+    if (fm.id) {
+      task.id = String(fm.id).toUpperCase();
     }
-
-    switch (key) {
-      case 'id':
-        task.id = value.toUpperCase();
-        break;
-      case 'title':
-        task.title = value;
-        break;
-      case 'status':
-        task.status = this.parseStatus(value);
-        break;
-      case 'priority':
-        task.priority = this.parsePriority(value);
-        break;
-      case 'milestone':
-        task.milestone = value || undefined;
-        break;
-      case 'labels':
-        // Labels can be inline array or multi-line
-        if (value.startsWith('[')) {
-          // Inline array: labels: [a, b, c]
-          task.labels = this.parseInlineArray(value);
-        } else if (value === '') {
-          // Multi-line array - look at next lines
-          task.labels = this.parseMultiLineArray(allLines, currentIndex);
-        }
-        break;
-      case 'assignee':
-      case 'assignees':
-        if (value.startsWith('[')) {
-          task.assignee = this.parseInlineArray(value);
-        } else if (value === '') {
-          task.assignee = this.parseMultiLineArray(allLines, currentIndex);
-        } else if (value) {
-          task.assignee = [value];
-        }
-        break;
-      case 'dependencies':
-        if (value.startsWith('[')) {
-          task.dependencies = this.parseInlineArray(value);
-        } else if (value === '') {
-          task.dependencies = this.parseMultiLineArray(allLines, currentIndex);
-        }
-        break;
-      case 'created_date':
-      case 'created':
-        task.createdAt = value;
-        break;
-      case 'updated_date':
-      case 'updated':
-        task.updatedAt = value;
-        break;
+    if (fm.title) {
+      task.title = String(fm.title);
+    }
+    if (fm.status) {
+      task.status = this.parseStatus(String(fm.status));
+    }
+    if (fm.priority) {
+      task.priority = this.parsePriority(String(fm.priority));
+    }
+    if (fm.milestone) {
+      task.milestone = String(fm.milestone);
+    }
+    if (fm.labels) {
+      task.labels = this.normalizeStringArray(fm.labels);
+    }
+    if (fm.assignee || fm.assignees) {
+      task.assignee = this.normalizeStringArray(fm.assignee || fm.assignees);
+    }
+    if (fm.dependencies) {
+      task.dependencies = this.normalizeStringArray(fm.dependencies);
+    }
+    if (fm.created_date || fm.created) {
+      task.createdAt = String(fm.created_date || fm.created);
+    }
+    if (fm.updated_date || fm.updated) {
+      task.updatedAt = String(fm.updated_date || fm.updated);
+    }
+    if (fm.parent) {
+      task.parentTaskId = String(fm.parent);
     }
   }
 
   /**
-   * Parse inline YAML array like [a, b, c]
+   * Normalize a value that could be a string or string array into a string array
    */
-  private parseInlineArray(value: string): string[] {
-    const inner = value.slice(1, -1); // Remove [ ]
-    if (!inner.trim()) return [];
-    return inner.split(',').map((s) => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
-  }
-
-  /**
-   * Parse multi-line YAML array (lines starting with -)
-   */
-  private parseMultiLineArray(lines: string[], startIndex: number): string[] {
-    const result: string[] = [];
-    let i = startIndex + 1;
-
-    while (i < lines.length) {
-      const line = lines[i].trim();
-      if (line.startsWith('- ')) {
-        let value = line.substring(2).trim();
-        // Remove quotes
-        if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
-          value = value.slice(1, -1);
-        }
-        result.push(value);
-        i++;
-      } else if (line === '---' || (line && !line.startsWith(' ') && !line.startsWith('-'))) {
-        // End of array - hit another key or end of frontmatter
-        break;
-      } else {
-        i++;
-      }
+  private normalizeStringArray(value: string | string[] | undefined): string[] {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      return value.map((v) => String(v).trim()).filter(Boolean);
     }
-
-    return result;
+    return [String(value).trim()].filter(Boolean);
   }
 
   private parseStatus(value: string): TaskStatus {
