@@ -35,8 +35,27 @@
       {
         "command": "backlog.openTaskDetail",
         "title": "Backlog: Open Task Detail"
+      },
+      {
+        "command": "backlog.createTask",
+        "title": "Backlog: Create Task",
+        "icon": "$(add)"
       }
     ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "backlog.createTask",
+          "when": "view == backlog.kanban || view == backlog.taskList",
+          "group": "navigation"
+        },
+        {
+          "command": "backlog.refresh",
+          "when": "view == backlog.kanban || view == backlog.taskList",
+          "group": "navigation"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {

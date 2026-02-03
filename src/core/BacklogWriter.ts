@@ -1,7 +1,21 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { Task, TaskStatus } from './types';
 import { BacklogParser } from './BacklogParser';
+
+/**
+ * Options for creating a new task
+ */
+export interface CreateTaskOptions {
+  title: string;
+  description?: string;
+  status?: TaskStatus;
+  priority?: 'high' | 'medium' | 'low';
+  labels?: string[];
+  milestone?: string;
+  assignee?: string[];
+}
 
 /**
  * Raw frontmatter structure for YAML serialization
@@ -79,6 +93,89 @@ export class BacklogWriter {
     // Reconstruct the file
     const updatedContent = this.reconstructFile(frontmatter, updatedBody);
     fs.writeFileSync(task.filePath, updatedContent, 'utf-8');
+  }
+
+  /**
+   * Create a new task file
+   */
+  async createTask(
+    backlogPath: string,
+    options: CreateTaskOptions
+  ): Promise<{ id: string; filePath: string }> {
+    const tasksDir = path.join(backlogPath, 'tasks');
+
+    // Ensure tasks directory exists
+    if (!fs.existsSync(tasksDir)) {
+      fs.mkdirSync(tasksDir, { recursive: true });
+    }
+
+    // Generate next task ID
+    const nextId = this.getNextTaskId(tasksDir);
+    const taskId = `TASK-${nextId}`;
+
+    // Sanitize title for filename
+    const sanitizedTitle = options.title
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50);
+    const fileName = `task-${nextId} - ${sanitizedTitle}.md`;
+    const filePath = path.join(tasksDir, fileName);
+
+    // Build frontmatter
+    const frontmatter: FrontmatterData = {
+      id: taskId,
+      title: options.title,
+      status: options.status || 'To Do',
+      priority: options.priority,
+      labels: options.labels || [],
+      milestone: options.milestone,
+      assignee: options.assignee || [],
+      dependencies: [],
+      created_date: new Date().toISOString().split('T')[0],
+      updated_date: new Date().toISOString().split('T')[0],
+    };
+
+    // Remove undefined values
+    Object.keys(frontmatter).forEach((key) => {
+      if (frontmatter[key] === undefined) {
+        delete frontmatter[key];
+      }
+    });
+
+    // Build body
+    let body = '\n## Description\n\n';
+    if (options.description) {
+      body += `<!-- SECTION:DESCRIPTION:BEGIN -->\n${options.description}\n<!-- SECTION:DESCRIPTION:END -->\n`;
+    } else {
+      body += '<!-- SECTION:DESCRIPTION:BEGIN -->\n<!-- SECTION:DESCRIPTION:END -->\n';
+    }
+    body += '\n## Acceptance Criteria\n<!-- AC:BEGIN -->\n<!-- AC:END -->\n';
+
+    // Build content
+    const content = this.reconstructFile(frontmatter, body);
+    fs.writeFileSync(filePath, content, 'utf-8');
+
+    return { id: taskId, filePath };
+  }
+
+  /**
+   * Get the next available task ID number
+   */
+  private getNextTaskId(tasksDir: string): number {
+    const files = fs.existsSync(tasksDir) ? fs.readdirSync(tasksDir) : [];
+    let maxId = 0;
+
+    for (const file of files) {
+      const match = file.match(/^task-(\d+)/i);
+      if (match) {
+        const id = parseInt(match[1], 10);
+        if (id > maxId) {
+          maxId = id;
+        }
+      }
+    }
+
+    return maxId + 1;
   }
 
   /**

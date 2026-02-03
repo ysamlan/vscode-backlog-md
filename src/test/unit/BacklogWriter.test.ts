@@ -12,6 +12,7 @@ vi.mock('fs', async () => {
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
     readdirSync: vi.fn(() => []),
+    mkdirSync: vi.fn(),
   };
 });
 
@@ -246,6 +247,75 @@ Old description
       expect(writtenContent).toContain('<!-- SECTION:DESCRIPTION:END -->');
       expect(writtenContent).not.toContain('Old description');
       expect(writtenContent).toContain('## Acceptance Criteria');
+    });
+  });
+
+  describe('createTask', () => {
+    it('should create a new task file with auto-generated ID', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['task-1.md', 'task-5.md', 'task-3.md']);
+
+      const result = await writer.createTask('/fake/backlog', {
+        title: 'New Feature',
+      });
+
+      expect(result.id).toBe('TASK-6'); // Next after highest ID (5)
+      expect(result.filePath).toContain('task-6 - New-Feature.md');
+      expect(fs.writeFileSync).toHaveBeenCalled();
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      expect(match).toBeTruthy();
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.id).toBe('TASK-6');
+      expect(frontmatter.title).toBe('New Feature');
+      expect(frontmatter.status).toBe('To Do');
+    });
+
+    it('should create task with all optional fields', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      await writer.createTask('/fake/backlog', {
+        title: 'Full Task',
+        description: 'Task description',
+        status: 'In Progress',
+        priority: 'high',
+        labels: ['bug', 'urgent'],
+        milestone: 'v1.0',
+      });
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.status).toBe('In Progress');
+      expect(frontmatter.priority).toBe('high');
+      expect(frontmatter.labels).toEqual(['bug', 'urgent']);
+      expect(frontmatter.milestone).toBe('v1.0');
+      expect(writtenContent).toContain('Task description');
+    });
+
+    it('should create tasks directory if it does not exist', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      mockReaddirSync([]);
+
+      await writer.createTask('/fake/backlog', { title: 'Test' });
+
+      expect(fs.mkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining('tasks'),
+        expect.objectContaining({ recursive: true })
+      );
+    });
+
+    it('should sanitize special characters in filename', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createTask('/fake/backlog', {
+        title: 'Fix: bug #123 (urgent!)',
+      });
+
+      expect(result.filePath).toContain('task-1 - Fix-bug-123-urgent.md');
     });
   });
 });

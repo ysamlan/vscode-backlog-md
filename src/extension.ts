@@ -4,6 +4,7 @@ import { KanbanViewProvider } from './providers/KanbanViewProvider';
 import { TaskListProvider } from './providers/TaskListProvider';
 import { TaskDetailProvider } from './providers/TaskDetailProvider';
 import { BacklogParser } from './core/BacklogParser';
+import { BacklogWriter, CreateTaskOptions } from './core/BacklogWriter';
 import { FileWatcher } from './core/FileWatcher';
 
 let fileWatcher: FileWatcher | undefined;
@@ -80,6 +81,86 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.openTaskDetail', (taskId: string) => {
       taskDetailProvider.openTask(taskId);
+    })
+  );
+
+  // Register create task command
+  const writer = new BacklogWriter();
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.createTask', async () => {
+      if (!backlogFolder) {
+        vscode.window.showErrorMessage('No backlog folder found in workspace');
+        return;
+      }
+
+      // Prompt for title (required)
+      const title = await vscode.window.showInputBox({
+        prompt: 'Enter task title',
+        placeHolder: 'e.g., Implement user authentication',
+        validateInput: (value) => {
+          if (!value?.trim()) {
+            return 'Title is required';
+          }
+          return undefined;
+        },
+      });
+
+      if (!title) {
+        return; // User cancelled
+      }
+
+      // Prompt for description (optional)
+      const description = await vscode.window.showInputBox({
+        prompt: 'Enter task description (optional)',
+        placeHolder: 'Brief description of what needs to be done',
+      });
+
+      // Prompt for priority (optional)
+      const priorityChoice = await vscode.window.showQuickPick(
+        [
+          { label: 'None', value: undefined },
+          { label: 'High', value: 'high' as const },
+          { label: 'Medium', value: 'medium' as const },
+          { label: 'Low', value: 'low' as const },
+        ],
+        {
+          placeHolder: 'Select priority (optional)',
+        }
+      );
+
+      // Prompt for labels (optional)
+      const labelsInput = await vscode.window.showInputBox({
+        prompt: 'Enter labels (optional, comma-separated)',
+        placeHolder: 'e.g., bug, urgent, frontend',
+      });
+      const labels = labelsInput
+        ? labelsInput
+            .split(',')
+            .map((l) => l.trim())
+            .filter((l) => l)
+        : undefined;
+
+      // Create the task
+      const options: CreateTaskOptions = {
+        title: title.trim(),
+        description: description?.trim() || undefined,
+        priority: priorityChoice?.value,
+        labels: labels?.length ? labels : undefined,
+      };
+
+      try {
+        const result = await writer.createTask(backlogFolder, options);
+        vscode.window.showInformationMessage(`Created task ${result.id}`);
+
+        // Refresh views
+        kanbanProvider.refresh();
+        taskListProvider.refresh();
+
+        // Open the new task
+        taskDetailProvider.openTask(result.id);
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to create task: ${error}`);
+      }
     })
   );
 
