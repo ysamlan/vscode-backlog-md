@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { KanbanViewProvider } from './providers/KanbanViewProvider';
-import { TaskListProvider } from './providers/TaskListProvider';
+import { TasksViewProvider } from './providers/TasksViewProvider';
 import { TaskDetailProvider } from './providers/TaskDetailProvider';
 import { TaskCreatePanel } from './providers/TaskCreatePanel';
 import { BacklogParser } from './core/BacklogParser';
@@ -41,19 +40,12 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(fileWatcher);
   }
 
-  // Register Kanban view provider (always, even without backlog folder)
-  const kanbanProvider = new KanbanViewProvider(context.extensionUri, parser);
+  // Register Tasks view provider (unified Kanban + List view)
+  const tasksProvider = new TasksViewProvider(context.extensionUri, parser, context);
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('backlog.kanban', kanbanProvider)
+    vscode.window.registerWebviewViewProvider('backlog.kanban', tasksProvider)
   );
-  console.log('[Backlog.md] Kanban view provider registered');
-
-  // Register Task List view provider (always, even without backlog folder)
-  const taskListProvider = new TaskListProvider(context.extensionUri, parser);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('backlog.taskList', taskListProvider)
-  );
-  console.log('[Backlog.md] Task list view provider registered');
+  console.log('[Backlog.md] Tasks view provider registered');
 
   // Create Task Detail provider for opening task details in editor
   const taskDetailProvider = new TaskDetailProvider(context.extensionUri, parser);
@@ -74,8 +66,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.refresh', () => {
-      kanbanProvider.refresh();
-      taskListProvider.refresh();
+      tasksProvider.refresh();
     })
   );
 
@@ -95,8 +86,7 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       TaskCreatePanel.show(context.extensionUri, writer, parser, backlogFolder, {
-        kanbanProvider,
-        taskListProvider,
+        tasksProvider,
         taskDetailProvider,
       });
     })
@@ -106,8 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
   if (fileWatcher) {
     fileWatcher.onDidChange((uri) => {
       console.log('[Backlog.md] File change detected, refreshing views');
-      kanbanProvider.refresh();
-      taskListProvider.refresh();
+      tasksProvider.refresh();
       TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
     });
   }

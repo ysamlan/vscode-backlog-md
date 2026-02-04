@@ -65,12 +65,12 @@
       "view/title": [
         {
           "command": "backlog.createTask",
-          "when": "view == backlog.kanban || view == backlog.taskList",
+          "when": "view == backlog.kanban",
           "group": "navigation"
         },
         {
           "command": "backlog.refresh",
-          "when": "view == backlog.kanban || view == backlog.taskList",
+          "when": "view == backlog.kanban",
           "group": "navigation"
         }
       ]
@@ -89,12 +89,7 @@
         {
           "type": "webview",
           "id": "backlog.kanban",
-          "name": "Kanban Board"
-        },
-        {
-          "type": "webview",
-          "id": "backlog.taskList",
-          "name": "Task List"
+          "name": "Tasks"
         }
       ]
     }

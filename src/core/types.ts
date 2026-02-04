@@ -85,6 +85,7 @@ export type WebviewMessage =
   | { type: 'createTask'; task: Partial<Task> }
   | { type: 'archiveTask'; taskId: string }
   | { type: 'openFile'; filePath: string }
+  | { type: 'toggleViewMode' }
   | {
       type: 'toggleChecklistItem';
       taskId: string;
@@ -100,5 +101,6 @@ export type ExtensionMessage =
   | { type: 'taskUpdated'; task: Task }
   | { type: 'milestonesUpdated'; milestones: Milestone[] }
   | { type: 'statusesUpdated'; statuses: string[] }
+  | { type: 'viewModeChanged'; viewMode: 'kanban' | 'list' }
   | { type: 'noBacklogFolder' }
   | { type: 'error'; message: string };

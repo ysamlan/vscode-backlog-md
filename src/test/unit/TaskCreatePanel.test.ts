@@ -34,8 +34,7 @@ describe('TaskCreatePanel', () => {
   let mockPanel: Partial<vscode.WebviewPanel>;
   let mockWebview: Partial<vscode.Webview>;
   let mockTaskDetailProvider: TaskDetailProvider;
-  let mockKanbanProvider: { refresh: Mock };
-  let mockTaskListProvider: { refresh: Mock };
+  let mockTasksProvider: { refresh: Mock };
   let messageHandler: (message: unknown) => Promise<void>;
 
   beforeEach(() => {
@@ -80,8 +79,7 @@ describe('TaskCreatePanel', () => {
       openTask: vi.fn(),
     } as unknown as TaskDetailProvider;
 
-    mockKanbanProvider = { refresh: vi.fn() };
-    mockTaskListProvider = { refresh: vi.fn() };
+    mockTasksProvider = { refresh: vi.fn() };
 
     // Clear static state between tests
     TaskCreatePanel['currentPanel'] = undefined;
@@ -99,8 +97,7 @@ describe('TaskCreatePanel', () => {
         mockParser,
         '/test/backlog',
         {
-          kanbanProvider: mockKanbanProvider,
-          taskListProvider: mockTaskListProvider,
+          tasksProvider: mockTasksProvider,
           taskDetailProvider: mockTaskDetailProvider,
         }
       );
@@ -124,8 +121,7 @@ describe('TaskCreatePanel', () => {
         mockParser,
         '/test/backlog',
         {
-          kanbanProvider: mockKanbanProvider,
-          taskListProvider: mockTaskListProvider,
+          tasksProvider: mockTasksProvider,
           taskDetailProvider: mockTaskDetailProvider,
         }
       );
@@ -137,8 +133,7 @@ describe('TaskCreatePanel', () => {
         mockParser,
         '/test/backlog',
         {
-          kanbanProvider: mockKanbanProvider,
-          taskListProvider: mockTaskListProvider,
+          tasksProvider: mockTasksProvider,
           taskDetailProvider: mockTaskDetailProvider,
         }
       );
@@ -154,8 +149,7 @@ describe('TaskCreatePanel', () => {
         mockParser,
         '/test/backlog',
         {
-          kanbanProvider: mockKanbanProvider,
-          taskListProvider: mockTaskListProvider,
+          tasksProvider: mockTasksProvider,
           taskDetailProvider: mockTaskDetailProvider,
         }
       );
@@ -175,8 +169,7 @@ describe('TaskCreatePanel', () => {
         mockParser,
         '/test/backlog',
         {
-          kanbanProvider: mockKanbanProvider,
-          taskListProvider: mockTaskListProvider,
+          tasksProvider: mockTasksProvider,
           taskDetailProvider: mockTaskDetailProvider,
         }
       );
@@ -195,8 +188,7 @@ describe('TaskCreatePanel', () => {
         mockParser,
         '/test/backlog',
         {
-          kanbanProvider: mockKanbanProvider,
-          taskListProvider: mockTaskListProvider,
+          tasksProvider: mockTasksProvider,
           taskDetailProvider: mockTaskDetailProvider,
         }
       );
@@ -256,8 +248,7 @@ describe('TaskCreatePanel', () => {
         description: 'Description',
       });
 
-      expect(mockKanbanProvider.refresh).toHaveBeenCalled();
-      expect(mockTaskListProvider.refresh).toHaveBeenCalled();
+      expect(mockTasksProvider.refresh).toHaveBeenCalled();
     });
 
     it('should show success message on creation', async () => {
@@ -344,8 +335,7 @@ describe('TaskCreatePanel', () => {
         mockParser,
         '/test/backlog',
         {
-          kanbanProvider: mockKanbanProvider,
-          taskListProvider: mockTaskListProvider,
+          tasksProvider: mockTasksProvider,
           taskDetailProvider: mockTaskDetailProvider,
         }
       );

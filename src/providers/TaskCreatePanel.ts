@@ -4,8 +4,7 @@ import { BacklogWriter, CreateTaskOptions } from '../core/BacklogWriter';
 import { TaskDetailProvider } from './TaskDetailProvider';
 
 interface ViewProviders {
-  kanbanProvider: { refresh: () => void };
-  taskListProvider: { refresh: () => void };
+  tasksProvider: { refresh: () => void };
   taskDetailProvider: TaskDetailProvider;
 }
 
@@ -128,8 +127,7 @@ export class TaskCreatePanel {
       vscode.window.showInformationMessage(`Created task ${result.id}`);
 
       // Refresh views
-      this.providers.kanbanProvider.refresh();
-      this.providers.taskListProvider.refresh();
+      this.providers.tasksProvider.refresh();
 
       // Dispose panel first, then open task detail
       this.panel.dispose();

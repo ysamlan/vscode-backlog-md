@@ -11,7 +11,8 @@ export abstract class BaseViewProvider implements vscode.WebviewViewProvider {
 
   constructor(
     protected readonly extensionUri: vscode.Uri,
-    protected readonly parser: BacklogParser | undefined
+    protected readonly parser: BacklogParser | undefined,
+    protected readonly context?: vscode.ExtensionContext
   ) {}
 
   /**
