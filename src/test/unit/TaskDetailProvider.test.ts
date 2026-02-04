@@ -276,4 +276,65 @@ describe('TaskDetailProvider', () => {
       expect(TaskDetailProvider['currentFilePath']).toBeUndefined();
     });
   });
+
+  describe('getCurrentTaskId', () => {
+    it('should return undefined when no task is open', () => {
+      expect(TaskDetailProvider.getCurrentTaskId()).toBeUndefined();
+    });
+
+    it('should return the current task ID when a task is open', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test Task',
+        description: 'Description',
+        status: 'To Do',
+        priority: undefined,
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: filePath,
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+
+      await provider.openTask('TASK-1');
+
+      expect(TaskDetailProvider.getCurrentTaskId()).toBe('TASK-1');
+    });
+
+    it('should return undefined after panel is disposed', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test Task',
+        description: 'Description',
+        status: 'To Do',
+        priority: undefined,
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: filePath,
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+
+      await provider.openTask('TASK-1');
+      expect(TaskDetailProvider.getCurrentTaskId()).toBe('TASK-1');
+
+      // Simulate panel disposal
+      const disposeCallback = (mockPanel as { _disposeCallback?: () => void })._disposeCallback;
+      if (disposeCallback) {
+        disposeCallback();
+      }
+
+      expect(TaskDetailProvider.getCurrentTaskId()).toBeUndefined();
+    });
+  });
 });

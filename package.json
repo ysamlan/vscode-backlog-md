@@ -60,6 +60,10 @@
         "command": "backlog.createTask",
         "title": "Backlog: Create Task",
         "icon": "$(add)"
+      },
+      {
+        "command": "backlog.openRawMarkdown",
+        "title": "Backlog: Open Task Raw Markdown"
       }
     ],
     "menus": {

@@ -26,6 +26,13 @@ export class TaskDetailProvider {
   private static currentFilePath: string | undefined;
   private readonly writer = new BacklogWriter();
 
+  /**
+   * Get the currently displayed task ID (for command palette commands)
+   */
+  public static getCurrentTaskId(): string | undefined {
+    return TaskDetailProvider.currentTaskId;
+  }
+
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly parser: BacklogParser | undefined

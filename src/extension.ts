@@ -78,6 +78,25 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Register open raw markdown command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.openRawMarkdown', async () => {
+      const taskId = TaskDetailProvider.getCurrentTaskId();
+      if (!taskId) {
+        vscode.window.showInformationMessage('No task is currently open');
+        return;
+      }
+      if (!parser) {
+        vscode.window.showErrorMessage('No backlog folder found');
+        return;
+      }
+      const task = await parser.getTask(taskId);
+      if (task?.filePath) {
+        vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
+      }
+    })
+  );
+
   // Register create task command
   const writer = new BacklogWriter();
   context.subscriptions.push(
