@@ -285,6 +285,15 @@ export class TasksViewProvider extends BaseViewProvider {
             90% { opacity: 1; transform: translateX(-50%) translateY(0); }
             100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
         }
+        /* Keyboard navigation focus styles */
+        .task-card:focus-visible {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+        }
+        .task-table tr:focus-visible {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: -2px;
+        }
     </style>
 </head>
 <body>
@@ -398,7 +407,7 @@ export class TasksViewProvider extends BaseViewProvider {
             ).join('');
 
             return \`
-                <div class="task-card" draggable="true" data-task-id="\${task.id}">
+                <div class="task-card" tabindex="0" draggable="true" data-task-id="\${task.id}">
                     <div class="task-card-title">\${escapeHtml(task.title)}</div>
                     <div class="task-card-meta">
                         \${priorityBadge}
@@ -504,7 +513,7 @@ export class TasksViewProvider extends BaseViewProvider {
             const priorityClass = task.priority ? \`priority-\${task.priority}\` : '';
 
             return \`
-                <tr data-task-id="\${task.id}">
+                <tr data-task-id="\${task.id}" tabindex="0">
                     <td>\${escapeHtml(task.title)}</td>
                     <td><span class="status-badge status-\${statusClass}">\${task.status}</span></td>
                     <td>\${task.priority ? \`<span class="priority-badge \${priorityClass}">\${task.priority}</span>\` : '-'}</td>
@@ -659,6 +668,68 @@ export class TasksViewProvider extends BaseViewProvider {
                 renderList();
             });
         });
+
+        // ===== Keyboard Navigation =====
+        document.addEventListener('keydown', e => {
+            const focused = document.activeElement;
+
+            // Kanban view: task cards
+            if (focused && focused.classList.contains('task-card')) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    vscode.postMessage({ type: 'openTask', taskId: focused.dataset.taskId });
+                }
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const next = focused.nextElementSibling;
+                    if (next && next.classList.contains('task-card')) next.focus();
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prev = focused.previousElementSibling;
+                    if (prev && prev.classList.contains('task-card')) prev.focus();
+                }
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const col = focused.closest('.kanban-column');
+                    const nextCol = col?.nextElementSibling;
+                    const cards = nextCol?.querySelectorAll('.task-card');
+                    if (cards && cards.length) cards[0].focus();
+                }
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    const col = focused.closest('.kanban-column');
+                    const prevCol = col?.previousElementSibling;
+                    const cards = prevCol?.querySelectorAll('.task-card');
+                    if (cards && cards.length) cards[0].focus();
+                }
+            }
+
+            // List view: table rows
+            if (focused && focused.tagName === 'TR' && focused.dataset.taskId) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    vscode.postMessage({ type: 'openTask', taskId: focused.dataset.taskId });
+                }
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const next = focused.nextElementSibling;
+                    if (next && next.dataset.taskId) next.focus();
+                }
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prev = focused.previousElementSibling;
+                    if (prev && prev.dataset.taskId) prev.focus();
+                }
+            }
+        });
+
+        // Scroll focused element into view
+        document.addEventListener('focus', e => {
+            if (e.target && (e.target.classList?.contains('task-card') || (e.target.tagName === 'TR' && e.target.dataset?.taskId))) {
+                e.target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }, true);
 
         window.addEventListener('message', event => {
             const message = event.data;
