@@ -93,6 +93,10 @@ export class TasksViewProvider extends BaseViewProvider {
         const kanbanIcon = \`${kanbanIcon}\`;
         const listIcon = \`${listIcon}\`;
 
+        // Arrow icons for dependency indicators
+        const arrowLeftIcon = \`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>\`;
+        const arrowRightIcon = \`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 5 7 7-7 7"/><path d="M5 12h14"/></svg>\`;
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
@@ -183,6 +187,32 @@ export class TasksViewProvider extends BaseViewProvider {
                 \`<span class="task-label">\${l}</span>\`
             ).join('');
 
+            // Build dependency indicators (tasks this task depends on)
+            const depsHtml = task.dependencies && task.dependencies.length > 0
+                ? \`<span class="task-deps">
+                    \${arrowLeftIcon}
+                    \${task.dependencies.slice(0, 2).map(id =>
+                        \`<a href="#" class="dep-link" data-task-id="\${escapeHtml(id)}">\${escapeHtml(id)}</a>\`
+                    ).join(', ')}
+                    \${task.dependencies.length > 2 ? \`<span class="dep-overflow">+\${task.dependencies.length - 2}</span>\` : ''}
+                   </span>\`
+                : '';
+
+            // Build blocks indicators (tasks that depend on this task)
+            const blocksHtml = task.blocksTaskIds && task.blocksTaskIds.length > 0
+                ? \`<span class="task-deps">
+                    \${arrowRightIcon}
+                    \${task.blocksTaskIds.slice(0, 2).map(id =>
+                        \`<a href="#" class="dep-link" data-task-id="\${escapeHtml(id)}">\${escapeHtml(id)}</a>\`
+                    ).join(', ')}
+                    \${task.blocksTaskIds.length > 2 ? \`<span class="dep-overflow">+\${task.blocksTaskIds.length - 2}</span>\` : ''}
+                   </span>\`
+                : '';
+
+            const depsSection = (depsHtml || blocksHtml)
+                ? \`<div class="task-card-deps">\${depsHtml}\${blocksHtml}</div>\`
+                : '';
+
             return \`
                 <div class="task-card" tabindex="0" draggable="true" data-task-id="\${task.id}" data-ordinal="\${task.ordinal || 0}">
                     <div class="task-card-title">\${escapeHtml(task.title)}</div>
@@ -190,6 +220,7 @@ export class TasksViewProvider extends BaseViewProvider {
                         \${priorityBadge}
                         \${labels}
                     </div>
+                    \${depsSection}
                 </div>
             \`;
         }
@@ -208,7 +239,19 @@ export class TasksViewProvider extends BaseViewProvider {
                     card.classList.remove('dragging');
                 });
 
-                card.addEventListener('click', () => {
+                card.addEventListener('click', (e) => {
+                    // Check if click was on a dependency link
+                    const depLink = e.target.closest('.dep-link');
+                    if (depLink) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        vscode.postMessage({
+                            type: 'openTask',
+                            taskId: depLink.dataset.taskId
+                        });
+                        return;
+                    }
+                    // Regular card click
                     vscode.postMessage({
                         type: 'openTask',
                         taskId: card.dataset.taskId
@@ -342,9 +385,19 @@ export class TasksViewProvider extends BaseViewProvider {
             const statusClass = task.status.toLowerCase().replace(' ', '-');
             const priorityClass = task.priority ? \`priority-\${task.priority}\` : '';
 
+            // Compact dependency indicator for list view
+            const depsCount = (task.dependencies || []).length;
+            const blocksCount = (task.blocksTaskIds || []).length;
+            const depsIndicator = (depsCount > 0 || blocksCount > 0)
+                ? \`<span class="deps-indicator" title="Blocked by: \${depsCount}, Blocks: \${blocksCount}">
+                    \${depsCount > 0 ? \`\${arrowLeftIcon}\${depsCount}\` : ''}
+                    \${blocksCount > 0 ? \`\${arrowRightIcon}\${blocksCount}\` : ''}
+                   </span>\`
+                : '';
+
             return \`
                 <tr data-task-id="\${task.id}" tabindex="0">
-                    <td>\${escapeHtml(task.title)}</td>
+                    <td>\${escapeHtml(task.title)} \${depsIndicator}</td>
                     <td><span class="status-badge status-\${statusClass}">\${task.status}</span></td>
                     <td>\${task.priority ? \`<span class="priority-badge \${priorityClass}">\${task.priority}</span>\` : '-'}</td>
                 </tr>
@@ -643,8 +696,16 @@ export class TasksViewProvider extends BaseViewProvider {
 
       const [tasks, statuses] = await Promise.all([taskLoader, this.parser.getStatuses()]);
 
+      // Compute reverse dependencies (blocksTaskIds) for each task
+      const tasksWithBlocks = await Promise.all(
+        tasks.map(async (task) => ({
+          ...task,
+          blocksTaskIds: await this.parser!.getBlockedByThisTask(task.id),
+        }))
+      );
+
       this.postMessage({ type: 'statusesUpdated', statuses });
-      this.postMessage({ type: 'tasksUpdated', tasks });
+      this.postMessage({ type: 'tasksUpdated', tasks: tasksWithBlocks });
     } catch (error) {
       console.error('[Backlog.md] Error refreshing Tasks view:', error);
       this.postMessage({ type: 'error', message: 'Failed to load tasks' });

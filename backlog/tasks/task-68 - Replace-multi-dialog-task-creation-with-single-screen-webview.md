@@ -1,9 +1,10 @@
 ---
 id: TASK-68
 title: Replace multi-dialog task creation with single-screen webview
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-04 01:57'
+updated_date: '2026-02-04 19:42'
 labels:
   - enhancement
   - ux
@@ -36,10 +37,10 @@ The current "Create Task" flow (`backlog.createTask` command) uses a series of V
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Create Task command opens a webview panel instead of dialogs
-- [ ] #2 Panel has title input field (required) and description textarea (optional)
-- [ ] #3 Panel has a Create Task button that saves and redirects to detail view
-- [ ] #4 New tasks default to medium priority and To Do status
-- [ ] #5 After creation, TaskDetailProvider opens with the new task
-- [ ] #6 Existing styling/theming from TaskDetailProvider is reused
+- [x] #1 Create Task command opens a webview panel instead of dialogs
+- [x] #2 Panel has title input field (required) and description textarea (optional)
+- [x] #3 Panel has a Create Task button that saves and redirects to detail view
+- [x] #4 New tasks default to medium priority and To Do status
+- [x] #5 After creation, TaskDetailProvider opens with the new task
+- [x] #6 Existing styling/theming from TaskDetailProvider is reused
 <!-- AC:END -->

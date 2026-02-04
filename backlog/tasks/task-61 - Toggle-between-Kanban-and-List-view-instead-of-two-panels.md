@@ -1,9 +1,10 @@
 ---
 id: TASK-61
 title: Toggle between Kanban and List view instead of two panels
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-03 16:50'
+updated_date: '2026-02-04 19:44'
 labels: []
 dependencies: []
 priority: medium

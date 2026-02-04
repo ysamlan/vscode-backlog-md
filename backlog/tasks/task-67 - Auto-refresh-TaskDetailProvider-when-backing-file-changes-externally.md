@@ -1,9 +1,10 @@
 ---
 id: TASK-67
 title: Auto-refresh TaskDetailProvider when backing file changes externally
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-04 01:54'
+updated_date: '2026-02-04 19:44'
 labels:
   - enhancement
   - task-detail

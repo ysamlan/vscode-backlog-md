@@ -373,6 +373,57 @@ body {
   opacity: 1;
 }
 
+/* Task card dependency links */
+.task-card-deps {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--vscode-widget-border);
+  font-size: 10px;
+}
+
+.task-deps {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.task-deps svg {
+  opacity: 0.7;
+}
+
+.dep-link {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  font-size: 10px;
+}
+
+.dep-link:hover {
+  text-decoration: underline;
+}
+
+.dep-overflow {
+  color: var(--vscode-descriptionForeground);
+  font-size: 9px;
+}
+
+/* List view dependency indicator */
+.deps-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.deps-indicator svg {
+  opacity: 0.7;
+}
+
 /* Task card optimistic UI */
 .task-card.saving {
   opacity: 0.7;
