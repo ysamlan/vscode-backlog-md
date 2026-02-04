@@ -102,5 +102,7 @@ export type ExtensionMessage =
   | { type: 'milestonesUpdated'; milestones: Milestone[] }
   | { type: 'statusesUpdated'; statuses: string[] }
   | { type: 'viewModeChanged'; viewMode: 'kanban' | 'list' }
+  | { type: 'taskUpdateSuccess'; taskId: string }
+  | { type: 'taskUpdateError'; taskId: string; originalStatus: TaskStatus; message: string }
   | { type: 'noBacklogFolder' }
   | { type: 'error'; message: string };

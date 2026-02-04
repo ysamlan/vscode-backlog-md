@@ -117,6 +117,7 @@ export class TasksViewProvider extends BaseViewProvider {
             min-height: 50px;
         }
         .task-card {
+            position: relative;
             background: var(--vscode-editor-background);
             border: 1px solid var(--vscode-widget-border);
             border-radius: 6px;
@@ -243,6 +244,47 @@ export class TasksViewProvider extends BaseViewProvider {
         .sort-indicator {
             margin-left: 4px;
         }
+        /* Optimistic UI styles */
+        .task-card.saving {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        .task-card.saving::after {
+            content: '';
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 8px;
+            height: 8px;
+            border: 2px solid var(--vscode-descriptionForeground);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+            color: var(--vscode-errorForeground, #f48771);
+            border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            animation: fadeInOut 3s forwards;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+        }
     </style>
 </head>
 <body>
@@ -294,6 +336,29 @@ export class TasksViewProvider extends BaseViewProvider {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function updateColumnCounts() {
+            document.querySelectorAll('.kanban-column').forEach(col => {
+                const status = col.dataset.status;
+                const count = col.querySelectorAll('.task-card').length;
+                const countEl = col.querySelector('.column-count');
+                if (countEl) countEl.textContent = count;
+            });
+        }
+
+        function showToast(message) {
+            // Remove existing toast
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            // Remove after animation
+            setTimeout(() => toast.remove(), 3000);
         }
 
         // ===== Kanban View Functions =====
@@ -380,7 +445,21 @@ export class TasksViewProvider extends BaseViewProvider {
                     list.classList.remove('drop-target');
 
                     const taskId = e.dataTransfer.getData('text/plain');
+                    const card = document.querySelector(\`[data-task-id="\${taskId}"]\`);
+                    if (!card) return;
+
+                    const originalColumn = card.closest('.task-list');
+                    const originalStatus = originalColumn?.dataset.status;
                     const newStatus = list.dataset.status;
+
+                    // If same column, no status change needed
+                    if (originalStatus === newStatus) return;
+
+                    // Optimistic move - move card immediately
+                    card.classList.add('saving');
+                    card.dataset.originalStatus = originalStatus || '';
+                    list.appendChild(card);
+                    updateColumnCounts();
 
                     vscode.postMessage({
                         type: 'updateTaskStatus',
@@ -599,6 +678,29 @@ export class TasksViewProvider extends BaseViewProvider {
                     updateViewMode(message.viewMode);
                     render();
                     break;
+                case 'taskUpdateSuccess': {
+                    const card = document.querySelector(\`[data-task-id="\${message.taskId}"]\`);
+                    if (card) {
+                        card.classList.remove('saving');
+                        delete card.dataset.originalStatus;
+                    }
+                    break;
+                }
+                case 'taskUpdateError': {
+                    const card = document.querySelector(\`[data-task-id="\${message.taskId}"]\`);
+                    if (card) {
+                        card.classList.remove('saving');
+                        // Move back to original column
+                        const origList = document.querySelector(\`.task-list[data-status="\${message.originalStatus}"]\`);
+                        if (origList) {
+                            origList.appendChild(card);
+                            updateColumnCounts();
+                        }
+                        delete card.dataset.originalStatus;
+                    }
+                    showToast(message.message || 'Failed to update task');
+                    break;
+                }
                 case 'noBacklogFolder':
                     renderNoBacklogState();
                     break;
@@ -659,17 +761,29 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
       }
 
-      case 'updateTaskStatus':
+      case 'updateTaskStatus': {
         if (!this.parser) break;
+        const taskId = message.taskId;
+        // Get original status before update for rollback
+        const task = await this.parser.getTask(taskId);
+        const originalStatus = task?.status || 'To Do';
+
         try {
           const writer = new BacklogWriter();
-          await writer.updateTaskStatus(message.taskId, message.status, this.parser);
-          await this.refresh();
+          await writer.updateTaskStatus(taskId, message.status, this.parser);
+          // Send success - no need to refresh since we did optimistic update
+          this.postMessage({ type: 'taskUpdateSuccess', taskId });
         } catch (error) {
           console.error('Error updating task status:', error);
-          this.postMessage({ type: 'error', message: 'Failed to update task status' });
+          this.postMessage({
+            type: 'taskUpdateError',
+            taskId,
+            originalStatus,
+            message: 'Failed to update task status',
+          });
         }
         break;
+      }
 
       case 'archiveTask': {
         if (!this.parser || !message.taskId) break;
