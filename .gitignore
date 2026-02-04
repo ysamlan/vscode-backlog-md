@@ -4,4 +4,7 @@ out/
 *.vsix
 .vscode-test/
 .DS_Store
+
+# vscode-extension-tester artifacts
+core
 .claude/settings.local.json

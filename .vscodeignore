@@ -24,3 +24,15 @@ CLAUDE.md
 
 # Test fixtures
 src/test/**
+
+# E2E test artifacts
+core
+.mcp.json
+
+# Cypress / webview tests
+cypress/**
+cypress.config.ts
+vite.config.ts
+
+# Devcontainer
+.devcontainer/**
