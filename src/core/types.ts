@@ -42,6 +42,7 @@ export interface Task {
   filePath: string;
   createdAt?: string;
   updatedAt?: string;
+  ordinal?: number; // For custom ordering within status columns (fractional indexing)
 }
 
 /**
@@ -86,6 +87,7 @@ export type WebviewMessage =
   | { type: 'archiveTask'; taskId: string }
   | { type: 'openFile'; filePath: string }
   | { type: 'toggleViewMode' }
+  | { type: 'reorderTask'; taskId: string; ordinal: number }
   | {
       type: 'toggleChecklistItem';
       taskId: string;

@@ -56,6 +56,7 @@ interface FrontmatterData {
   type?: string;
   created_date?: string;
   updated_date?: string;
+  ordinal?: number;
   [key: string]: unknown;
 }
 
@@ -180,6 +181,9 @@ export class BacklogWriter {
     }
     if (updates.type !== undefined) {
       frontmatter.type = updates.type;
+    }
+    if (updates.ordinal !== undefined) {
+      frontmatter.ordinal = updates.ordinal;
     }
 
     // Update the updated_date

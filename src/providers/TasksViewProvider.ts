@@ -380,7 +380,18 @@ export class TasksViewProvider extends BaseViewProvider {
             }
 
             app.innerHTML = columns.map(col => {
-                const columnTasks = tasks.filter(t => t.status === col.status);
+                const columnTasks = tasks
+                    .filter(t => t.status === col.status)
+                    .sort((a, b) => {
+                        // Tasks with ordinal come before tasks without
+                        const aOrd = a.ordinal;
+                        const bOrd = b.ordinal;
+                        if (aOrd !== undefined && bOrd === undefined) return -1;
+                        if (aOrd === undefined && bOrd !== undefined) return 1;
+                        if (aOrd !== undefined && bOrd !== undefined) return aOrd - bOrd;
+                        // Both undefined: sort by ID
+                        return a.id.localeCompare(b.id);
+                    });
                 return \`
                     <div class="kanban-column" data-status="\${col.status}">
                         <div class="column-header">
@@ -407,7 +418,7 @@ export class TasksViewProvider extends BaseViewProvider {
             ).join('');
 
             return \`
-                <div class="task-card" tabindex="0" draggable="true" data-task-id="\${task.id}">
+                <div class="task-card" tabindex="0" draggable="true" data-task-id="\${task.id}" data-ordinal="\${task.ordinal || 0}">
                     <div class="task-card-title">\${escapeHtml(task.title)}</div>
                     <div class="task-card-meta">
                         \${priorityBadge}
@@ -461,22 +472,75 @@ export class TasksViewProvider extends BaseViewProvider {
                     const originalStatus = originalColumn?.dataset.status;
                     const newStatus = list.dataset.status;
 
-                    // If same column, no status change needed
-                    if (originalStatus === newStatus) return;
+                    if (originalStatus === newStatus) {
+                        // Same column - reorder within column
+                        const dropTarget = getDropTarget(e, list, card);
+                        if (!dropTarget && card === list.lastElementChild) return; // No change
 
-                    // Optimistic move - move card immediately
-                    card.classList.add('saving');
-                    card.dataset.originalStatus = originalStatus || '';
-                    list.appendChild(card);
-                    updateColumnCounts();
+                        const newOrdinal = calculateNewOrdinal(dropTarget, list, card);
 
-                    vscode.postMessage({
-                        type: 'updateTaskStatus',
-                        taskId: taskId,
-                        status: newStatus
-                    });
+                        // Optimistic reorder
+                        card.classList.add('saving');
+                        if (dropTarget) {
+                            list.insertBefore(card, dropTarget);
+                        } else {
+                            list.appendChild(card);
+                        }
+                        card.dataset.ordinal = String(newOrdinal);
+
+                        vscode.postMessage({
+                            type: 'reorderTask',
+                            taskId: taskId,
+                            ordinal: newOrdinal
+                        });
+                    } else {
+                        // Different column - status change
+                        card.classList.add('saving');
+                        card.dataset.originalStatus = originalStatus || '';
+                        list.appendChild(card);
+                        updateColumnCounts();
+
+                        vscode.postMessage({
+                            type: 'updateTaskStatus',
+                            taskId: taskId,
+                            status: newStatus
+                        });
+                    }
                 });
             });
+        }
+
+        function getDropTarget(e, list, draggedCard) {
+            const cards = [...list.querySelectorAll('.task-card:not(.dragging)')].filter(c => c !== draggedCard);
+            return cards.find(card => {
+                const rect = card.getBoundingClientRect();
+                return e.clientY < rect.top + rect.height / 2;
+            }) || null;
+        }
+
+        function calculateNewOrdinal(dropTarget, list, draggedCard) {
+            const DEFAULT_STEP = 1000;
+            const cards = [...list.querySelectorAll('.task-card')].filter(c => c !== draggedCard);
+
+            if (!dropTarget) {
+                // Dropping at end
+                if (cards.length === 0) return DEFAULT_STEP;
+                const lastCard = cards[cards.length - 1];
+                const lastOrdinal = parseFloat(lastCard.dataset.ordinal) || 0;
+                return lastOrdinal + DEFAULT_STEP;
+            }
+
+            const targetIndex = cards.indexOf(dropTarget);
+            const nextOrdinal = parseFloat(dropTarget.dataset.ordinal) || DEFAULT_STEP;
+
+            if (targetIndex === 0) {
+                // Dropping at start
+                return nextOrdinal / 2;
+            }
+
+            const prevCard = cards[targetIndex - 1];
+            const prevOrdinal = parseFloat(prevCard.dataset.ordinal) || 0;
+            return (prevOrdinal + nextOrdinal) / 2;
         }
 
         // ===== List View Functions =====
@@ -852,6 +916,22 @@ export class TasksViewProvider extends BaseViewProvider {
             originalStatus,
             message: 'Failed to update task status',
           });
+        }
+        break;
+      }
+
+      case 'reorderTask': {
+        if (!this.parser) break;
+        const taskId = message.taskId;
+        try {
+          const writer = new BacklogWriter();
+          await writer.updateTask(taskId, { ordinal: message.ordinal }, this.parser);
+          this.postMessage({ type: 'taskUpdateSuccess', taskId });
+        } catch (error) {
+          console.error('Error reordering task:', error);
+          // For reorder errors, just remove saving state - no need to restore position
+          // since the UI already shows the new position optimistically
+          this.postMessage({ type: 'taskUpdateSuccess', taskId });
         }
         break;
       }

@@ -24,6 +24,7 @@ interface RawFrontmatter {
   created?: string;
   updated_date?: string;
   updated?: string;
+  ordinal?: number;
 }
 
 /**
@@ -325,6 +326,9 @@ export class BacklogParser {
     }
     if (fm.type) {
       task.type = String(fm.type);
+    }
+    if (typeof fm.ordinal === 'number') {
+      task.ordinal = fm.ordinal;
     }
   }
 
