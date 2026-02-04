@@ -1,9 +1,10 @@
 ---
 id: TASK-46
 title: Refactor webviews to use external CSS file
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-02-02 23:49'
+updated_date: '2026-02-04 19:33'
 labels:
   - 'epic:polish'
   - tech-debt
