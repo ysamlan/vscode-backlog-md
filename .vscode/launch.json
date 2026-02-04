@@ -10,7 +10,7 @@
         "--folder-uri=file://${workspaceFolder}"
       ],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "preLaunchTask": "npm: build"
+      "preLaunchTask": "bun: build"
     },
     {
       "name": "Run Extension (test workspace)",
@@ -21,7 +21,7 @@
         "--folder-uri=file://${workspaceFolder}/src/test/e2e/fixtures/test-workspace"
       ],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "preLaunchTask": "npm: build"
+      "preLaunchTask": "bun: build"
     },
     {
       "name": "Run Extension (no workspace)",
@@ -29,7 +29,7 @@
       "request": "launch",
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-      "preLaunchTask": "npm: build"
+      "preLaunchTask": "bun: build"
     }
   ]
 }

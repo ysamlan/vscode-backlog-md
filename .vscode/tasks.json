@@ -2,17 +2,17 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "type": "npm",
-      "script": "build",
+      "type": "shell",
+      "command": "bun run build",
       "group": "build",
-      "label": "npm: build",
+      "label": "bun: build",
       "problemMatcher": []
     },
     {
-      "type": "npm",
-      "script": "watch",
+      "type": "shell",
+      "command": "bun run watch",
       "group": "build",
-      "label": "npm: watch",
+      "label": "bun: watch",
       "isBackground": true,
       "problemMatcher": []
     }

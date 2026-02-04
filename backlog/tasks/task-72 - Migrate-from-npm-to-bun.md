@@ -1,10 +1,13 @@
 ---
 id: TASK-72
 title: Migrate from npm to bun
-status: Backlog
-priority: Low
-type: DX
-created: 2026-02-04
+status: Done
+assignee: []
+created_date: ''
+updated_date: '2026-02-04 15:29'
+labels: []
+dependencies: []
+priority: low
 ---
 
 # Migrate from npm to bun
@@ -46,10 +49,45 @@ Replace npm with bun as the package manager and script runner for faster install
 - `bun run package` (vsce)
 
 ## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 Replace package-lock.json with bun.lockb
+- [x] #2 All existing npm scripts work with bun
+- [x] #3 Update devcontainer configuration
+- [x] #4 Update CI workflows (if any) - N/A, no workflows exist
+- [x] #5 Update CLAUDE.md with bun commands
+- [x] #6 Document any compatibility issues found (none encountered)
+<!-- AC:END -->
 
-- [ ] Replace package-lock.json with bun.lockb
-- [ ] All existing npm scripts work with bun
-- [ ] Update devcontainer configuration
-- [ ] Update CI workflows (if any)
-- [ ] Update CLAUDE.md with bun commands
-- [ ] Document any compatibility issues found
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## Summary
+Migrated the vscode-backlog-md project from npm to bun as the package manager and script runner.
+
+## Changes Made
+
+### Config Files
+- **package.json**: Updated 3 scripts (`npx` → `bunx`, `npm run` → `bun run`)
+- **.vscode/tasks.json**: Changed task type from `npm` to `shell`, updated labels to `bun: build` and `bun: watch`
+- **.vscode/launch.json**: Updated all 3 `preLaunchTask` references from `npm: build` to `bun: build`
+- **.devcontainer/devcontainer.json**: Updated `postCreateCommand` from `npm install` to `bun install`
+
+### Shell Scripts
+- **scripts/generate-licenses.sh**: `npx` → `bunx`
+- **scripts/run-e2e.sh**: `npx` → `bunx`
+
+### Documentation
+- **CLAUDE.md**: Updated all npm commands to bun equivalents
+- **README.md**: Updated development and testing sections
+- **CONTRIBUTING.md**: Updated prerequisites, setup, and code style instructions
+
+### Deleted
+- **package-lock.json**: Replaced by `bun.lockb`
+
+## Verification
+All tests pass with bun:
+- `bun run build` - compiles extension and CSS
+- `bun run test` - passes all unit tests
+- `bun run lint` - no errors
+- `bun run typecheck` - no errors
+<!-- SECTION:FINAL_SUMMARY:END -->

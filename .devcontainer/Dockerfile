@@ -126,8 +126,9 @@ RUN echo 'eval "$(mise activate zsh)"' >> /home/node/.zshrc && \
 RUN curl -fsSL https://claude.ai/install.sh | bash -s -- $CLAUDE_CODE_VERSION
 
 # Pre-install mise tools (Node + Bun) for faster container startup
-RUN mise trust --yes /workspace/mise.toml 2>/dev/null || true
+RUN printf '[tools]\nnode = "22"\nbun = "latest"\n' > /workspace/mise.toml && \
+    mise trust --yes /workspace/mise.toml && \
+    mise install
 
-RUN bun i -g backlog.md 
-# you'll need to run `claude mcp add backlog --scope user -- backlog mcp start` the first time you use it -
-# subsequently
+RUN mise exec -- bun i -g backlog.md 
+# you'll need to run `claude mcp add backlog --scope user -- backlog mcp start` the first time you use it
