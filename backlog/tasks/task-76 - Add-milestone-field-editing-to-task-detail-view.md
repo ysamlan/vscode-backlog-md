@@ -1,9 +1,10 @@
 ---
 id: TASK-76
 title: Add milestone field editing to task detail view
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-04 20:20'
+updated_date: '2026-02-04 20:52'
 labels:
   - feature
   - ui
@@ -31,9 +32,26 @@ This mirrors the milestone filtering feature in the list view (TASK-16) but prov
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Milestone field appears in task detail metadata section
-- [ ] #2 Dropdown shows all milestones from config + milestones used by tasks
-- [ ] #3 User can select a milestone to assign it to the task
-- [ ] #4 User can clear the milestone ("None" option)
-- [ ] #5 Changes are saved to the task markdown file
+- [x] #1 Milestone field appears in task detail metadata section
+- [x] #2 Dropdown shows all milestones from config + milestones used by tasks
+- [x] #3 User can select a milestone to assign it to the task
+- [x] #4 User can clear the milestone ("None" option)
+- [x] #5 Changes are saved to the task markdown file
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added milestone field editing to task detail view:
+
+**Changes:**
+- `src/providers/TaskDetailProvider.ts`: Added milestone dropdown with options from config + task milestones
+- `src/webview/styles.css`: Added `.milestone-select` styling
+- `src/test/unit/TaskDetailProvider.test.ts`: Updated mock parser with `getMilestones` and `getTasks`
+
+**Implementation:**
+- Fetches milestones from config via `parser.getMilestones()`
+- Combines with unique milestones from all tasks (for orphaned milestones)
+- Dropdown includes "None" option to clear milestone
+- Changes saved via existing `updateField` message handler
+<!-- SECTION:FINAL_SUMMARY:END -->

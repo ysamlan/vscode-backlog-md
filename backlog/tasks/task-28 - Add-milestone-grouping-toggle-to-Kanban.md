@@ -1,10 +1,10 @@
 ---
 id: TASK-28
 title: Add milestone grouping toggle to Kanban
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-02 23:22'
-updated_date: '2026-02-04 01:26'
+updated_date: '2026-02-04 20:55'
 labels:
   - 'epic:kanban-board'
   - 'phase:6'
@@ -27,9 +27,37 @@ When "Milestone" view is selected:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Toggle button to switch between 'All Tasks' and 'Milestone' views
-- [ ] #2 Collapsible milestone sections with task count badge
-- [ ] #3 Progress bar showing % of tasks completed per milestone
-- [ ] #4 Kanban columns within each milestone section
-- [ ] #5 Uncategorized section for tasks without milestone
+- [x] #1 Toggle button to switch between 'All Tasks' and 'Milestone' views
+- [x] #2 Collapsible milestone sections with task count badge
+- [x] #3 Progress bar showing % of tasks completed per milestone
+- [x] #4 Kanban columns within each milestone section
+- [x] #5 Uncategorized section for tasks without milestone
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added milestone grouping toggle to Kanban view:
+
+**Changes:**
+- `src/providers/TasksViewProvider.ts`:
+  - Added `milestoneGrouping` and `collapsedMilestones` state variables
+  - Added toolbar with "All Tasks" / "By Milestone" toggle buttons
+  - Implemented `renderKanbanByMilestone()` function with collapsible milestone sections
+  - Added message handlers for `toggleMilestoneGrouping` and `toggleMilestoneCollapse`
+  - State persisted to `globalState`
+- `src/webview/styles.css`:
+  - Added `.kanban-toolbar` and `.grouping-btn` styles
+  - Added `.milestone-section`, `.milestone-header`, `.milestone-content` styles
+  - Added `.progress-bar`, `.progress-fill`, `.progress-text` for progress visualization
+  - Added `.column-header-mini` for nested kanban headers
+- `src/core/types.ts`: Added new message types
+
+**Features:**
+- Toggle between flat and milestone-grouped Kanban views
+- Collapsible milestone sections with task count badge
+- Progress bar showing % of done tasks per milestone
+- Nested Kanban columns within each milestone section
+- "Uncategorized" section for tasks without milestone
+- Milestones sorted by config order first, then alphabetically
+<!-- SECTION:FINAL_SUMMARY:END -->
