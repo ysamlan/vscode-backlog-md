@@ -34,10 +34,6 @@ export class TasksViewProvider extends BaseViewProvider {
     const nonce = this.getNonce();
     const styleUri = this.getResourceUri(webview, 'styles.css');
 
-    // Lucide icons for toggle button
-    const kanbanIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>`;
-    const listIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>`;
-
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,11 +44,6 @@ export class TasksViewProvider extends BaseViewProvider {
     <title>Tasks</title>
 </head>
 <body>
-    <div class="view-header">
-        <button id="toggleView" class="toggle-btn" title="Toggle view">
-            ${this.viewMode === 'kanban' ? listIcon : kanbanIcon}
-        </button>
-    </div>
     <div id="kanban-view" class="view-content ${this.viewMode === 'kanban' ? '' : 'hidden'}">
         <div id="kanban-app" class="kanban-board">
             <div class="empty-state">Loading tasks...</div>
@@ -88,10 +79,6 @@ export class TasksViewProvider extends BaseViewProvider {
         let currentSort = { field: 'status', direction: 'asc' };
         let searchQuery = '';
         let collapsedColumns = new Set(${JSON.stringify(Array.from(this.collapsedColumns))});
-
-        // Icon SVGs for toggle button
-        const kanbanIcon = \`${kanbanIcon}\`;
-        const listIcon = \`${listIcon}\`;
 
         // Arrow icons for dependency indicators
         const arrowLeftIcon = \`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>\`;
@@ -490,18 +477,13 @@ export class TasksViewProvider extends BaseViewProvider {
             viewMode = newMode;
             const kanbanView = document.getElementById('kanban-view');
             const listView = document.getElementById('list-view');
-            const toggleBtn = document.getElementById('toggleView');
 
             if (viewMode === 'kanban') {
                 kanbanView.classList.remove('hidden');
                 listView.classList.add('hidden');
-                toggleBtn.innerHTML = listIcon;
-                toggleBtn.title = 'Switch to list view';
             } else {
                 kanbanView.classList.add('hidden');
                 listView.classList.remove('hidden');
-                toggleBtn.innerHTML = kanbanIcon;
-                toggleBtn.title = 'Switch to kanban view';
             }
         }
 
@@ -534,10 +516,6 @@ export class TasksViewProvider extends BaseViewProvider {
         }
 
         // ===== Event Handlers =====
-        document.getElementById('toggleView').addEventListener('click', () => {
-            vscode.postMessage({ type: 'toggleViewMode' });
-        });
-
         document.getElementById('searchInput').addEventListener('input', e => {
             searchQuery = e.target.value;
             renderList();
@@ -718,14 +696,6 @@ export class TasksViewProvider extends BaseViewProvider {
         await this.refresh();
         break;
 
-      case 'toggleViewMode':
-        this.viewMode = this.viewMode === 'kanban' ? 'list' : 'kanban';
-        if (this.context) {
-          await this.context.globalState.update('backlog.viewMode', this.viewMode);
-        }
-        this.postMessage({ type: 'viewModeChanged', viewMode: this.viewMode });
-        break;
-
       case 'openTask': {
         vscode.commands.executeCommand('backlog.openTaskDetail', message.taskId);
         break;
@@ -830,5 +800,17 @@ export class TasksViewProvider extends BaseViewProvider {
    */
   getDataSourceMode(): DataSourceMode {
     return this.dataSourceMode;
+  }
+
+  /**
+   * Set the view mode (kanban or list) from external command
+   */
+  setViewMode(mode: 'kanban' | 'list'): void {
+    if (this.viewMode === mode) return;
+    this.viewMode = mode;
+    if (this.context) {
+      this.context.globalState.update('backlog.viewMode', mode);
+    }
+    this.postMessage({ type: 'viewModeChanged', viewMode: mode });
   }
 }

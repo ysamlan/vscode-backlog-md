@@ -8,3 +8,4 @@ out/
 # vscode-extension-tester artifacts
 /core
 .claude/settings.local.json
+tmp/

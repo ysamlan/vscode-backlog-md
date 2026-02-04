@@ -194,30 +194,6 @@ body {
    Tasks View (Kanban + List) Styles
    ============================================ */
 
-.view-header {
-  display: flex;
-  justify-content: flex-end;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--vscode-widget-border);
-}
-
-.toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: transparent;
-  color: var(--vscode-foreground);
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.toggle-btn:hover {
-  background: var(--vscode-toolbar-hoverBackground);
-}
-
 .view-content {
   display: block;
 }

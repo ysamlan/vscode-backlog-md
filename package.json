@@ -50,7 +50,8 @@
       },
       {
         "command": "backlog.refresh",
-        "title": "Backlog: Refresh"
+        "title": "Backlog: Refresh",
+        "icon": "$(refresh)"
       },
       {
         "command": "backlog.openTaskDetail",
@@ -64,6 +65,16 @@
       {
         "command": "backlog.openRawMarkdown",
         "title": "Backlog: Open Task Raw Markdown"
+      },
+      {
+        "command": "backlog.showListView",
+        "title": "Switch to List View",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "backlog.showKanbanView",
+        "title": "Switch to Kanban View",
+        "icon": "$(layout)"
       }
     ],
     "menus": {
@@ -71,12 +82,22 @@
         {
           "command": "backlog.createTask",
           "when": "view == backlog.kanban",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "backlog.showListView",
+          "when": "view == backlog.kanban && !backlog.isListView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "backlog.showKanbanView",
+          "when": "view == backlog.kanban && backlog.isListView",
+          "group": "navigation@2"
         },
         {
           "command": "backlog.refresh",
           "when": "view == backlog.kanban",
-          "group": "navigation"
+          "group": "navigation@3"
         }
       ]
     },

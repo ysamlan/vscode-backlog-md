@@ -107,7 +107,6 @@ export type WebviewMessage =
   | { type: 'createTask'; task: Partial<Task> }
   | { type: 'archiveTask'; taskId: string }
   | { type: 'openFile'; filePath: string }
-  | { type: 'toggleViewMode' }
   | { type: 'reorderTask'; taskId: string; ordinal: number }
   | {
       type: 'toggleChecklistItem';

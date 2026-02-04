@@ -72,6 +72,25 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Register view mode toggle commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.showListView', () => {
+      tasksProvider.setViewMode('list');
+      vscode.commands.executeCommand('setContext', 'backlog.isListView', true);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.showKanbanView', () => {
+      tasksProvider.setViewMode('kanban');
+      vscode.commands.executeCommand('setContext', 'backlog.isListView', false);
+    })
+  );
+
+  // Initialize context for view mode (default is kanban)
+  const savedViewMode = context.globalState.get<'kanban' | 'list'>('backlog.viewMode', 'kanban');
+  vscode.commands.executeCommand('setContext', 'backlog.isListView', savedViewMode === 'list');
+
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.openTaskDetail', (taskId: string) => {
       taskDetailProvider.openTask(taskId);
