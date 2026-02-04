@@ -149,13 +149,52 @@ The extension activates when it detects `backlog/tasks/*.md` files.
 
 ### Upstream Backlog.md Reference
 
-When researching Backlog.md data models, frontmatter fields, or functionality, consult the upstream source at **https://github.com/MrLesk/Backlog.md**. Key areas:
+When researching Backlog.md data models, frontmatter fields, or functionality, consult the upstream source at **https://github.com/MrLesk/Backlog.md**.
 
-- `src/core/` - Data models, task types, reordering logic
-- `src/utils/task-sorting.ts` - Ordinal-based sorting
-- Task frontmatter schema and field definitions
+**To fetch raw files from the repo** (for code inspection):
+
+```
+https://raw.githubusercontent.com/MrLesk/Backlog.md/main/src/<path>
+```
+
+**Key source files:**
+
+- `src/markdown/parser.ts` - Frontmatter parsing, date formats, array handling
+- `src/markdown/serializer.ts` - Task serialization with `gray-matter` library
+- `src/file-system/operations.ts` - File I/O, config serialization
+- `src/core/backlog.ts` - Core task operations (createTask, updateTask)
+- `src/core/task-loader.ts` - Cross-branch task loading
+
+**Task file format (canonical):**
+
+```yaml
+---
+id: TASK-1
+title: Example task
+status: To Do
+priority: high
+milestone: v1.0
+labels: [feature, ui]
+assignee: [@user]
+created: 2024-01-15
+updated_date: 2024-01-16
+dependencies: [TASK-2]
+---
+
+# Example task
+
+Description content here.
+```
+
+**Key formatting rules:**
+
+- Arrays use inline bracket format: `labels: [item1, item2]`
+- Dates use `YYYY-MM-DD` format (no timestamps)
+- Assignees with `@` prefix are quoted: `[@user]` or `["@user"]`
+- Field order: id, title, status, priority, milestone, labels, assignee, created, updated_date, dependencies...
 
 Always check the upstream repo when:
+
 - Adding new frontmatter field support
 - Implementing sorting/ordering features
 - Questions about expected behavior or compatibility
@@ -163,6 +202,7 @@ Always check the upstream repo when:
 ### Version Management
 
 This project uses [Mise](https://mise.jdx.dev/) to manage Node.js and Bun versions. The `mise.toml` file pins:
+
 - Node.js 22
 - Bun (latest)
 

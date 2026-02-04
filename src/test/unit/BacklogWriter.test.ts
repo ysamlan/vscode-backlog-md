@@ -866,6 +866,86 @@ references:
     });
   });
 
+  describe('Canonical Format Compatibility', () => {
+    it('should output arrays in inline bracket format', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+labels: [feature, ui]
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      // Should use inline format [item1, item2] not block format
+      expect(writtenContent).toMatch(/labels: \[feature, ui\]/);
+    });
+
+    it('should preserve date strings without converting to timestamps', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+created: 2026-02-01
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      // Should NOT convert to ISO timestamp like 2026-02-01T00:00:00.000Z
+      expect(writtenContent).not.toContain('T00:00:00');
+      expect(writtenContent).toContain('created: 2026-02-01');
+    });
+
+    it('should have newline between closing --- and body content', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+# Test
+
+Description here.
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      // Should have newline after closing ---, not ---# or ---\n#
+      expect(writtenContent).toMatch(/---\n\n/);
+      expect(writtenContent).not.toMatch(/---#/);
+    });
+
+    it('should format empty arrays as []', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+labels: []
+dependencies: []
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('labels: []');
+      expect(writtenContent).toContain('dependencies: []');
+    });
+  });
+
   describe('Edge Cases: YAML Serialization', () => {
     it('should handle empty arrays properly', async () => {
       const content = `---

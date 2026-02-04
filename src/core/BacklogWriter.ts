@@ -387,7 +387,9 @@ export class BacklogWriter {
     const body = lines.slice(endIndex + 1).join('\n');
 
     try {
-      const frontmatter = (yaml.load(frontmatterYaml) as FrontmatterData) || {};
+      // Use JSON_SCHEMA to prevent date strings from being parsed as Date objects
+      const frontmatter =
+        (yaml.load(frontmatterYaml, { schema: yaml.JSON_SCHEMA }) as FrontmatterData) || {};
       return { frontmatter, body };
     } catch {
       return { frontmatter: {}, body: content };
@@ -396,16 +398,119 @@ export class BacklogWriter {
 
   /**
    * Reconstruct file from frontmatter and body
+   * Outputs frontmatter in a format compatible with upstream Backlog.md:
+   * - Dates as YYYY-MM-DD strings
+   * - Arrays in inline format [item1, item2]
    */
   private reconstructFile(frontmatter: FrontmatterData, body: string): string {
-    // Use yaml.dump with specific options for clean output
-    const yamlContent = yaml.dump(frontmatter, {
-      lineWidth: -1, // Don't wrap lines
-      quotingType: "'", // Use single quotes for strings
-      forceQuotes: false, // Only quote when necessary
-      sortKeys: false, // Preserve key order
-    });
+    // Build YAML manually to match upstream Backlog.md format
+    const lines: string[] = [];
 
-    return `---\n${yamlContent}---${body}`;
+    // Define field order to match upstream convention
+    const fieldOrder = [
+      'id',
+      'title',
+      'status',
+      'priority',
+      'milestone',
+      'labels',
+      'assignee',
+      'reporter',
+      'created',
+      'created_date',
+      'updated_date',
+      'dependencies',
+      'references',
+      'documentation',
+      'parent_task_id',
+      'subtasks',
+      'ordinal',
+      'type',
+      'onStatusChange',
+    ];
+
+    // First output fields in the defined order
+    for (const key of fieldOrder) {
+      if (key in frontmatter && frontmatter[key] !== undefined) {
+        lines.push(this.formatYamlField(key, frontmatter[key]));
+      }
+    }
+
+    // Then output any remaining fields not in the order list
+    for (const key of Object.keys(frontmatter)) {
+      if (!fieldOrder.includes(key) && frontmatter[key] !== undefined) {
+        lines.push(this.formatYamlField(key, frontmatter[key]));
+      }
+    }
+
+    const yamlContent = lines.join('\n') + '\n';
+    return `---\n${yamlContent}---\n${body}`;
+  }
+
+  /**
+   * Format a single YAML field in upstream-compatible format
+   */
+  private formatYamlField(key: string, value: unknown): string {
+    if (value === null || value === undefined) {
+      return `${key}: `;
+    }
+
+    if (Array.isArray(value)) {
+      // Use inline array format [item1, item2] like upstream
+      if (value.length === 0) {
+        return `${key}: []`;
+      }
+      const items = value.map((item) => this.formatYamlValue(item)).join(', ');
+      return `${key}: [${items}]`;
+    }
+
+    if (typeof value === 'object') {
+      // For objects, use yaml.dump but inline
+      const dumped = yaml.dump(value, { flowLevel: 0 }).trim();
+      return `${key}: ${dumped}`;
+    }
+
+    return `${key}: ${this.formatYamlValue(value)}`;
+  }
+
+  /**
+   * Format a YAML value, quoting strings if necessary
+   */
+  private formatYamlValue(value: unknown): string {
+    if (typeof value === 'string') {
+      // Quote if contains special characters or looks like other YAML types
+      if (
+        value.includes(':') ||
+        value.includes('#') ||
+        value.includes('[') ||
+        value.includes(']') ||
+        value.includes('{') ||
+        value.includes('}') ||
+        value.includes(',') ||
+        value.includes("'") ||
+        value.includes('"') ||
+        value.includes('\n') ||
+        value.startsWith('@') ||
+        value.startsWith('*') ||
+        value.startsWith('&') ||
+        value.startsWith('!') ||
+        value === 'true' ||
+        value === 'false' ||
+        value === 'null' ||
+        value === 'yes' ||
+        value === 'no' ||
+        value === ''
+      ) {
+        // Use double quotes and escape internal quotes
+        return `"${value.replace(/"/g, '\\"')}"`;
+      }
+      return value;
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+
+    return String(value);
   }
 }
