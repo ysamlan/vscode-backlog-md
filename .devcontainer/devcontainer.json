@@ -1,7 +1,9 @@
 {
   "name": "vscode-backlog.md",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    // amd64 required for vscode-extension-tester support 
+    "options": ["--platform=linux/amd64"]
   },
   "postCreateCommand": "fnm install 22 && npm install",
   "customizations": {

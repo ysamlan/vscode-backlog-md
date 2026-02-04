@@ -1,7 +1,7 @@
 # Devcontainer for vscode-backlog.md development
-# amd64 required for vscode-extension-tester support 
+# amd64 required for vscode-extension-tester support (set in devcontainer.json)
 # https://github.com/redhat-developer/vscode-extension-tester/issues/506
-FROM --platform=linux/amd64 mcr.microsoft.com/devcontainers/javascript-node:22
+FROM mcr.microsoft.com/devcontainers/javascript-node:22
 
 ARG CLAUDE_CODE_VERSION=latest
 
@@ -75,11 +75,25 @@ RUN mkdir -p /workspace /home/node/.claude && \
 
 WORKDIR /workspace
 
+ARG GIT_DELTA_VERSION=0.18.2
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget "https://github.com/dandavison/delta/releases/download/${GIT_DELTA_VERSION}/git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
+    sudo dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
+    rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Install bun
+COPY --from=oven/bun:latest /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=oven/bun:latest /usr/local/bin/bunx /usr/local/bin/bunx
+
 # Set up non-root user
 USER node
 
 # Install global packages
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
+ENV PATH=$PATH:/usr/local/bin/
 ENV PATH=$PATH:/usr/local/share/npm-global/bin
 ENV PATH=$PATH:/home/node/.bun/bin
 ENV PATH=$PATH:/home/node/.local/bin
@@ -87,10 +101,13 @@ ENV PATH=$PATH:/home/node/.local/bin
 # Set the default shell to zsh rather than sh
 ENV SHELL=/bin/zsh
 
-
 # Set the default editor and visual
 ENV EDITOR=nano
 ENV VISUAL=nano
+
+# explicitly set uv venv path so we don't stomp on host-local .venv
+ENV UV_PROJECT_ENVIRONMENT=.venv_devcontainer
+ENV UV_LINK_MODE=copy
 
 # Default powerline10k theme
 ARG ZSH_IN_DOCKER_VERSION=1.2.0
@@ -108,6 +125,6 @@ RUN curl -fsSL https://claude.ai/install.sh | bash -s -- $CLAUDE_CODE_VERSION
 # install fnm (node manager)
 RUN curl -fsSL https://fnm.vercel.app/install | bash
 
-RUN npm i -g backlog.md 
+RUN bun i -g backlog.md 
 # you'll need to run `claude mcp add backlog --scope user -- backlog mcp start` the first time you use it -
 # subsequently
