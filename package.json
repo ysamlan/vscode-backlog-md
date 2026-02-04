@@ -23,7 +23,8 @@
     "markdown"
   ],
   "engines": {
-    "vscode": "^1.108.0"
+    "vscode": "^1.108.0",
+    "node": ">=22"
   },
   "categories": [
     "Other",
@@ -97,11 +98,11 @@
   "scripts": {
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "build:css": "npx @tailwindcss/cli -i ./src/webview/styles.css -o ./dist/webview/styles.css",
-    "build": "npm run build:css && npm run compile",
+    "build:css": "bunx @tailwindcss/cli -i ./src/webview/styles.css -o ./dist/webview/styles.css",
+    "build": "bun run build:css && bun run compile",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run build && tsc -p tsconfig.e2e.json && bash scripts/run-e2e.sh",
+    "test:e2e": "bun run build && tsc -p tsconfig.e2e.json && bash scripts/run-e2e.sh",
     "test:webview": "concurrently --kill-others --success first \"vite\" \"wait-on http://localhost:5173 && cypress run\"",
     "test:webview:open": "concurrently --kill-others \"vite\" \"wait-on http://localhost:5173 && cypress open\"",
     "webview:serve": "vite",

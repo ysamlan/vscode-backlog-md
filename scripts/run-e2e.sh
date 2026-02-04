@@ -3,7 +3,7 @@
 
 set -e
 
-CMD="fnm exec --using=22 -- npx extest setup-and-run 'out/test/e2e/*.test.js' --mocha_config .mocharc.json"
+CMD="bunx extest setup-and-run 'out/test/e2e/*.test.js' --mocha_config .mocharc.json"
 
 if [ -n "$DEVCONTAINER" ] || [ -n "$CI" ] || [ -z "$DISPLAY" ]; then
   echo "Running e2e tests with virtual display (xvfb)..."

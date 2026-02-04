@@ -84,9 +84,8 @@ RUN ARCH=$(dpkg --print-architecture) && \
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Install bun
-COPY --from=oven/bun:latest /usr/local/bin/bun /usr/local/bin/bun
-COPY --from=oven/bun:latest /usr/local/bin/bunx /usr/local/bin/bunx
+# Install mise (polyglot version manager for Node.js and Bun)
+COPY --from=jdxcode/mise /usr/local/bin/mise /usr/local/bin/mise
 
 # Set up non-root user
 USER node
@@ -95,8 +94,8 @@ USER node
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/bin/
 ENV PATH=$PATH:/usr/local/share/npm-global/bin
-ENV PATH=$PATH:/home/node/.bun/bin
 ENV PATH=$PATH:/home/node/.local/bin
+ENV PATH=$PATH:/home/node/.local/share/mise/shims
 
 # Set the default shell to zsh rather than sh
 ENV SHELL=/bin/zsh
@@ -119,11 +118,15 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
     -a "export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
     -x
 
+# Activate mise in shells
+RUN echo 'eval "$(mise activate zsh)"' >> /home/node/.zshrc && \
+    echo 'eval "$(mise activate bash)"' >> /home/node/.bashrc
+
 # Install Claude
 RUN curl -fsSL https://claude.ai/install.sh | bash -s -- $CLAUDE_CODE_VERSION
 
-# install fnm (node manager)
-RUN curl -fsSL https://fnm.vercel.app/install | bash
+# Pre-install mise tools (Node + Bun) for faster container startup
+RUN mise trust --yes /workspace/mise.toml 2>/dev/null || true
 
 RUN bun i -g backlog.md 
 # you'll need to run `claude mcp add backlog --scope user -- backlog mcp start` the first time you use it -

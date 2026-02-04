@@ -105,15 +105,20 @@ Open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P) and type "Backlog":
 
 ## Development
 
+This project uses [Mise](https://mise.jdx.dev/) for version management (Node.js 22 + Bun).
+
 ```bash
+# Install tools via mise
+mise install
+
 # Install dependencies
-npm install
+bun install
 
 # Build the extension
-npm run build
+bun run build
 
 # Watch mode for development
-npm run watch
+bun run watch
 ```
 
 Press **F5** to launch the Extension Development Host and test the extension.
@@ -122,17 +127,17 @@ Press **F5** to launch the Extension Development Host and test the extension.
 
 ```bash
 # Unit tests (core logic)
-npm test
+bun run test
 
 # Webview UI tests (Cypress)
-npm run test:webview
+bun run test:webview
 
 # Extension e2e tests
-npm run test:e2e
+bun run test:e2e
 
 # Linting and type checking
-npm run lint
-npm run typecheck
+bun run lint
+bun run typecheck
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.

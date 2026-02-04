@@ -6,9 +6,10 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 ### Prerequisites
 
-- Node.js 22 (use [fnm](https://github.com/Schniz/fnm) for version management)
-- npm 10+
+- [Mise](https://mise.jdx.dev/) for version management (manages Node.js 22 and Bun automatically)
 - VS Code 1.85+
+
+The project includes a `mise.toml` file that pins the correct Node.js and Bun versions.
 
 ### Getting Started
 
@@ -17,14 +18,14 @@ Thank you for your interest in contributing! This document provides guidelines a
 git clone https://github.com/ysamlan/vscode-backlog-md.git
 cd vscode-backlog.md
 
-# Set up Node version (if using fnm)
-fnm use
+# Install tools via mise (Node.js + Bun)
+mise install
 
 # Install dependencies
-npm install
+bun install
 
 # Build the extension
-npm run build
+bun run build
 
 # Launch Extension Development Host
 # Press F5 in VS Code, or run:
@@ -48,22 +49,22 @@ We use a three-tier testing strategy:
 
 ```bash
 # Unit tests - Vitest for parser, writer, and business logic
-npm test
+bun run test
 
 # Webview UI tests - Cypress standalone for webview interactions
-npm run test:webview
+bun run test:webview
 
 # Interactive Cypress mode
-npm run test:webview:open
+bun run test:webview:open
 
 # Extension e2e tests - Full VS Code integration
-npm run test:e2e
+bun run test:e2e
 ```
 
 Run all tests:
 
 ```bash
-npm test && npm run lint && npm run typecheck
+bun run test && bun run lint && bun run typecheck
 ```
 
 ## Test-Driven Development
@@ -78,16 +79,16 @@ We use ESLint and Prettier for consistent code style:
 
 ```bash
 # Check for linting errors
-npm run lint
+bun run lint
 
 # Format code
-npm run format
+bun run format
 
 # Check formatting without changes
-npm run format:check
+bun run format:check
 
 # Type checking
-npm run typecheck
+bun run typecheck
 ```
 
 ### UI Guidelines
@@ -101,7 +102,7 @@ npm run typecheck
 1. **One feature/fix per PR** — Keep changes focused and reviewable
 2. **Include tests** — New features need tests; bug fixes need regression tests
 3. **Update documentation** — If your change affects user-facing behavior
-4. **Run the full test suite** — `npm test && npm run lint && npm run typecheck`
+4. **Run the full test suite** — `bun run test && bun run lint && bun run typecheck`
 5. **Write a clear description** — Explain what, why, and how
 
 ### Commit Message Format

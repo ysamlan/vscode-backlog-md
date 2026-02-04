@@ -40,7 +40,7 @@ VS Code extension providing a beautiful UI for browsing and managing Backlog.md 
 1. Mark task as In Progress
 2. Write failing tests for the new functionality
 3. Implement the feature to make tests pass
-4. Run ALL tests (`npm test`) to verify nothing broke
+4. Run ALL tests (`bun run test`) to verify nothing broke
 5. Run lint and typecheck
 6. Commit with message referencing the task ID
 7. Mark task as Done
@@ -53,7 +53,7 @@ VS Code extension providing a beautiful UI for browsing and managing Backlog.md 
 - Pure refactoring with existing test coverage
 - Configuration changes
 
-**CRITICAL**: Always run `npm test && npm run lint && npm run typecheck` before marking a task as Done. Never skip this step.
+**CRITICAL**: Always run `bun run test && bun run lint && bun run typecheck` before marking a task as Done. Never skip this step.
 
 **One commit per task**: When a backlog task is self-contained and testable, commit it individually before moving to the next task. This keeps the git history clean and makes it easier to review/revert changes.
 
@@ -70,37 +70,37 @@ Completes TASK-XX.
 Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
 
-**Adding dependencies**: Always use `npm install` to add new packages rather than manually editing package.json. This ensures the latest version is installed and package-lock.json is updated correctly.
+**Adding dependencies**: Always use `bun add` to add new packages rather than manually editing package.json. This ensures the latest version is installed and bun.lockb is updated correctly.
 
 ```bash
-npm install <package>           # production dependency
-npm install --save-dev <package> # dev dependency
+bun add <package>           # production dependency
+bun add --dev <package>     # dev dependency
 ```
 
 ### Commands
 
-- `npm run compile` - Build extension with esbuild
-- `npm run watch` - Watch mode for development
-- `npm run build` - Build CSS + extension
-- `npm test` - Run unit tests (vitest)
-- `npm run test:webview` - Run Cypress webview UI tests
-- `npm run test:webview:open` - Open Cypress interactive mode
-- `npm run test:e2e` - Run VS Code extension e2e tests
-- `npm run lint` - ESLint check
-- `npm run format` - Format with Prettier
-- `npm run typecheck` - TypeScript type checking
+- `bun run compile` - Build extension with esbuild
+- `bun run watch` - Watch mode for development
+- `bun run build` - Build CSS + extension
+- `bun run test` - Run unit tests (vitest)
+- `bun run test:webview` - Run Cypress webview UI tests
+- `bun run test:webview:open` - Open Cypress interactive mode
+- `bun run test:e2e` - Run VS Code extension e2e tests
+- `bun run lint` - ESLint check
+- `bun run format` - Format with Prettier
+- `bun run typecheck` - TypeScript type checking
 
 ### Testing Strategy
 
 **Three-tier approach:**
 
-1. **Unit tests** (`npm test`) - Vitest with vscode API mocking for core logic
-2. **Webview UI tests** (`npm run test:webview`) - Cypress standalone for webview interactions
-3. **Extension e2e tests** (`npm run test:e2e`) - vscode-extension-tester for extension activation
+1. **Unit tests** (`bun run test`) - Vitest with vscode API mocking for core logic
+2. **Webview UI tests** (`bun run test:webview`) - Cypress standalone for webview interactions
+3. **Extension e2e tests** (`bun run test:e2e`) - vscode-extension-tester for extension activation
 
 **Webview testing pattern** (based on Nx Console approach):
 
-- Webview HTML is served standalone via Vite (`npm run webview:serve`)
+- Webview HTML is served standalone via Vite (`bun run webview:serve`)
 - `acquireVsCodeApi()` is mocked to capture postMessage calls
 - Tests verify UI interactions send correct messages to extension
 
@@ -112,7 +112,7 @@ Reference repos for webview testing patterns:
 
 ### Testing the Extension Manually
 
-1. Run `npm run build` to compile everything
+1. Run `bun run build` to compile everything
 2. Press **F5** to launch Extension Development Host
 3. Open a folder containing a `backlog/` directory with task files
 4. Click the **Backlog** icon in the activity bar to see views
@@ -159,6 +159,14 @@ Always check the upstream repo when:
 - Adding new frontmatter field support
 - Implementing sorting/ordering features
 - Questions about expected behavior or compatibility
+
+### Version Management
+
+This project uses [Mise](https://mise.jdx.dev/) to manage Node.js and Bun versions. The `mise.toml` file pins:
+- Node.js 22
+- Bun (latest)
+
+Mise automatically activates when you enter the project directory (if shell integration is set up).
 
 ### Known Issues / Tech Debt
 

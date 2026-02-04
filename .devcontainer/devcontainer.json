@@ -5,7 +5,7 @@
     // amd64 required for vscode-extension-tester support 
     "options": ["--platform=linux/amd64"]
   },
-  "postCreateCommand": "fnm install 22 && npm install",
+  "postCreateCommand": "mise trust --yes && mise install --yes && bun install",
   "customizations": {
     "vscode": {
       "extensions": [
