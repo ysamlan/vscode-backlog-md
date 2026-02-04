@@ -4,6 +4,7 @@ title: 'Research: Port cross-branch logic from upstream Backlog.md'
 status: To Do
 assignee: []
 created_date: '2026-02-04 18:47'
+updated_date: '2026-02-04 18:59'
 labels:
   - research
   - architecture
@@ -67,3 +68,33 @@ Currently we rely on the `backlog` CLI binary for cross-branch task functionalit
 - [ ] #4 Make recommendation for best approach
 - [ ] #5 Estimate effort for recommended approach
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Test Infrastructure Available
+
+The `CrossBranchIntegration.test.ts` file includes a reusable pattern for testing cross-branch functionality:
+
+```typescript
+// Creates temp git repo with:
+// - Main branch with TASK-1
+// - feature/new-feature branch with TASK-2  
+// - old-feature branch with TASK-3 (backdated 60 days)
+```
+
+### Key patterns to reuse:
+- `fs.mkdtempSync()` for temp directory
+- Helper functions: `git()` wrapper, `createTask()` for task files
+- `git for-each-ref` for branch date filtering
+- `git show branch:path` for reading files from other branches
+- `git ls-tree` for listing files on other branches
+- Backdated commits with `GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE` env vars
+
+### Tests already written:
+- Branch age filtering (activeBranchDays)
+- Task resolution strategies (most_recent, most_progressed)
+- Same task different status across branches
+
+When implementing native cross-branch support, extend these tests rather than starting from scratch.
+<!-- SECTION:NOTES:END -->
