@@ -842,6 +842,13 @@ export class TasksViewProvider extends BaseViewProvider {
                     });
                     render();
                     break;
+                case 'setFilter':
+                    currentFilter = message.filter;
+                    document.querySelectorAll('.filter-btn').forEach(b => {
+                        b.classList.toggle('active', b.dataset.filter === currentFilter);
+                    });
+                    renderList();
+                    break;
                 case 'error':
                     console.error(message.message);
                     break;
@@ -1058,5 +1065,12 @@ export class TasksViewProvider extends BaseViewProvider {
       this.context.globalState.update('backlog.viewMode', mode);
     }
     this.postMessage({ type: 'viewModeChanged', viewMode: mode });
+  }
+
+  /**
+   * Set the filter in the list view from external command
+   */
+  setFilter(filter: string): void {
+    this.postMessage({ type: 'setFilter', filter });
   }
 }

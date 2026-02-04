@@ -1205,12 +1205,28 @@ body {
   text-align: center;
 }
 
+.stat-card.stat-todo {
+  border-left: 3px solid var(--vscode-badge-background);
+}
+
 .stat-card.stat-in-progress {
   border-left: 3px solid var(--vscode-textLink-foreground, #3b82f6);
 }
 
 .stat-card.stat-done {
   border-left: 3px solid var(--vscode-testing-iconPassed, #10b981);
+}
+
+.stat-card.clickable {
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.stat-card.clickable:hover {
+  transform: translateY(-2px);
+  border-color: var(--vscode-focusBorder);
 }
 
 .stat-value {

@@ -106,6 +106,24 @@ export function activate(context: vscode.ExtensionContext) {
   const savedViewMode = context.globalState.get<'kanban' | 'list'>('backlog.viewMode', 'kanban');
   vscode.commands.executeCommand('setContext', 'backlog.isListView', savedViewMode === 'list');
 
+  // Register filter by status command (used by dashboard clickable cards)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.filterByStatus', (status: string) => {
+      // Map status to filter value
+      const filterMap: Record<string, string> = {
+        'To Do': 'todo',
+        'In Progress': 'in-progress',
+        Done: 'done',
+      };
+      const filter = filterMap[status] || 'all';
+
+      // Switch to list view and apply filter
+      tasksProvider.setViewMode('list');
+      vscode.commands.executeCommand('setContext', 'backlog.isListView', true);
+      tasksProvider.setFilter(filter);
+    })
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.openTaskDetail', (taskId: string) => {
       taskDetailProvider.openTask(taskId);

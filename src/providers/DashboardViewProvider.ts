@@ -36,6 +36,15 @@ export class DashboardViewProvider extends BaseViewProvider {
             return div.innerHTML;
         }
 
+        function setupClickHandlers() {
+            const container = document.getElementById('dashboard-content');
+            container.querySelectorAll('.stat-card.clickable[data-status]').forEach(card => {
+                card.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'filterByStatus', status: card.dataset.status });
+                });
+            });
+        }
+
         function renderDashboard(stats) {
             const container = document.getElementById('dashboard-content');
 
@@ -56,17 +65,21 @@ export class DashboardViewProvider extends BaseViewProvider {
 
             container.innerHTML = \`
                 <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-value">\${stats.totalTasks}</div>
-                        <div class="stat-label">Total Tasks</div>
+                    <div class="stat-card stat-todo clickable" data-status="To Do">
+                        <div class="stat-value">\${stats.byStatus['To Do'] || 0}</div>
+                        <div class="stat-label">To Do</div>
                     </div>
-                    <div class="stat-card stat-in-progress">
+                    <div class="stat-card stat-in-progress clickable" data-status="In Progress">
                         <div class="stat-value">\${stats.byStatus['In Progress'] || 0}</div>
                         <div class="stat-label">In Progress</div>
                     </div>
-                    <div class="stat-card stat-done">
-                        <div class="stat-value">\${completionPct}%</div>
-                        <div class="stat-label">Completed</div>
+                    <div class="stat-card stat-done clickable" data-status="Done">
+                        <div class="stat-value">\${stats.byStatus['Done'] || 0}</div>
+                        <div class="stat-label">Done</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">\${stats.totalTasks}</div>
+                        <div class="stat-label">Total (\${completionPct}%)</div>
                     </div>
                 </div>
 
@@ -152,6 +165,7 @@ export class DashboardViewProvider extends BaseViewProvider {
             switch (message.type) {
                 case 'statsUpdated':
                     renderDashboard(message.stats);
+                    setupClickHandlers();
                     break;
                 case 'noBacklogFolder':
                     renderNoBacklogState();
@@ -252,6 +266,9 @@ export class DashboardViewProvider extends BaseViewProvider {
     switch (message.type) {
       case 'refresh':
         await this.refresh();
+        break;
+      case 'filterByStatus':
+        vscode.commands.executeCommand('backlog.filterByStatus', message.status);
         break;
     }
   }
