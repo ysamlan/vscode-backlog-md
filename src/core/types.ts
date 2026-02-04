@@ -114,7 +114,9 @@ export type WebviewMessage =
       listType: 'acceptanceCriteria' | 'definitionOfDone';
       itemId: number;
     }
-  | { type: 'toggleColumnCollapse'; status: string };
+  | { type: 'toggleColumnCollapse'; status: string }
+  | { type: 'toggleMilestoneGrouping'; enabled: boolean }
+  | { type: 'toggleMilestoneCollapse'; milestone: string };
 
 /**
  * Data source mode for task viewing
@@ -135,4 +137,6 @@ export type ExtensionMessage =
   | { type: 'noBacklogFolder' }
   | { type: 'error'; message: string }
   | { type: 'dataSourceChanged'; mode: DataSourceMode; reason?: string }
-  | { type: 'columnCollapseChanged'; collapsedColumns: string[] };
+  | { type: 'columnCollapseChanged'; collapsedColumns: string[] }
+  | { type: 'milestoneGroupingChanged'; enabled: boolean }
+  | { type: 'milestoneCollapseChanged'; collapsedMilestones: string[] };

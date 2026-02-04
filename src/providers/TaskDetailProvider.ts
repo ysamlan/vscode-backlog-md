@@ -332,12 +332,23 @@ export class TaskDetailProvider {
     const nonce = this.getNonce();
     const styleUri = this.getResourceUri(webview, 'styles.css');
 
-    // Fetch unique labels, assignees, and reverse dependencies for autocomplete and dependency visualization
-    const [uniqueLabels, uniqueAssignees, blocksTaskIds] = await Promise.all([
-      this.parser!.getUniqueLabels(),
-      this.parser!.getUniqueAssignees(),
-      this.parser!.getBlockedByThisTask(task.id),
-    ]);
+    // Fetch unique labels, assignees, milestones, and reverse dependencies for autocomplete and dependency visualization
+    const [uniqueLabels, uniqueAssignees, configMilestones, allTasks, blocksTaskIds] =
+      await Promise.all([
+        this.parser!.getUniqueLabels(),
+        this.parser!.getUniqueAssignees(),
+        this.parser!.getMilestones(),
+        this.parser!.getTasks(),
+        this.parser!.getBlockedByThisTask(task.id),
+      ]);
+
+    // Combine config milestones with unique milestones from tasks (for orphaned milestones)
+    const configMilestoneNames = configMilestones.map((m) => m.name);
+    const taskMilestones = [...new Set(allTasks.map((t) => t.milestone).filter(Boolean))];
+    const allMilestones = [
+      ...configMilestoneNames,
+      ...taskMilestones.filter((m) => !configMilestoneNames.includes(m!)),
+    ];
 
     // Check if any dependencies are not Done (task is blocked)
     let isBlocked = false;
@@ -414,9 +425,13 @@ export class TaskDetailProvider {
             .join(', ')
         : '<span class="empty-value">None</span>';
 
-    const milestoneHtml = task.milestone
-      ? `<span class="milestone">${this.escapeHtml(task.milestone)}</span>`
-      : '<span class="empty-value">None</span>';
+    // Generate milestone options for dropdown
+    const milestoneOptionsHtml = allMilestones
+      .map(
+        (m) =>
+          `<option value="${this.escapeHtml(m!)}" ${m === task.milestone ? 'selected' : ''}>${this.escapeHtml(m!)}</option>`
+      )
+      .join('');
 
     const descriptionValue = task.description || '';
     const descriptionHtml = descriptionValue
@@ -501,7 +516,12 @@ export class TaskDetailProvider {
             </div>
             <div class="meta-item">
                 <div class="meta-label">Milestone</div>
-                <div>${milestoneHtml}</div>
+                <div>
+                    <select class="dropdown-select milestone-select" id="milestoneSelect">
+                        <option value="">None</option>
+                        ${milestoneOptionsHtml}
+                    </select>
+                </div>
             </div>
             <div class="meta-item">
                 <div class="meta-label">Blocked By</div>
@@ -620,6 +640,13 @@ export class TaskDetailProvider {
         prioritySelect.addEventListener('change', () => {
             const value = prioritySelect.value || undefined;
             vscode.postMessage({ type: 'updateField', field: 'priority', value });
+        });
+
+        // Milestone dropdown
+        const milestoneSelect = document.getElementById('milestoneSelect');
+        milestoneSelect.addEventListener('change', () => {
+            const value = milestoneSelect.value || undefined;
+            vscode.postMessage({ type: 'updateField', field: 'milestone', value });
         });
 
         // Description view/edit toggle

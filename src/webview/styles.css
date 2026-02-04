@@ -202,13 +202,48 @@ body {
   display: none;
 }
 
+/* Kanban Toolbar */
+.kanban-toolbar {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-widget-border);
+}
+
+.grouping-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.grouping-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid var(--vscode-button-secondaryBackground, var(--vscode-widget-border));
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.grouping-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.grouping-btn.active {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
 /* Kanban Board */
 .kanban-board {
   display: flex;
   gap: 12px;
   padding: 12px;
-  min-height: calc(100vh - 45px);
+  min-height: calc(100vh - 85px);
   overflow-x: auto;
+}
+
+.kanban-board.nested {
+  min-height: auto;
+  padding: 8px;
 }
 
 .kanban-column {
@@ -347,6 +382,102 @@ body {
 
 .drop-zone.active {
   opacity: 1;
+}
+
+/* Milestone Section Styles */
+.milestone-section {
+  background: var(--vscode-sideBar-background);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.milestone-section.collapsed .milestone-content {
+  display: none;
+}
+
+.milestone-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--vscode-widget-border);
+}
+
+.milestone-header:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.milestone-section.collapsed .milestone-header {
+  border-bottom: none;
+}
+
+.milestone-title {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1;
+}
+
+.milestone-count {
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.milestone-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-bar {
+  width: 60px;
+  height: 6px;
+  background: var(--vscode-progressBar-background, rgba(59, 130, 246, 0.2));
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--vscode-progressBar-background, #3b82f6);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  min-width: 32px;
+  text-align: right;
+}
+
+.milestone-content {
+  padding: 0;
+}
+
+/* Mini column headers for nested kanban */
+.column-header-mini {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Nested kanban columns are smaller */
+.kanban-board.nested .kanban-column {
+  min-width: 150px;
+  max-width: 250px;
+  padding: 8px;
 }
 
 /* Task card dependency links */
@@ -742,6 +873,12 @@ body {
   border-color: var(--vscode-focusBorder);
 }
 
+/* Milestone dropdown in task detail */
+.milestone-select {
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+
 /* Description textarea */
 .description-textarea {
   width: 100%;
@@ -1025,6 +1162,216 @@ body {
 .markdown-content th {
   background: var(--vscode-editor-background);
   font-weight: 600;
+}
+
+/* ============================================
+   Dashboard View Styles
+   ============================================ */
+
+.dashboard-page {
+  padding: 12px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: var(--vscode-sideBar-background);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-card.stat-in-progress {
+  border-left: 3px solid var(--vscode-textLink-foreground, #3b82f6);
+}
+
+.stat-card.stat-done {
+  border-left: 3px solid var(--vscode-testing-iconPassed, #10b981);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--vscode-foreground);
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dashboard-page .section {
+  margin-bottom: 20px;
+}
+
+.dashboard-page .section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+/* Status breakdown */
+.status-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-name {
+  font-size: 12px;
+  min-width: 80px;
+}
+
+.status-bar-container {
+  flex: 1;
+  height: 8px;
+  background: var(--vscode-widget-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.status-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.status-bar-to-do {
+  background: var(--vscode-badge-background);
+}
+
+.status-bar-in-progress {
+  background: var(--vscode-textLink-foreground, #3b82f6);
+}
+
+.status-bar-done {
+  background: var(--vscode-testing-iconPassed, #10b981);
+}
+
+.status-bar-draft {
+  background: var(--vscode-disabledForeground, #6b7280);
+}
+
+.status-count {
+  font-size: 12px;
+  min-width: 24px;
+  text-align: right;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Priority breakdown */
+.priority-breakdown {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.priority-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--vscode-sideBar-background);
+}
+
+.priority-item.priority-high {
+  border-left: 3px solid var(--vscode-errorForeground, #dc2626);
+}
+
+.priority-item.priority-medium {
+  border-left: 3px solid var(--vscode-editorWarning-foreground, #f59e0b);
+}
+
+.priority-item.priority-low {
+  border-left: 3px solid var(--vscode-testing-iconPassed, #10b981);
+}
+
+.priority-item.priority-none {
+  border-left: 3px solid var(--vscode-descriptionForeground);
+}
+
+.priority-label {
+  font-size: 12px;
+}
+
+.priority-count {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Milestone list */
+.milestone-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.milestone-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--vscode-sideBar-background);
+  border-radius: 6px;
+}
+
+.milestone-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.milestone-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.milestone-stats {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.milestone-bar-container {
+  width: 80px;
+  height: 6px;
+  background: var(--vscode-widget-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.milestone-bar {
+  height: 100%;
+  background: var(--vscode-progressBar-background, #3b82f6);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.milestone-pct {
+  font-size: 12px;
+  min-width: 36px;
+  text-align: right;
+  color: var(--vscode-descriptionForeground);
 }
 
 /* Utility classes */

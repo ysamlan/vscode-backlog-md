@@ -8,9 +8,11 @@ import { BacklogWriter } from '../core/BacklogWriter';
  */
 export class TasksViewProvider extends BaseViewProvider {
   private viewMode: 'kanban' | 'list' = 'kanban';
+  private milestoneGrouping: boolean = false;
   private dataSourceMode: DataSourceMode = 'local-only';
   private dataSourceReason?: string;
   private collapsedColumns: Set<string> = new Set();
+  private collapsedMilestones: Set<string> = new Set();
 
   protected get viewType(): string {
     return 'backlog.kanban';
@@ -21,11 +23,17 @@ export class TasksViewProvider extends BaseViewProvider {
     resolveContext: vscode.WebviewViewResolveContext,
     token: vscode.CancellationToken
   ): void | Thenable<void> {
-    // Load saved view mode and collapsed columns from globalState
+    // Load saved view mode, milestone grouping, and collapsed columns from globalState
     if (this.context) {
       this.viewMode = this.context.globalState.get('backlog.viewMode', 'kanban');
+      this.milestoneGrouping = this.context.globalState.get('backlog.milestoneGrouping', false);
       const savedCollapsed = this.context.globalState.get<string[]>('backlog.collapsedColumns', []);
       this.collapsedColumns = new Set(savedCollapsed);
+      const savedCollapsedMilestones = this.context.globalState.get<string[]>(
+        'backlog.collapsedMilestones',
+        []
+      );
+      this.collapsedMilestones = new Set(savedCollapsedMilestones);
     }
     return super.resolveWebviewView(webviewView, resolveContext, token);
   }
@@ -45,6 +53,12 @@ export class TasksViewProvider extends BaseViewProvider {
 </head>
 <body>
     <div id="kanban-view" class="view-content ${this.viewMode === 'kanban' ? '' : 'hidden'}">
+        <div class="kanban-toolbar">
+            <div class="grouping-toggle">
+                <button class="grouping-btn ${!this.milestoneGrouping ? 'active' : ''}" data-grouping="none">All Tasks</button>
+                <button class="grouping-btn ${this.milestoneGrouping ? 'active' : ''}" data-grouping="milestone">By Milestone</button>
+            </div>
+        </div>
         <div id="kanban-app" class="kanban-board">
             <div class="empty-state">Loading tasks...</div>
         </div>
@@ -83,6 +97,8 @@ export class TasksViewProvider extends BaseViewProvider {
         let currentSort = { field: 'status', direction: 'asc' };
         let searchQuery = '';
         let collapsedColumns = new Set(${JSON.stringify(Array.from(this.collapsedColumns))});
+        let collapsedMilestones = new Set(${JSON.stringify(Array.from(this.collapsedMilestones))});
+        let milestoneGrouping = ${this.milestoneGrouping};
         let configMilestones = [];
 
         // Arrow icons for dependency indicators
@@ -127,6 +143,14 @@ export class TasksViewProvider extends BaseViewProvider {
                 return;
             }
 
+            if (milestoneGrouping) {
+                renderKanbanByMilestone(app);
+            } else {
+                renderKanbanFlat(app);
+            }
+        }
+
+        function renderKanbanFlat(app) {
             app.innerHTML = columns.map(col => {
                 const columnTasks = tasks
                     .filter(t => t.status === col.status)
@@ -157,6 +181,108 @@ export class TasksViewProvider extends BaseViewProvider {
 
             setupKanbanDragAndDrop();
             setupColumnCollapse();
+        }
+
+        function renderKanbanByMilestone(app) {
+            // Group tasks by milestone
+            const milestoneMap = new Map();
+            const uncategorized = [];
+
+            tasks.forEach(task => {
+                if (task.milestone) {
+                    if (!milestoneMap.has(task.milestone)) {
+                        milestoneMap.set(task.milestone, []);
+                    }
+                    milestoneMap.get(task.milestone).push(task);
+                } else {
+                    uncategorized.push(task);
+                }
+            });
+
+            // Sort milestones: config milestones first (in order), then others alphabetically
+            const configMilestoneNames = configMilestones.map(m => m.name);
+            const milestoneNames = [...milestoneMap.keys()].sort((a, b) => {
+                const aIdx = configMilestoneNames.indexOf(a);
+                const bIdx = configMilestoneNames.indexOf(b);
+                if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                if (aIdx !== -1) return -1;
+                if (bIdx !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
+            // Add uncategorized at the end if there are any
+            if (uncategorized.length > 0) {
+                milestoneNames.push(null); // null represents uncategorized
+                milestoneMap.set(null, uncategorized);
+            }
+
+            app.innerHTML = milestoneNames.map(milestoneName => {
+                const milestoneTasks = milestoneMap.get(milestoneName);
+                const displayName = milestoneName || 'Uncategorized';
+                const milestoneKey = milestoneName || '__uncategorized__';
+                const isCollapsed = collapsedMilestones.has(milestoneKey);
+
+                // Calculate progress
+                const doneTasks = milestoneTasks.filter(t => t.status === 'Done').length;
+                const totalTasks = milestoneTasks.length;
+                const progressPct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+                return \`
+                    <div class="milestone-section\${isCollapsed ? ' collapsed' : ''}" data-milestone="\${escapeHtml(milestoneKey)}">
+                        <div class="milestone-header" data-milestone="\${escapeHtml(milestoneKey)}">
+                            <span class="collapse-icon">\${isCollapsed ? '▸' : '▾'}</span>
+                            <span class="milestone-title">\${escapeHtml(displayName)}</span>
+                            <span class="milestone-count">\${totalTasks}</span>
+                            <div class="milestone-progress">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: \${progressPct}%"></div>
+                                </div>
+                                <span class="progress-text">\${progressPct}%</span>
+                            </div>
+                        </div>
+                        <div class="milestone-content">
+                            <div class="kanban-board nested">
+                                \${columns.map(col => {
+                                    const columnTasks = milestoneTasks
+                                        .filter(t => t.status === col.status)
+                                        .sort((a, b) => {
+                                            const aOrd = a.ordinal;
+                                            const bOrd = b.ordinal;
+                                            if (aOrd !== undefined && bOrd === undefined) return -1;
+                                            if (aOrd === undefined && bOrd !== undefined) return 1;
+                                            if (aOrd !== undefined && bOrd !== undefined) return aOrd - bOrd;
+                                            return a.id.localeCompare(b.id);
+                                        });
+                                    return \`
+                                        <div class="kanban-column" data-status="\${col.status}" data-milestone="\${escapeHtml(milestoneKey)}">
+                                            <div class="column-header-mini">
+                                                <span class="column-title">\${col.label}</span>
+                                                <span class="column-count">\${columnTasks.length}</span>
+                                            </div>
+                                            <div class="task-list" data-status="\${col.status}" data-milestone="\${escapeHtml(milestoneKey)}">
+                                                \${columnTasks.map(task => renderTaskCard(task)).join('')}
+                                            </div>
+                                        </div>
+                                    \`;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                \`;
+            }).join('');
+
+            setupKanbanDragAndDrop();
+            setupMilestoneCollapse();
+        }
+
+        function setupMilestoneCollapse() {
+            document.querySelectorAll('.milestone-header').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    if (e.target.closest('.task-card')) return;
+                    const milestone = header.dataset.milestone;
+                    vscode.postMessage({ type: 'toggleMilestoneCollapse', milestone });
+                });
+            });
         }
 
         function setupColumnCollapse() {
@@ -525,6 +651,22 @@ export class TasksViewProvider extends BaseViewProvider {
         }
 
         // ===== Event Handlers =====
+
+        // Grouping toggle buttons
+        document.querySelectorAll('.grouping-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const grouping = btn.dataset.grouping;
+                const newMilestoneGrouping = grouping === 'milestone';
+                if (milestoneGrouping !== newMilestoneGrouping) {
+                    milestoneGrouping = newMilestoneGrouping;
+                    document.querySelectorAll('.grouping-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    vscode.postMessage({ type: 'toggleMilestoneGrouping', enabled: milestoneGrouping });
+                    render();
+                }
+            });
+        });
+
         document.getElementById('searchInput').addEventListener('input', e => {
             searchQuery = e.target.value;
             renderList();
@@ -686,6 +828,18 @@ export class TasksViewProvider extends BaseViewProvider {
                     collapsedColumns = new Set(message.collapsedColumns);
                     render();
                     break;
+                case 'milestoneCollapseChanged':
+                    collapsedMilestones = new Set(message.collapsedMilestones);
+                    render();
+                    break;
+                case 'milestoneGroupingChanged':
+                    milestoneGrouping = message.enabled;
+                    document.querySelectorAll('.grouping-btn').forEach(b => {
+                        b.classList.toggle('active',
+                            (b.dataset.grouping === 'milestone') === milestoneGrouping);
+                    });
+                    render();
+                    break;
                 case 'error':
                     console.error(message.message);
                     break;
@@ -831,6 +985,45 @@ export class TasksViewProvider extends BaseViewProvider {
         this.postMessage({
           type: 'columnCollapseChanged',
           collapsedColumns: Array.from(this.collapsedColumns),
+        });
+        break;
+      }
+
+      case 'toggleMilestoneGrouping': {
+        this.milestoneGrouping = message.enabled;
+        // Persist to globalState
+        if (this.context) {
+          await this.context.globalState.update(
+            'backlog.milestoneGrouping',
+            this.milestoneGrouping
+          );
+        }
+        // Notify webview (for consistency, though UI already updated)
+        this.postMessage({
+          type: 'milestoneGroupingChanged',
+          enabled: this.milestoneGrouping,
+        });
+        break;
+      }
+
+      case 'toggleMilestoneCollapse': {
+        const milestone = message.milestone;
+        if (this.collapsedMilestones.has(milestone)) {
+          this.collapsedMilestones.delete(milestone);
+        } else {
+          this.collapsedMilestones.add(milestone);
+        }
+        // Persist to globalState
+        if (this.context) {
+          await this.context.globalState.update(
+            'backlog.collapsedMilestones',
+            Array.from(this.collapsedMilestones)
+          );
+        }
+        // Notify webview
+        this.postMessage({
+          type: 'milestoneCollapseChanged',
+          collapsedMilestones: Array.from(this.collapsedMilestones),
         });
         break;
       }

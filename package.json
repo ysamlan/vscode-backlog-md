@@ -116,6 +116,11 @@
           "type": "webview",
           "id": "backlog.kanban",
           "name": "Tasks"
+        },
+        {
+          "type": "webview",
+          "id": "backlog.dashboard",
+          "name": "Dashboard"
         }
       ]
     }

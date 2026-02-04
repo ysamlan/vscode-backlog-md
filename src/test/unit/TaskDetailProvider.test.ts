@@ -75,6 +75,8 @@ describe('TaskDetailProvider', () => {
       getStatuses: vi.fn().mockResolvedValue(['To Do', 'In Progress', 'Done']),
       getUniqueLabels: vi.fn().mockResolvedValue([]),
       getUniqueAssignees: vi.fn().mockResolvedValue([]),
+      getMilestones: vi.fn().mockResolvedValue([]),
+      getTasks: vi.fn().mockResolvedValue([]),
       getBlockedByThisTask: vi.fn().mockResolvedValue([]),
     } as unknown as BacklogParser;
 
