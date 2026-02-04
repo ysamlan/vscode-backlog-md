@@ -6,5 +6,5 @@ out/
 .DS_Store
 
 # vscode-extension-tester artifacts
-core
+/core
 .claude/settings.local.json
