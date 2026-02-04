@@ -109,22 +109,22 @@ body {
 
 .status-to-do,
 .status-todo {
-  background-color: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
+  background-color: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.2));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
 }
 
 .status-in-progress {
-  background-color: var(--vscode-progressBar-background, rgba(59, 130, 246, 0.15));
-  color: var(--vscode-textLink-foreground, #3b82f6);
+  background-color: rgba(59, 130, 246, 0.15);
+  color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground, #3b82f6));
 }
 
 .status-done {
-  background-color: var(--vscode-testing-iconPassed, rgba(16, 185, 129, 0.15));
-  color: var(--vscode-testing-iconPassed, #10b981);
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--vscode-terminal-ansiGreen, var(--vscode-charts-green, #10b981));
 }
 
 .status-draft {
-  background-color: var(--vscode-disabledForeground, rgba(107, 114, 128, 0.15));
+  background-color: rgba(107, 114, 128, 0.15);
   color: var(--vscode-disabledForeground, #6b7280);
 }
 
@@ -152,22 +152,22 @@ body {
 }
 
 .status-select {
-  background-color: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
+  background-color: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.2));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
 }
 
 .status-select.status-in-progress {
-  background-color: var(--vscode-progressBar-background, rgba(59, 130, 246, 0.15));
-  color: var(--vscode-textLink-foreground, #3b82f6);
+  background-color: rgba(59, 130, 246, 0.15);
+  color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground, #3b82f6));
 }
 
 .status-select.status-done {
-  background-color: var(--vscode-testing-iconPassed, rgba(16, 185, 129, 0.15));
-  color: var(--vscode-testing-iconPassed, #10b981);
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--vscode-terminal-ansiGreen, var(--vscode-charts-green, #10b981));
 }
 
 .status-select.status-draft {
-  background-color: var(--vscode-disabledForeground, rgba(107, 114, 128, 0.15));
+  background-color: rgba(107, 114, 128, 0.15);
   color: var(--vscode-disabledForeground, #6b7280);
 }
 
@@ -244,6 +244,25 @@ body {
 .kanban-board.nested {
   min-height: auto;
   padding: 8px;
+}
+
+/* Milestone grouping: vertical stacking of milestone sections */
+.kanban-board.milestone-grouped {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-x: visible;
+}
+
+.kanban-board.milestone-grouped .milestone-section {
+  width: 100%;
+}
+
+.kanban-board.milestone-grouped .milestone-content .kanban-board.nested {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  overflow-x: auto;
 }
 
 .kanban-column {

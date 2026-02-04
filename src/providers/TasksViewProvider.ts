@@ -151,6 +151,7 @@ export class TasksViewProvider extends BaseViewProvider {
         }
 
         function renderKanbanFlat(app) {
+            app.className = 'kanban-board';
             app.innerHTML = columns.map(col => {
                 const columnTasks = tasks
                     .filter(t => t.status === col.status)
@@ -216,6 +217,7 @@ export class TasksViewProvider extends BaseViewProvider {
                 milestoneMap.set(null, uncategorized);
             }
 
+            app.className = 'kanban-board milestone-grouped';
             app.innerHTML = milestoneNames.map(milestoneName => {
                 const milestoneTasks = milestoneMap.get(milestoneName);
                 const displayName = milestoneName || 'Uncategorized';
