@@ -1,33 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as vscode from 'vscode';
+import { BacklogCli } from '../../core/BacklogCli';
+
+// vscode mock is provided via vitest.config.ts alias
 
 // Use vi.hoisted to ensure mock function is created before vi.mock runs
 const { mockExecAsync } = vi.hoisted(() => ({
   mockExecAsync: vi.fn(),
-}));
-
-// Mock vscode first
-vi.mock('vscode', () => ({
-  window: {
-    showWarningMessage: vi.fn().mockResolvedValue(undefined),
-    createStatusBarItem: vi.fn().mockReturnValue({
-      text: '',
-      tooltip: '',
-      backgroundColor: undefined,
-      show: vi.fn(),
-      hide: vi.fn(),
-      dispose: vi.fn(),
-      name: '',
-    }),
-  },
-  env: {
-    openExternal: vi.fn(),
-  },
-  Uri: {
-    parse: vi.fn((url: string) => ({ toString: () => url })),
-  },
-  StatusBarAlignment: {
-    Right: 2,
-  },
 }));
 
 // Mock child_process exec with promisify behavior
@@ -37,10 +16,6 @@ vi.mock('child_process', () => ({
 vi.mock('util', () => ({
   promisify: () => mockExecAsync,
 }));
-
-// Import after mocks
-import { BacklogCli } from '../../core/BacklogCli';
-import * as vscode from 'vscode';
 
 describe('BacklogCli', () => {
   beforeEach(() => {

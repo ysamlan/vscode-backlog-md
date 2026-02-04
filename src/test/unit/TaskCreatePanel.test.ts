@@ -5,27 +5,7 @@ import { BacklogParser } from '../../core/BacklogParser';
 import { BacklogWriter } from '../../core/BacklogWriter';
 import { TaskDetailProvider } from '../../providers/TaskDetailProvider';
 
-// Mock vscode module
-vi.mock('vscode', () => ({
-  Uri: {
-    file: (path: string) => ({ fsPath: path }),
-    joinPath: (base: { fsPath: string }, ...segments: string[]) => ({
-      fsPath: [base.fsPath, ...segments].join('/'),
-    }),
-  },
-  window: {
-    createWebviewPanel: vi.fn(),
-    showErrorMessage: vi.fn(),
-    showWarningMessage: vi.fn(),
-    showInformationMessage: vi.fn(),
-  },
-  commands: {
-    executeCommand: vi.fn(),
-  },
-  ViewColumn: {
-    One: 1,
-  },
-}));
+// vscode mock is provided via vitest.config.ts alias
 
 describe('TaskCreatePanel', () => {
   let extensionUri: vscode.Uri;
@@ -91,16 +71,10 @@ describe('TaskCreatePanel', () => {
 
   describe('show', () => {
     it('should create a new webview panel', () => {
-      TaskCreatePanel.show(
-        extensionUri,
-        mockWriter,
-        mockParser,
-        '/test/backlog',
-        {
-          tasksProvider: mockTasksProvider,
-          taskDetailProvider: mockTaskDetailProvider,
-        }
-      );
+      TaskCreatePanel.show(extensionUri, mockWriter, mockParser, '/test/backlog', {
+        tasksProvider: mockTasksProvider,
+        taskDetailProvider: mockTaskDetailProvider,
+      });
 
       expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
         'backlog.createTask',
@@ -115,44 +89,26 @@ describe('TaskCreatePanel', () => {
 
     it('should reveal existing panel if already open', () => {
       // First call creates panel
-      TaskCreatePanel.show(
-        extensionUri,
-        mockWriter,
-        mockParser,
-        '/test/backlog',
-        {
-          tasksProvider: mockTasksProvider,
-          taskDetailProvider: mockTaskDetailProvider,
-        }
-      );
+      TaskCreatePanel.show(extensionUri, mockWriter, mockParser, '/test/backlog', {
+        tasksProvider: mockTasksProvider,
+        taskDetailProvider: mockTaskDetailProvider,
+      });
 
       // Second call should reveal, not create
-      TaskCreatePanel.show(
-        extensionUri,
-        mockWriter,
-        mockParser,
-        '/test/backlog',
-        {
-          tasksProvider: mockTasksProvider,
-          taskDetailProvider: mockTaskDetailProvider,
-        }
-      );
+      TaskCreatePanel.show(extensionUri, mockWriter, mockParser, '/test/backlog', {
+        tasksProvider: mockTasksProvider,
+        taskDetailProvider: mockTaskDetailProvider,
+      });
 
       expect(vscode.window.createWebviewPanel).toHaveBeenCalledTimes(1);
       expect(mockPanel.reveal).toHaveBeenCalled();
     });
 
     it('should include form elements in webview content', () => {
-      TaskCreatePanel.show(
-        extensionUri,
-        mockWriter,
-        mockParser,
-        '/test/backlog',
-        {
-          tasksProvider: mockTasksProvider,
-          taskDetailProvider: mockTaskDetailProvider,
-        }
-      );
+      TaskCreatePanel.show(extensionUri, mockWriter, mockParser, '/test/backlog', {
+        tasksProvider: mockTasksProvider,
+        taskDetailProvider: mockTaskDetailProvider,
+      });
 
       const html = mockWebview.html as string;
       expect(html).toContain('id="titleInput"');
@@ -163,16 +119,10 @@ describe('TaskCreatePanel', () => {
     });
 
     it('should mark title as required in the form', () => {
-      TaskCreatePanel.show(
-        extensionUri,
-        mockWriter,
-        mockParser,
-        '/test/backlog',
-        {
-          tasksProvider: mockTasksProvider,
-          taskDetailProvider: mockTaskDetailProvider,
-        }
-      );
+      TaskCreatePanel.show(extensionUri, mockWriter, mockParser, '/test/backlog', {
+        tasksProvider: mockTasksProvider,
+        taskDetailProvider: mockTaskDetailProvider,
+      });
 
       const html = mockWebview.html as string;
       expect(html).toContain('Title');
@@ -182,16 +132,10 @@ describe('TaskCreatePanel', () => {
 
   describe('message handling', () => {
     beforeEach(() => {
-      TaskCreatePanel.show(
-        extensionUri,
-        mockWriter,
-        mockParser,
-        '/test/backlog',
-        {
-          tasksProvider: mockTasksProvider,
-          taskDetailProvider: mockTaskDetailProvider,
-        }
-      );
+      TaskCreatePanel.show(extensionUri, mockWriter, mockParser, '/test/backlog', {
+        tasksProvider: mockTasksProvider,
+        taskDetailProvider: mockTaskDetailProvider,
+      });
     });
 
     it('should create task with correct defaults when createTask message received', async () => {
@@ -329,16 +273,10 @@ describe('TaskCreatePanel', () => {
 
   describe('panel disposal', () => {
     it('should clear currentPanel on dispose', () => {
-      TaskCreatePanel.show(
-        extensionUri,
-        mockWriter,
-        mockParser,
-        '/test/backlog',
-        {
-          tasksProvider: mockTasksProvider,
-          taskDetailProvider: mockTaskDetailProvider,
-        }
-      );
+      TaskCreatePanel.show(extensionUri, mockWriter, mockParser, '/test/backlog', {
+        tasksProvider: mockTasksProvider,
+        taskDetailProvider: mockTaskDetailProvider,
+      });
 
       expect(TaskCreatePanel['currentPanel']).toBeDefined();
 

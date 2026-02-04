@@ -126,8 +126,8 @@
     }
   },
   "scripts": {
-    "compile": "node esbuild.js",
-    "watch": "node esbuild.js --watch",
+    "compile": "bun scripts/build.ts",
+    "watch": "bun scripts/build.ts --watch",
     "build:css": "bunx @tailwindcss/cli -i ./src/webview/styles.css -o ./dist/webview/styles.css",
     "build": "bun run build:css && bun run compile",
     "test": "vitest run",

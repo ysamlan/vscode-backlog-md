@@ -10,7 +10,7 @@ node_modules/**
 tsconfig.json
 tsconfig.e2e.json
 eslint.config.mjs
-esbuild.js
+scripts/**
 vitest.config.ts
 *.vsix
 

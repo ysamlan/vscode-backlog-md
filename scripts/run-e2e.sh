@@ -3,7 +3,10 @@
 
 set -e
 
-CMD="bunx extest setup-and-run 'out/test/e2e/*.test.js' --mocha_config .mocharc.json"
+# Use a project-local directory for test resources to avoid macOS temp folder quarantine issues
+STORAGE_PATH=".vscode-test"
+
+CMD="bunx extest setup-and-run 'out/test/e2e/*.test.js' --mocha_config .mocharc.json --storage $STORAGE_PATH"
 
 # Check if we need xvfb:
 # - Not on macOS (darwin) - macOS doesn't use X11

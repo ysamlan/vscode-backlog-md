@@ -1,9 +1,9 @@
-const esbuild = require('esbuild');
+import * as esbuild from 'esbuild';
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
-async function main() {
+async function main(): Promise<void> {
   const ctx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,

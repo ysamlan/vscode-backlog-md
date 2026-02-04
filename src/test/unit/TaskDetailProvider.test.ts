@@ -4,27 +4,7 @@ import * as fs from 'fs';
 import { TaskDetailProvider } from '../../providers/TaskDetailProvider';
 import { BacklogParser } from '../../core/BacklogParser';
 
-// Mock vscode module
-vi.mock('vscode', () => ({
-  Uri: {
-    file: (path: string) => ({ fsPath: path }),
-    joinPath: (base: { fsPath: string }, ...segments: string[]) => ({
-      fsPath: [base.fsPath, ...segments].join('/'),
-    }),
-  },
-  window: {
-    createWebviewPanel: vi.fn(),
-    showErrorMessage: vi.fn(),
-    showWarningMessage: vi.fn(),
-    showInformationMessage: vi.fn(),
-  },
-  commands: {
-    executeCommand: vi.fn(),
-  },
-  ViewColumn: {
-    One: 1,
-  },
-}));
+// vscode mock is provided via vitest.config.ts alias
 
 // Mock fs module
 vi.mock('fs', () => ({
