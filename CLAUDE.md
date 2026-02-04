@@ -147,6 +147,19 @@ The extension activates when it detects `backlog/tasks/*.md` files.
 </svg>
 ```
 
+### Upstream Backlog.md Reference
+
+When researching Backlog.md data models, frontmatter fields, or functionality, consult the upstream source at **https://github.com/MrLesk/Backlog.md**. Key areas:
+
+- `src/core/` - Data models, task types, reordering logic
+- `src/utils/task-sorting.ts` - Ordinal-based sorting
+- Task frontmatter schema and field definitions
+
+Always check the upstream repo when:
+- Adding new frontmatter field support
+- Implementing sorting/ordering features
+- Questions about expected behavior or compatibility
+
 ### Known Issues / Tech Debt
 
 - Webviews use inline styles instead of external CSS (TASK-46)
