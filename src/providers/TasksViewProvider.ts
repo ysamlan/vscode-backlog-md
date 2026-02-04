@@ -855,7 +855,8 @@ export class TasksViewProvider extends BaseViewProvider {
   }
 
   /**
-   * Override refresh to also send statuses from config
+   * Override refresh to also send statuses from config.
+   * Uses cross-branch loading when configured.
    */
   async refresh(): Promise<void> {
     if (!this._view) return;
@@ -866,10 +867,13 @@ export class TasksViewProvider extends BaseViewProvider {
     }
 
     try {
-      const [tasks, statuses] = await Promise.all([
-        this.parser.getTasks(),
-        this.parser.getStatuses(),
-      ]);
+      // Use cross-branch loading when in cross-branch mode
+      const taskLoader =
+        this.dataSourceMode === 'cross-branch'
+          ? this.parser.getTasksWithCrossBranch()
+          : this.parser.getTasks();
+
+      const [tasks, statuses] = await Promise.all([taskLoader, this.parser.getStatuses()]);
 
       this.postMessage({ type: 'statusesUpdated', statuses });
       this.postMessage({ type: 'tasksUpdated', tasks });

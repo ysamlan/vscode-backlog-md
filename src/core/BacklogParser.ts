@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { Task, TaskStatus, TaskPriority, ChecklistItem, Milestone, BacklogConfig } from './types';
+import { GitBranchService } from './GitBranchService';
+import { CrossBranchTaskLoader } from './CrossBranchTaskLoader';
 
 /**
  * Raw frontmatter structure from YAML parsing
@@ -132,6 +134,44 @@ export class BacklogParser {
     const assigneeSet = new Set<string>();
     tasks.forEach((task) => task.assignee.forEach((a) => assigneeSet.add(a)));
     return Array.from(assigneeSet).sort();
+  }
+
+  /**
+   * Get tasks with cross-branch support.
+   * If cross-branch is enabled in config and the workspace is a git repo,
+   * loads and merges tasks from all active branches.
+   * Falls back to local-only on any errors.
+   */
+  async getTasksWithCrossBranch(): Promise<Task[]> {
+    const config = await this.getConfig();
+
+    // Check if cross-branch features are enabled
+    if (!config.check_active_branches) {
+      // Local-only mode (default)
+      return this.getTasks();
+    }
+
+    // Get workspace root (parent of backlog folder)
+    const workspaceRoot = path.dirname(this.backlogPath);
+
+    // Check if this is a git repository
+    const gitService = new GitBranchService(workspaceRoot);
+    if (!gitService.isGitRepository()) {
+      console.log('[Backlog.md Parser] Not a git repository, falling back to local-only');
+      return this.getTasks();
+    }
+
+    try {
+      const loader = new CrossBranchTaskLoader(gitService, this, config, this.backlogPath);
+      return await loader.loadTasksAcrossBranches();
+    } catch (error) {
+      // Fallback to local-only on git errors
+      console.error(
+        '[Backlog.md Parser] Cross-branch loading failed, falling back to local:',
+        error
+      );
+      return this.getTasks();
+    }
   }
 
   /**

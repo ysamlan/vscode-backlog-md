@@ -1,10 +1,10 @@
 ---
 id: TASK-75
 title: 'Research: Port cross-branch logic from upstream Backlog.md'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-04 18:47'
-updated_date: '2026-02-04 18:59'
+updated_date: '2026-02-04 19:18'
 labels:
   - research
   - architecture
@@ -62,11 +62,11 @@ Currently we rely on the `backlog` CLI binary for cross-branch task functionalit
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Document pros/cons of each approach (submodule, vendor, npm, rewrite)
-- [ ] #2 Evaluate VS Code git extension APIs for branch operations
-- [ ] #3 Prototype minimal cross-branch detection
-- [ ] #4 Make recommendation for best approach
-- [ ] #5 Estimate effort for recommended approach
+- [x] #1 Document pros/cons of each approach (submodule, vendor, npm, rewrite)
+- [x] #2 Evaluate VS Code git extension APIs for branch operations
+- [x] #3 Prototype minimal cross-branch detection
+- [x] #4 Make recommendation for best approach
+- [x] #5 Estimate effort for recommended approach
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -98,3 +98,41 @@ The `CrossBranchIntegration.test.ts` file includes a reusable pattern for testin
 
 When implementing native cross-branch support, extend these tests rather than starting from scratch.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## Implementation Summary
+
+Successfully implemented native cross-branch task support without requiring the external Backlog.md CLI binary.
+
+### New Components Created
+
+**GitBranchService** (`src/core/GitBranchService.ts`)
+- Provides git operations via `child_process.execSync`
+- Key methods: `listLocalBranches()`, `listRecentBranches()`, `readFileFromBranch()`, `listFilesInPath()`, `getFileLastModified()`
+- No external dependencies - uses raw git commands
+
+**CrossBranchTaskLoader** (`src/core/CrossBranchTaskLoader.ts`)
+- Loads and merges tasks from multiple branches
+- Implements two resolution strategies: `most_recent` and `most_progressed`
+- Adds `source` and `branch` metadata to tasks
+- Respects `active_branch_days` config for branch filtering
+
+### Modified Components
+
+- **BacklogParser**: Added `getTasksWithCrossBranch()` method
+- **TasksViewProvider**: Uses cross-branch loading when mode is 'cross-branch'
+- **extension.ts**: Simplified to use native support instead of CLI detection
+
+### Test Coverage
+
+- **GitBranchService.test.ts**: 25 tests using temp git repos
+- **CrossBranchTaskLoader.test.ts**: 11 tests including conflict resolution scenarios
+
+### Key Features
+
+- Graceful fallback to local-only on any git errors
+- Branch prioritization: current branch > main/master > others by date
+- Configurable via existing `check_active_branches`, `active_branch_days`, and `task_resolution_strategy` options
+<!-- SECTION:FINAL_SUMMARY:END -->
