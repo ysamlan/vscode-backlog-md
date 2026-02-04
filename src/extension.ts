@@ -166,10 +166,11 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Listen for file changes (only if we have a file watcher)
   if (fileWatcher) {
-    fileWatcher.onDidChange(() => {
+    fileWatcher.onDidChange((uri) => {
       console.log('[Backlog.md] File change detected, refreshing views');
       kanbanProvider.refresh();
       taskListProvider.refresh();
+      TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
     });
   }
 

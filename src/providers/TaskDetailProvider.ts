@@ -23,12 +23,41 @@ export class TaskDetailProvider {
   private static currentPanel: vscode.WebviewPanel | undefined;
   private static currentTaskId: string | undefined;
   private static currentFileHash: string | undefined;
+  private static currentFilePath: string | undefined;
   private readonly writer = new BacklogWriter();
 
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly parser: BacklogParser | undefined
   ) {}
+
+  /**
+   * Handle file change events from the FileWatcher.
+   * Refreshes the view if the changed file matches the currently displayed task.
+   * @param uri The URI of the changed file
+   * @param provider The TaskDetailProvider instance to use for refreshing
+   */
+  public static onFileChanged(uri: vscode.Uri, provider: TaskDetailProvider): void {
+    // Only proceed if panel exists and is showing a task
+    if (!this.currentPanel || !this.currentTaskId || !this.currentFilePath) {
+      return;
+    }
+
+    // Check if the changed file matches the currently displayed task
+    if (uri.fsPath === this.currentFilePath) {
+      // Check if file was deleted
+      if (!fs.existsSync(uri.fsPath)) {
+        vscode.window.showWarningMessage(
+          `Task file was deleted: ${uri.fsPath.split('/').pop() || uri.fsPath}`
+        );
+        this.currentPanel?.dispose();
+        return;
+      }
+
+      // Reload the task - this will also update the hash
+      provider.openTask(this.currentTaskId);
+    }
+  }
 
   /**
    * Open or update the task detail panel for a specific task
@@ -45,12 +74,14 @@ export class TaskDetailProvider {
       return;
     }
 
-    // Capture file state for conflict detection
+    // Capture file state for conflict detection and auto-refresh
     if (task.filePath && fs.existsSync(task.filePath)) {
       const fileContent = fs.readFileSync(task.filePath, 'utf-8');
       TaskDetailProvider.currentFileHash = computeContentHash(fileContent);
+      TaskDetailProvider.currentFilePath = task.filePath;
     } else {
       TaskDetailProvider.currentFileHash = undefined;
+      TaskDetailProvider.currentFilePath = undefined;
     }
 
     const statuses = await this.parser.getStatuses();
@@ -95,6 +126,7 @@ export class TaskDetailProvider {
       TaskDetailProvider.currentPanel = undefined;
       TaskDetailProvider.currentTaskId = undefined;
       TaskDetailProvider.currentFileHash = undefined;
+      TaskDetailProvider.currentFilePath = undefined;
     });
   }
 
