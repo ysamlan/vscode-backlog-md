@@ -111,7 +111,16 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "package": "vsce package",
-    "licenses:generate": "bash scripts/generate-licenses.sh"
+    "licenses:generate": "bash scripts/generate-licenses.sh",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix"
+    ],
+    "*.{ts,js,json,md,yml,yaml,css,html}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
@@ -128,6 +137,8 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "generate-license-file": "^4.1.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.0",
     "typescript": "^5.9.0",

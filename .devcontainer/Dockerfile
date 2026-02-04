@@ -96,6 +96,7 @@ ENV PATH=$PATH:/usr/local/bin/
 ENV PATH=$PATH:/usr/local/share/npm-global/bin
 ENV PATH=$PATH:/home/node/.local/bin
 ENV PATH=$PATH:/home/node/.local/share/mise/shims
+ENV PATH=/home/node/.bun/bin:$PATH
 
 # Set the default shell to zsh rather than sh
 ENV SHELL=/bin/zsh
@@ -125,7 +126,7 @@ RUN echo 'eval "$(mise activate zsh)"' >> /home/node/.zshrc && \
 # Install Claude
 RUN curl -fsSL https://claude.ai/install.sh | bash -s -- $CLAUDE_CODE_VERSION
 
-# Pre-install mise tools (Node + Bun) for faster container startup
+# Pre-install mise tools (Node + Bun) for caching and so we can install backlog.md
 RUN printf '[tools]\nnode = "22"\nbun = "latest"\n' > /workspace/mise.toml && \
     mise trust --yes /workspace/mise.toml && \
     mise install

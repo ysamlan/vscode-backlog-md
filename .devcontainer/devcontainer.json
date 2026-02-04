@@ -2,7 +2,7 @@
   "name": "vscode-backlog.md",
   "build": {
     "dockerfile": "Dockerfile",
-    // amd64 required for vscode-extension-tester support 
+    // amd64 required for vscode-extension-tester support
     "options": ["--platform=linux/amd64"]
   },
   "postCreateCommand": "mise trust --yes && mise install --yes && bun install",
@@ -12,7 +12,8 @@
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "ms-vscode.vscode-typescript-next",
-        "anthropic.claude-code"
+        "anthropic.claude-code",
+        "vira.vsc-vira-theme"
       ],
       "settings": {
         "editor.formatOnSave": true,
@@ -34,7 +35,7 @@
       }
     }
   },
-   "remoteUser": "node",
+  "remoteUser": "node",
   "mounts": [
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
     "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",

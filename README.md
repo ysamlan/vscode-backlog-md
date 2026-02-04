@@ -123,6 +123,15 @@ bun run watch
 
 Press **F5** to launch the Extension Development Host and test the extension.
 
+### Pre-commit Hooks
+
+This project uses [husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/lint-staged/lint-staged) to run linting and formatting on staged files before each commit.
+
+After cloning the repository and running `bun install`, the hooks are automatically set up via the `prepare` script. Each commit will:
+
+- Run ESLint with auto-fix on staged `.ts` files
+- Run Prettier on staged `.ts`, `.js`, `.json`, `.md`, `.yml`, `.yaml`, `.css`, and `.html` files
+
 ### Testing
 
 ```bash
