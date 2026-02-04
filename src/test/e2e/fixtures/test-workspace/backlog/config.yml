@@ -1,0 +1,13 @@
+project_name: "Test Workspace"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+labels: ["bug", "feature", "docs"]
+milestones:
+  - name: "v1.0"
+    description: "Initial release"
+  - name: "v1.1"
+    description: "Bug fixes and improvements"
+  - name: "v2.0"
+    description: "Major feature update"
+date_format: yyyy-mm-dd
+task_prefix: "task"

@@ -60,6 +60,9 @@ export class TasksViewProvider extends BaseViewProvider {
                 <button class="filter-btn" data-filter="in-progress">In Progress</button>
                 <button class="filter-btn" data-filter="done">Done</button>
                 <button class="filter-btn" data-filter="high-priority">High Priority</button>
+                <select id="milestoneFilter" class="milestone-filter">
+                    <option value="">All Milestones</option>
+                </select>
             </div>
             <div id="taskListContent">
                 <div class="empty-state">Loading tasks...</div>
@@ -76,9 +79,11 @@ export class TasksViewProvider extends BaseViewProvider {
             { status: 'Done', label: 'Done' }
         ];
         let currentFilter = 'all';
+        let currentMilestone = '';
         let currentSort = { field: 'status', direction: 'asc' };
         let searchQuery = '';
         let collapsedColumns = new Set(${JSON.stringify(Array.from(this.collapsedColumns))});
+        let configMilestones = [];
 
         // Arrow icons for dependency indicators
         const arrowLeftIcon = \`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>\`;
@@ -417,6 +422,10 @@ export class TasksViewProvider extends BaseViewProvider {
                 );
             }
 
+            if (currentMilestone) {
+                filtered = filtered.filter(t => t.milestone === currentMilestone);
+            }
+
             return filtered;
         }
 
@@ -530,6 +539,38 @@ export class TasksViewProvider extends BaseViewProvider {
             });
         });
 
+        document.getElementById('milestoneFilter').addEventListener('change', e => {
+            currentMilestone = e.target.value;
+            renderList();
+        });
+
+        function updateMilestoneDropdown() {
+            const select = document.getElementById('milestoneFilter');
+            const currentValue = select.value;
+
+            // Get unique milestones from tasks (for milestones not in config)
+            const taskMilestones = [...new Set(tasks.map(t => t.milestone).filter(Boolean))];
+            const configMilestoneNames = configMilestones.map(m => m.name);
+
+            // Combine config milestones with unique task milestones not in config
+            const allMilestones = [
+                ...configMilestoneNames,
+                ...taskMilestones.filter(m => !configMilestoneNames.includes(m))
+            ];
+
+            // Rebuild options
+            select.innerHTML = '<option value="">All Milestones</option>' +
+                allMilestones.map(m => \`<option value="\${escapeHtml(m)}">\${escapeHtml(m)}</option>\`).join('');
+
+            // Restore previous selection if still valid
+            if (allMilestones.includes(currentValue)) {
+                select.value = currentValue;
+            } else {
+                select.value = '';
+                currentMilestone = '';
+            }
+        }
+
         // ===== Keyboard Navigation =====
         document.addEventListener('keydown', e => {
             const focused = document.activeElement;
@@ -602,8 +643,13 @@ export class TasksViewProvider extends BaseViewProvider {
                         label: status
                     }));
                     break;
+                case 'milestonesUpdated':
+                    configMilestones = message.milestones;
+                    updateMilestoneDropdown();
+                    break;
                 case 'tasksUpdated':
                     tasks = message.tasks;
+                    updateMilestoneDropdown();
                     render();
                     break;
                 case 'viewModeChanged':
@@ -672,7 +718,11 @@ export class TasksViewProvider extends BaseViewProvider {
           ? this.parser.getTasksWithCrossBranch()
           : this.parser.getTasks();
 
-      const [tasks, statuses] = await Promise.all([taskLoader, this.parser.getStatuses()]);
+      const [tasks, statuses, milestones] = await Promise.all([
+        taskLoader,
+        this.parser.getStatuses(),
+        this.parser.getMilestones(),
+      ]);
 
       // Compute reverse dependencies (blocksTaskIds) for each task
       const tasksWithBlocks = await Promise.all(
@@ -683,6 +733,7 @@ export class TasksViewProvider extends BaseViewProvider {
       );
 
       this.postMessage({ type: 'statusesUpdated', statuses });
+      this.postMessage({ type: 'milestonesUpdated', milestones });
       this.postMessage({ type: 'tasksUpdated', tasks: tasksWithBlocks });
     } catch (error) {
       console.error('[Backlog.md] Error refreshing Tasks view:', error);
