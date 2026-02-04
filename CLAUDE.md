@@ -70,6 +70,13 @@ Completes TASK-XX.
 Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
 ```
 
+**Adding dependencies**: Always use `npm install` to add new packages rather than manually editing package.json. This ensures the latest version is installed and package-lock.json is updated correctly.
+
+```bash
+npm install <package>           # production dependency
+npm install --save-dev <package> # dev dependency
+```
+
 ### Commands
 
 - `npm run compile` - Build extension with esbuild
@@ -122,7 +129,7 @@ The extension activates when it detects `backlog/tasks/*.md` files.
 
 ### UI Guidelines
 
-**Icons**: Use Lucide icons (inline SVG) instead of emojis in webviews. The `lucide` package is already a dependency. Example:
+**Icons**: Use Lucide icons (inline SVG copied from [lucide.dev](https://lucide.dev/)) instead of emojis in webviews. Example:
 
 ```html
 <svg
