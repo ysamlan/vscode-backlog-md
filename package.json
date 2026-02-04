@@ -4,15 +4,30 @@
   "description": "Beautiful UI for browsing and managing Backlog.md tasks",
   "version": "0.0.1",
   "publisher": "backlog-md",
+  "license": "MIT",
+  "icon": "images/icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/ysamlan/vscode-backlog-md"
   },
+  "homepage": "https://github.com/ysamlan/vscode-backlog-md#readme",
+  "bugs": {
+    "url": "https://github.com/ysamlan/vscode-backlog-md/issues"
+  },
+  "keywords": [
+    "backlog",
+    "kanban",
+    "tasks",
+    "todo",
+    "project management",
+    "markdown"
+  ],
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.108.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization"
   ],
   "activationEvents": [
     "workspaceContains:**/backlog/tasks/*.md"

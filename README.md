@@ -1,6 +1,6 @@
 # Backlog.md for VS Code
 
-[![VS Code 1.85+](https://img.shields.io/badge/VS%20Code-1.85%2B-blue.svg)](https://code.visualstudio.com/)
+[![VS Code 1.108+](https://img.shields.io/badge/VS%20Code-1.108%2B-blue.svg)](https://code.visualstudio.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A beautiful VS Code extension for browsing and managing [Backlog.md](https://github.com/backlog-md/backlog) tasks directly in your editor.
@@ -100,7 +100,7 @@ Open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P) and type "Backlog":
 
 ## Requirements
 
-- VS Code 1.85.0 or later
+- VS Code 1.108.0 or later
 - A workspace containing `backlog/tasks/*.md` files
 
 ## Development
