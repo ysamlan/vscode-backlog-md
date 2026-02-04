@@ -1,9 +1,10 @@
 ---
 id: TASK-27
 title: Implement collapsible Kanban columns
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-02 23:22'
+updated_date: '2026-02-04 19:33'
 labels:
   - 'epic:kanban-board'
   - 'phase:6'
@@ -20,7 +21,7 @@ Allow collapsing columns to save space, especially useful for Done column.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Click header to collapse/expand
-- [ ] #2 Collapsed shows only header with count
-- [ ] #3 Remember collapsed state
+- [x] #1 Click header to collapse/expand
+- [x] #2 Collapsed shows only header with count
+- [x] #3 Remember collapsed state
 <!-- AC:END -->

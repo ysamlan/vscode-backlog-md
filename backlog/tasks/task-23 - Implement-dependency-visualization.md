@@ -1,10 +1,10 @@
 ---
 id: TASK-23
 title: Implement dependency visualization
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-02 23:22'
-updated_date: '2026-02-02 23:24'
+updated_date: '2026-02-04 19:30'
 labels:
   - 'epic:task-detail'
   - 'phase:5'
@@ -22,8 +22,8 @@ Show task dependencies visually - what this task blocks and what blocks it.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Show 'Blocked by' tasks as links
-- [ ] #2 Show 'Blocks' tasks as links
-- [ ] #3 Click to navigate to dependency
-- [ ] #4 Visual indicator if blocked
+- [x] #1 Show 'Blocked by' tasks as links
+- [x] #2 Show 'Blocks' tasks as links
+- [x] #3 Click to navigate to dependency
+- [x] #4 Visual indicator if blocked
 <!-- AC:END -->
