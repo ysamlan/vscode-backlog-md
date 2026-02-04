@@ -982,6 +982,128 @@ These are implementation notes.
     });
   });
 
+  describe('getBlockedByThisTask', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return task IDs that depend on the given task', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        return String(p).includes('tasks');
+      });
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue([
+        'task-1.md',
+        'task-2.md',
+        'task-3.md',
+      ]);
+
+      const parser = new BacklogParser('/fake/backlog');
+      vi.spyOn(parser, 'parseTaskFile').mockImplementation(async (filePath: string) => {
+        if (filePath.includes('task-1')) {
+          return {
+            id: 'TASK-1',
+            title: 'Task 1',
+            status: 'To Do' as const,
+            labels: [],
+            assignee: [],
+            dependencies: [], // No dependencies
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath,
+          };
+        }
+        if (filePath.includes('task-2')) {
+          return {
+            id: 'TASK-2',
+            title: 'Task 2',
+            status: 'To Do' as const,
+            labels: [],
+            assignee: [],
+            dependencies: ['TASK-1'], // Depends on TASK-1
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath,
+          };
+        }
+        return {
+          id: 'TASK-3',
+          title: 'Task 3',
+          status: 'To Do' as const,
+          labels: [],
+          assignee: [],
+          dependencies: ['TASK-1'], // Also depends on TASK-1
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath,
+        };
+      });
+
+      const blockedBy = await parser.getBlockedByThisTask('TASK-1');
+      expect(blockedBy).toEqual(['TASK-2', 'TASK-3']);
+    });
+
+    it('should return empty array if no tasks depend on given task', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        return String(p).includes('tasks');
+      });
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['task-1.md', 'task-2.md']);
+
+      const parser = new BacklogParser('/fake/backlog');
+      vi.spyOn(parser, 'parseTaskFile').mockImplementation(async (filePath: string) => {
+        if (filePath.includes('task-1')) {
+          return {
+            id: 'TASK-1',
+            title: 'Task 1',
+            status: 'To Do' as const,
+            labels: [],
+            assignee: [],
+            dependencies: [],
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath,
+          };
+        }
+        return {
+          id: 'TASK-2',
+          title: 'Task 2',
+          status: 'To Do' as const,
+          labels: [],
+          assignee: [],
+          dependencies: [], // No dependencies
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath,
+        };
+      });
+
+      const blockedBy = await parser.getBlockedByThisTask('TASK-1');
+      expect(blockedBy).toEqual([]);
+    });
+
+    it('should return empty array for non-existent task', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        return String(p).includes('tasks');
+      });
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['task-1.md']);
+
+      const parser = new BacklogParser('/fake/backlog');
+      vi.spyOn(parser, 'parseTaskFile').mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Task 1',
+        status: 'To Do' as const,
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/fake/backlog/tasks/task-1.md',
+      });
+
+      const blockedBy = await parser.getBlockedByThisTask('TASK-999');
+      expect(blockedBy).toEqual([]);
+    });
+  });
+
   describe('Edge Cases: Section Parsing', () => {
     it('should handle description without markers', () => {
       const parser = new BacklogParser('/fake/path');

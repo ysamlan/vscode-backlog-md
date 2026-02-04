@@ -332,11 +332,21 @@ export class TaskDetailProvider {
     const nonce = this.getNonce();
     const styleUri = this.getResourceUri(webview, 'styles.css');
 
-    // Fetch unique labels and assignees for autocomplete
-    const [uniqueLabels, uniqueAssignees] = await Promise.all([
+    // Fetch unique labels, assignees, and reverse dependencies for autocomplete and dependency visualization
+    const [uniqueLabels, uniqueAssignees, blocksTaskIds] = await Promise.all([
       this.parser!.getUniqueLabels(),
       this.parser!.getUniqueAssignees(),
+      this.parser!.getBlockedByThisTask(task.id),
     ]);
+
+    // Check if any dependencies are not Done (task is blocked)
+    let isBlocked = false;
+    if (task.dependencies.length > 0) {
+      const depTasks = await Promise.all(
+        task.dependencies.map((depId) => this.parser!.getTask(depId))
+      );
+      isBlocked = depTasks.some((depTask) => depTask && depTask.status !== 'Done');
+    }
 
     const priorityClass = task.priority ? `priority-${task.priority}` : '';
     const statusClass = task.status.toLowerCase().replace(/\s+/g, '-');
@@ -382,9 +392,21 @@ export class TaskDetailProvider {
         : '';
     const assigneesJson = JSON.stringify(task.assignee);
 
-    const dependenciesHtml =
+    // "Blocked By" - tasks this task depends on (must complete before this task)
+    const blockedByHtml =
       task.dependencies.length > 0
         ? task.dependencies
+            .map(
+              (d) =>
+                `<a href="#" class="dependency-link" data-task-id="${this.escapeHtml(d)}">${this.escapeHtml(d)}</a>`
+            )
+            .join(', ')
+        : '<span class="empty-value">None</span>';
+
+    // "Blocks" - tasks that depend on this task (cannot start until this completes)
+    const blocksHtml =
+      blocksTaskIds.length > 0
+        ? blocksTaskIds
             .map(
               (d) =>
                 `<a href="#" class="dependency-link" data-task-id="${this.escapeHtml(d)}">${this.escapeHtml(d)}</a>`
@@ -481,6 +503,16 @@ export class TaskDetailProvider {
         .priority-badge {
             padding: 4px 12px;
             font-size: 12px;
+        }
+        .blocked-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            background-color: var(--vscode-inputValidation-warningBackground, rgba(245, 158, 11, 0.15));
+            color: var(--vscode-editorWarning-foreground, #f59e0b);
+            border: 1px solid var(--vscode-inputValidation-warningBorder, transparent);
         }
         .section {
             margin-bottom: 24px;
@@ -856,6 +888,7 @@ export class TaskDetailProvider {
                 <option value="">No Priority</option>
                 ${priorityOptionsHtml}
             </select>
+            ${isBlocked ? '<span class="blocked-badge">Blocked</span>' : ''}
         </div>
     </div>
 
@@ -881,8 +914,12 @@ export class TaskDetailProvider {
                 <div>${milestoneHtml}</div>
             </div>
             <div class="meta-item">
-                <div class="meta-label">Dependencies</div>
-                <div>${dependenciesHtml}</div>
+                <div class="meta-label">Blocked By</div>
+                <div>${blockedByHtml}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Blocks</div>
+                <div>${blocksHtml}</div>
             </div>
         </div>
     </div>

@@ -137,6 +137,15 @@ export class BacklogParser {
   }
 
   /**
+   * Get task IDs that are blocked by (depend on) the given task.
+   * Returns IDs of tasks whose dependencies array contains the given taskId.
+   */
+  async getBlockedByThisTask(taskId: string): Promise<string[]> {
+    const tasks = await this.getTasks();
+    return tasks.filter((task) => task.dependencies.includes(taskId)).map((task) => task.id);
+  }
+
+  /**
    * Get tasks with cross-branch support.
    * If cross-branch is enabled in config and the workspace is a git repo,
    * loads and merges tasks from all active branches.
