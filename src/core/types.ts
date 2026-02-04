@@ -18,6 +18,11 @@ export interface ChecklistItem {
 }
 
 /**
+ * Task source indicating where the task was loaded from (cross-branch feature)
+ */
+export type TaskSource = 'local' | 'remote' | 'completed' | 'local-branch';
+
+/**
  * Represents a Backlog.md task
  */
 export interface Task {
@@ -43,6 +48,13 @@ export interface Task {
   createdAt?: string;
   updatedAt?: string;
   ordinal?: number; // For custom ordering within status columns (fractional indexing)
+
+  // Cross-branch fields (upstream compatibility)
+  source?: TaskSource; // Where the task was loaded from
+  branch?: string; // Branch the task was found on
+  lastModified?: Date; // Last modification timestamp for conflict resolution
+  reporter?: string; // Task reporter (upstream field)
+  subtasks?: string[]; // IDs of subtask children
 }
 
 /**
@@ -53,6 +65,11 @@ export interface Milestone {
   name: string;
   description?: string;
 }
+
+/**
+ * Task resolution strategy for cross-branch conflicts
+ */
+export type TaskResolutionStrategy = 'most_recent' | 'most_progressed';
 
 /**
  * Backlog.md configuration from config.yml
@@ -73,6 +90,10 @@ export interface BacklogConfig {
   check_active_branches?: boolean;
   active_branch_days?: number;
   task_prefix?: string;
+
+  // Cross-branch config options (upstream compatibility)
+  task_resolution_strategy?: TaskResolutionStrategy;
+  zero_padded_ids?: boolean; // Use zero-padded IDs (e.g., TASK-001)
 }
 
 /**
@@ -96,6 +117,11 @@ export type WebviewMessage =
     };
 
 /**
+ * Data source mode for task viewing
+ */
+export type DataSourceMode = 'local-only' | 'cross-branch';
+
+/**
  * Message from extension to webview
  */
 export type ExtensionMessage =
@@ -107,4 +133,5 @@ export type ExtensionMessage =
   | { type: 'taskUpdateSuccess'; taskId: string }
   | { type: 'taskUpdateError'; taskId: string; originalStatus: TaskStatus; message: string }
   | { type: 'noBacklogFolder' }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'dataSourceChanged'; mode: DataSourceMode; reason?: string };

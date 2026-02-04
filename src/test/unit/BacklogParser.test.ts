@@ -232,6 +232,107 @@ labels: ["bug", "feature"]
     });
   });
 
+  describe('Cross-Branch Config Options', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should parse check_active_branches option from config', async () => {
+      const configContent = `
+check_active_branches: true
+active_branch_days: 30
+`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config.check_active_branches).toBe(true);
+      expect(config.active_branch_days).toBe(30);
+    });
+
+    it('should parse remote_operations option from config', async () => {
+      const configContent = `
+remote_operations: false
+check_active_branches: false
+`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config.remote_operations).toBe(false);
+      expect(config.check_active_branches).toBe(false);
+    });
+
+    it('should parse task_resolution_strategy option from config', async () => {
+      const configContent = `
+task_resolution_strategy: most_progressed
+`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config.task_resolution_strategy).toBe('most_progressed');
+    });
+
+    it('should parse zero_padded_ids option from config', async () => {
+      const configContent = `
+zero_padded_ids: true
+`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config.zero_padded_ids).toBe(true);
+    });
+
+    it('should handle config with all cross-branch options', async () => {
+      const configContent = `
+project_name: "Test Project"
+check_active_branches: true
+remote_operations: true
+active_branch_days: 14
+task_resolution_strategy: most_recent
+zero_padded_ids: false
+`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config.project_name).toBe('Test Project');
+      expect(config.check_active_branches).toBe(true);
+      expect(config.remote_operations).toBe(true);
+      expect(config.active_branch_days).toBe(14);
+      expect(config.task_resolution_strategy).toBe('most_recent');
+      expect(config.zero_padded_ids).toBe(false);
+    });
+
+    it('should return undefined for missing cross-branch config options', async () => {
+      const configContent = `
+project_name: "Simple Project"
+`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config.check_active_branches).toBeUndefined();
+      expect(config.remote_operations).toBeUndefined();
+      expect(config.active_branch_days).toBeUndefined();
+      expect(config.task_resolution_strategy).toBeUndefined();
+    });
+  });
+
   describe('Edge Cases: Empty/Malformed Files', () => {
     it('should return undefined for empty file', () => {
       const parser = new BacklogParser('/fake/path');

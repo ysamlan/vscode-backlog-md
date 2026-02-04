@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { BaseViewProvider } from './BaseViewProvider';
-import { WebviewMessage } from '../core/types';
+import { WebviewMessage, DataSourceMode } from '../core/types';
 import { BacklogWriter } from '../core/BacklogWriter';
 
 /**
@@ -8,6 +8,8 @@ import { BacklogWriter } from '../core/BacklogWriter';
  */
 export class TasksViewProvider extends BaseViewProvider {
   private viewMode: 'kanban' | 'list' = 'kanban';
+  private dataSourceMode: DataSourceMode = 'local-only';
+  private dataSourceReason?: string;
 
   protected get viewType(): string {
     return 'backlog.kanban';
@@ -957,5 +959,21 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
       }
     }
+  }
+
+  /**
+   * Set the data source mode and notify the webview
+   */
+  setDataSourceMode(mode: DataSourceMode, reason?: string): void {
+    this.dataSourceMode = mode;
+    this.dataSourceReason = reason;
+    this.postMessage({ type: 'dataSourceChanged', mode, reason });
+  }
+
+  /**
+   * Get the current data source mode
+   */
+  getDataSourceMode(): DataSourceMode {
+    return this.dataSourceMode;
   }
 }

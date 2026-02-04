@@ -6,8 +6,11 @@ import { TaskCreatePanel } from './providers/TaskCreatePanel';
 import { BacklogParser } from './core/BacklogParser';
 import { BacklogWriter } from './core/BacklogWriter';
 import { FileWatcher } from './core/FileWatcher';
+import { BacklogCli } from './core/BacklogCli';
+import { DataSourceMode } from './core/types';
 
 let fileWatcher: FileWatcher | undefined;
+let statusBarItem: vscode.StatusBarItem | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('[Backlog.md] Extension activating...');
@@ -101,12 +104,77 @@ export function activate(context: vscode.ExtensionContext) {
     });
   }
 
+  // Check for cross-branch feature configuration and CLI availability
+  if (parser) {
+    checkCrossBranchConfig(parser, context, tasksProvider);
+  }
+
   console.log('[Backlog.md] Extension activation complete!');
 }
 
 export function deactivate() {
   if (fileWatcher) {
     fileWatcher.dispose();
+  }
+  if (statusBarItem) {
+    statusBarItem.dispose();
+  }
+}
+
+/**
+ * Check if cross-branch features are configured and CLI is available.
+ * Shows appropriate warnings and status bar indicators.
+ */
+async function checkCrossBranchConfig(
+  parser: BacklogParser,
+  context: vscode.ExtensionContext,
+  tasksProvider: TasksViewProvider
+): Promise<void> {
+  try {
+    const config = await parser.getConfig();
+    const crossBranchEnabled =
+      config.check_active_branches === true || config.remote_operations === true;
+
+    if (!crossBranchEnabled) {
+      // Local-only mode is configured (or default) - no warning needed
+      console.log('[Backlog.md] Cross-branch features not enabled in config');
+      return;
+    }
+
+    // Cross-branch features are enabled, check if CLI is available
+    console.log('[Backlog.md] Cross-branch features enabled, checking CLI availability...');
+    const cliResult = await BacklogCli.isAvailable();
+
+    // Create status bar item
+    statusBarItem = BacklogCli.createStatusBarItem();
+    context.subscriptions.push(statusBarItem);
+
+    let dataSourceMode: DataSourceMode;
+    let reason: string | undefined;
+
+    if (cliResult.available) {
+      console.log(
+        `[Backlog.md] CLI available at: ${cliResult.path} (version: ${cliResult.version})`
+      );
+      dataSourceMode = 'cross-branch';
+      BacklogCli.updateStatusBarItem(statusBarItem, 'cross-branch');
+    } else {
+      console.log('[Backlog.md] CLI not available, falling back to local-only mode');
+      dataSourceMode = 'local-only';
+      reason =
+        'Cross-branch features require the backlog CLI. Install from https://github.com/MrLesk/Backlog.md or set checkActiveBranches: false in config.';
+
+      // Show warning notification
+      BacklogCli.showCrossbranchWarning();
+
+      // Update status bar to show local-only mode
+      BacklogCli.updateStatusBarItem(statusBarItem, 'local-only', reason);
+    }
+
+    // Notify the tasks provider about the data source mode
+    tasksProvider.setDataSourceMode(dataSourceMode, reason);
+  } catch (error) {
+    console.error('[Backlog.md] Error checking cross-branch config:', error);
   }
 }
 
