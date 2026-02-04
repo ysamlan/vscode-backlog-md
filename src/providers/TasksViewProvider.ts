@@ -10,6 +10,7 @@ export class TasksViewProvider extends BaseViewProvider {
   private viewMode: 'kanban' | 'list' = 'kanban';
   private dataSourceMode: DataSourceMode = 'local-only';
   private dataSourceReason?: string;
+  private collapsedColumns: Set<string> = new Set();
 
   protected get viewType(): string {
     return 'backlog.kanban';
@@ -20,9 +21,11 @@ export class TasksViewProvider extends BaseViewProvider {
     resolveContext: vscode.WebviewViewResolveContext,
     token: vscode.CancellationToken
   ): void | Thenable<void> {
-    // Load saved view mode from globalState
+    // Load saved view mode and collapsed columns from globalState
     if (this.context) {
       this.viewMode = this.context.globalState.get('backlog.viewMode', 'kanban');
+      const savedCollapsed = this.context.globalState.get<string[]>('backlog.collapsedColumns', []);
+      this.collapsedColumns = new Set(savedCollapsed);
     }
     return super.resolveWebviewView(webviewView, resolveContext, token);
   }
@@ -93,6 +96,29 @@ export class TasksViewProvider extends BaseViewProvider {
             background: var(--vscode-sideBar-background);
             border-radius: 8px;
             padding: 12px;
+            transition: min-width 0.2s ease, max-width 0.2s ease;
+        }
+        .kanban-column.collapsed {
+            min-width: 48px;
+            max-width: 48px;
+            padding: 12px 8px;
+        }
+        .kanban-column.collapsed .task-list {
+            display: none;
+        }
+        .kanban-column.collapsed .column-header {
+            flex-direction: column;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            height: auto;
+            min-height: 120px;
+            margin-bottom: 0;
+        }
+        .kanban-column.collapsed .column-header .column-title {
+            margin-top: 8px;
+        }
+        .kanban-column.collapsed .column-count {
+            margin-bottom: 8px;
         }
         .column-header {
             font-weight: 600;
@@ -104,6 +130,19 @@ export class TasksViewProvider extends BaseViewProvider {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .column-header:hover {
+            color: var(--vscode-foreground);
+        }
+        .collapse-icon {
+            font-size: 10px;
+            margin-right: 4px;
+            transition: transform 0.2s ease;
+        }
+        .kanban-column.collapsed .collapse-icon {
+            transform: rotate(-90deg);
         }
         .column-count {
             background: var(--vscode-badge-background);
@@ -338,6 +377,7 @@ export class TasksViewProvider extends BaseViewProvider {
         let currentFilter = 'all';
         let currentSort = { field: 'status', direction: 'asc' };
         let searchQuery = '';
+        let collapsedColumns = new Set(${JSON.stringify(Array.from(this.collapsedColumns))});
 
         // Icon SVGs for toggle button
         const kanbanIcon = \`${kanbanIcon}\`;
@@ -394,10 +434,12 @@ export class TasksViewProvider extends BaseViewProvider {
                         // Both undefined: sort by ID
                         return a.id.localeCompare(b.id);
                     });
+                const isCollapsed = collapsedColumns.has(col.status);
                 return \`
-                    <div class="kanban-column" data-status="\${col.status}">
-                        <div class="column-header">
-                            <span>\${col.label}</span>
+                    <div class="kanban-column\${isCollapsed ? ' collapsed' : ''}" data-status="\${col.status}">
+                        <div class="column-header" data-status="\${col.status}">
+                            <span class="collapse-icon">\${isCollapsed ? '▸' : '▾'}</span>
+                            <span class="column-title">\${col.label}</span>
                             <span class="column-count">\${columnTasks.length}</span>
                         </div>
                         <div class="task-list" data-status="\${col.status}">
@@ -408,6 +450,18 @@ export class TasksViewProvider extends BaseViewProvider {
             }).join('');
 
             setupKanbanDragAndDrop();
+            setupColumnCollapse();
+        }
+
+        function setupColumnCollapse() {
+            document.querySelectorAll('.column-header').forEach(header => {
+                header.addEventListener('click', (e) => {
+                    // Don't collapse when clicking on task cards (drag events)
+                    if (e.target.closest('.task-card')) return;
+                    const status = header.dataset.status;
+                    vscode.postMessage({ type: 'toggleColumnCollapse', status });
+                });
+            });
         }
 
         function renderTaskCard(task) {
@@ -841,6 +895,10 @@ export class TasksViewProvider extends BaseViewProvider {
                 case 'noBacklogFolder':
                     renderNoBacklogState();
                     break;
+                case 'columnCollapseChanged':
+                    collapsedColumns = new Set(message.collapsedColumns);
+                    render();
+                    break;
                 case 'error':
                     console.error(message.message);
                     break;
@@ -960,6 +1018,28 @@ export class TasksViewProvider extends BaseViewProvider {
             vscode.window.showErrorMessage(`Failed to archive: ${error}`);
           }
         }
+        break;
+      }
+
+      case 'toggleColumnCollapse': {
+        const status = message.status;
+        if (this.collapsedColumns.has(status)) {
+          this.collapsedColumns.delete(status);
+        } else {
+          this.collapsedColumns.add(status);
+        }
+        // Persist to globalState
+        if (this.context) {
+          await this.context.globalState.update(
+            'backlog.collapsedColumns',
+            Array.from(this.collapsedColumns)
+          );
+        }
+        // Notify webview
+        this.postMessage({
+          type: 'columnCollapseChanged',
+          collapsedColumns: Array.from(this.collapsedColumns),
+        });
         break;
       }
     }

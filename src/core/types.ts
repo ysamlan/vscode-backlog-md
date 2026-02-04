@@ -114,7 +114,8 @@ export type WebviewMessage =
       taskId: string;
       listType: 'acceptanceCriteria' | 'definitionOfDone';
       itemId: number;
-    };
+    }
+  | { type: 'toggleColumnCollapse'; status: string };
 
 /**
  * Data source mode for task viewing
@@ -134,4 +135,5 @@ export type ExtensionMessage =
   | { type: 'taskUpdateError'; taskId: string; originalStatus: TaskStatus; message: string }
   | { type: 'noBacklogFolder' }
   | { type: 'error'; message: string }
-  | { type: 'dataSourceChanged'; mode: DataSourceMode; reason?: string };
+  | { type: 'dataSourceChanged'; mode: DataSourceMode; reason?: string }
+  | { type: 'columnCollapseChanged'; collapsedColumns: string[] };
