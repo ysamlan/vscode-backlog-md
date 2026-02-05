@@ -9,22 +9,9 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: {
-          allowDefaultProject: [
-            'scripts/*.ts',
-            'vitest.config.ts',
-            'vite.config.ts',
-            'vite.webview.config.ts',
-            'playwright.config.ts',
-            'e2e/*.ts',
-            'e2e/fixtures/*.ts',
-            'src/webview/entries/*.ts',
-            'src/webview/lib/*.ts',
-            'src/webview/stores/*.ts',
-          ],
-          // Increase limit from 8 to 20 for config files and webview code
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
-        },
+        // Use traditional project array - more explicit but reliable
+        // The tsconfig.eslint.json covers all linted files
+        project: './tsconfig.eslint.json',
         tsconfigRootDir: import.meta.dirname,
       },
     },
