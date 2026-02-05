@@ -138,8 +138,8 @@ After cloning the repository and running `bun install`, the hooks are automatica
 # Unit tests (core logic)
 bun run test
 
-# Webview UI tests (Cypress)
-bun run test:webview
+# Webview UI tests (Playwright)
+bun run test:playwright
 
 # Extension e2e tests
 bun run test:e2e

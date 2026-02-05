@@ -41,8 +41,7 @@ export default defineConfig({
 
   // Web server configuration - serves the webview test pages
   webServer: {
-    // Use the existing vite.config.ts which serves cypress/webview-fixtures
-    // We'll migrate these fixtures to use compiled Svelte components
+    // Use vite.config.ts which serves e2e/webview-fixtures with compiled Svelte bundles
     command: 'bun run vite',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,

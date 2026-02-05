@@ -51,11 +51,11 @@ We use a three-tier testing strategy:
 # Unit tests - Vitest for parser, writer, and business logic
 bun run test
 
-# Webview UI tests - Cypress standalone for webview interactions
-bun run test:webview
+# Webview UI tests - Playwright for webview interactions
+bun run test:playwright
 
-# Interactive Cypress mode
-bun run test:webview:open
+# Interactive Playwright UI mode
+bun run test:playwright:ui
 
 # Extension e2e tests - Full VS Code integration
 bun run test:e2e

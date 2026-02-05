@@ -4,16 +4,15 @@ import { resolve } from 'path';
 /**
  * Vite configuration for serving webview test pages
  *
- * This serves the webview HTML files in a standalone browser for Cypress/Playwright testing.
- * The VS Code API is mocked by e2e/fixtures/vscode-mock.ts (Playwright) or
- * cypress/support/vscode-mock.ts (Cypress, legacy).
+ * This serves the webview HTML files in a standalone browser for Playwright testing.
+ * The VS Code API is mocked by e2e/fixtures/vscode-mock.ts.
  *
  * Reference: Nx Console uses a similar pattern
  * https://github.com/nrwl/nx-console/tree/master/apps/generate-ui-v2-e2e
  */
 export default defineConfig({
-  root: 'cypress/webview-fixtures',
-  publicDir: resolve(__dirname, 'cypress/fixtures'),
+  root: 'e2e/webview-fixtures',
+  publicDir: resolve(__dirname, 'e2e/fixtures'),
   server: {
     port: 5173,
     strictPort: true,

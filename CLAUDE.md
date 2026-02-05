@@ -80,11 +80,12 @@ bun add --dev <package>     # dev dependency
 ### Commands
 
 - `bun run compile` - Build extension with esbuild
+- `bun run compile:webview` - Build Svelte webview components
 - `bun run watch` - Watch mode for development
-- `bun run build` - Build CSS + extension
-- `bun run test` - Run unit tests (vitest)
-- `bun run test:webview` - Run Cypress webview UI tests
-- `bun run test:webview:open` - Open Cypress interactive mode
+- `bun run build` - Build CSS + webview + extension
+- `bun run test` - Run unit tests (Vitest)
+- `bun run test:playwright` - Run Playwright webview UI tests
+- `bun run test:playwright:ui` - Open Playwright interactive UI mode
 - `bun run test:e2e` - Run VS Code extension e2e tests
 - `bun run lint` - ESLint check
 - `bun run format` - Format with Prettier
@@ -95,25 +96,26 @@ bun add --dev <package>     # dev dependency
 **Three-tier approach:**
 
 1. **Unit tests** (`bun run test`) - Vitest with vscode API mocking for core logic
-2. **Webview UI tests** (`bun run test:webview`) - Cypress standalone for webview interactions
+2. **Webview UI tests** (`bun run test:playwright`) - Playwright for webview interactions
 3. **Extension e2e tests** (`bun run test:e2e`) - vscode-extension-tester for extension activation
 
-**Webview testing pattern** (based on Nx Console approach):
+**Webview testing pattern:**
 
-- Webview HTML is served standalone via Vite (`bun run webview:serve`)
+- Webview HTML fixtures are served via Vite (`bun run webview:serve`)
 - `acquireVsCodeApi()` is mocked to capture postMessage calls
 - Tests verify UI interactions send correct messages to extension
+- Test fixtures in `e2e/fixtures/` load compiled Svelte bundles
 
-**When to use Cypress webview tests:**
+**When to use Playwright webview tests:**
 
-Cypress tests (`bun run test:webview`) are REQUIRED for:
+Playwright tests (`bun run test:playwright`) are REQUIRED for:
 
 - **Drag-and-drop interactions** - Unit tests cannot simulate HTML5 drag events
 - **Multi-element user flows** - Clicking, hovering, keyboard navigation sequences
 - **DOM-dependent behavior** - Where visual order, positioning, or layout affects logic
 - **State transitions** - Verifying UI updates in response to interactions
 
-Signs you need Cypress instead of (or in addition to) unit tests:
+Signs you need Playwright instead of (or in addition to) unit tests:
 
 - The behavior involves `addEventListener` for user events
 - You're testing "what message gets sent when user does X"
@@ -122,15 +124,9 @@ Signs you need Cypress instead of (or in addition to) unit tests:
 
 **Test fixture pattern:**
 
-- Create HTML fixtures in `cypress/webview-fixtures/`
-- Include realistic test data with edge cases (e.g., mixed ordinal/no-ordinal cards)
-- Use `data-cy` attributes for reliable selectors
-
-Reference repos for webview testing patterns:
-
-- [Nx Console](https://github.com/nrwl/nx-console/tree/master/apps/generate-ui-v2-e2e) - Cypress standalone
-- [wdio-vscode-service](https://github.com/webdriverio-community/wdio-vscode-service) - Frame switching
-- [Marquee](https://github.com/stateful/marquee) - vscode API mocking
+- HTML fixtures load compiled Svelte bundles from `dist/webview/`
+- VS Code mock helpers in `e2e/fixtures/vscode-mock.ts`
+- Use `data-testid` attributes for reliable selectors
 
 ### Testing the Extension Manually
 
@@ -144,10 +140,15 @@ The extension activates when it detects `backlog/tasks/*.md` files.
 ### Architecture
 
 - `src/extension.ts` - Extension entry point
-- `src/core/` - Business logic (parser, writer, file watcher, types)
-- `src/providers/` - Webview providers (Kanban, TaskList, TaskDetail)
-- `src/webview/` - Webview UI (HTML/CSS/JS embedded in providers)
+- `src/core/` - Business logic (parser, writer, file watcher, types, ordinalUtils)
+- `src/providers/` - Webview providers (load Svelte bundles, handle messages)
+- `src/webview/` - Svelte 5 components
+  - `components/` - UI components (dashboard, kanban, list, task-detail, shared)
+  - `entries/` - Webview entry points (tasks.ts, dashboard.ts, task-detail.ts)
+  - `stores/` - VS Code API bridge (vscode.svelte.ts)
+  - `lib/` - Shared types
 - `src/test/` - Unit and integration tests
+- `e2e/` - Playwright webview E2E tests
 
 ### UI Guidelines
 
@@ -232,8 +233,7 @@ Mise automatically activates when you enter the project directory (if shell inte
 
 ### Known Issues / Tech Debt
 
-- Webviews use inline styles instead of external CSS (TASK-46)
-- Inline styles duplicate VS Code theme variable mappings
+- Some styling still uses inline styles in Svelte components (can be moved to shared CSS)
 
 # Svelte MCP guidance
 

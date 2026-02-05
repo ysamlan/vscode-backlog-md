@@ -134,8 +134,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "bun run build && tsc -p tsconfig.e2e.json && bash scripts/run-e2e.sh",
-    "test:webview": "concurrently --kill-others --success first \"vite\" \"wait-on http://localhost:5173 && cypress run\"",
-    "test:webview:open": "concurrently --kill-others \"vite\" \"wait-on http://localhost:5173 && cypress open\"",
     "test:playwright": "playwright test",
     "test:playwright:ui": "playwright test --ui",
     "webview:serve": "vite",
@@ -161,14 +159,10 @@
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@tailwindcss/cli": "^4.1.0",
     "@testing-library/svelte": "^5.3.1",
-    "@types/chai": "^5.2.3",
     "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.19.8",
     "@types/vscode": "^1.108.0",
-    "chai": "^6.2.2",
-    "concurrently": "^9.2.1",
-    "cypress": "^15.10.0",
     "esbuild": "^0.27.2",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
@@ -181,8 +175,7 @@
     "typescript-eslint": "^8.54.0",
     "vite": "^7.3.1",
     "vitest": "^4.0.18",
-    "vscode-extension-tester": "^8.21.0",
-    "wait-on": "^9.0.3"
+    "vscode-extension-tester": "^8.21.0"
   },
   "dependencies": {
     "js-yaml": "^4.1.1",
