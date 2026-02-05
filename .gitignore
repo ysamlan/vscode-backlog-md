@@ -9,3 +9,4 @@ out/
 /core
 .claude/settings.local.json
 tmp/
+test-results/
