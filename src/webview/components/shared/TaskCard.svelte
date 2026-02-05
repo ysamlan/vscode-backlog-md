@@ -132,19 +132,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  .dep-link {
-    background: none;
-    border: none;
-    padding: 0;
-    font: inherit;
-    color: var(--vscode-textLink-foreground);
-    cursor: pointer;
-    text-decoration: none;
-  }
-
-  .dep-link:hover {
-    text-decoration: underline;
-  }
-</style>

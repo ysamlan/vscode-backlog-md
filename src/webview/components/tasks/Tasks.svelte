@@ -203,13 +203,13 @@
 
 <div id="kanban-view" class="view-content" class:hidden={viewMode !== 'kanban'}>
   {#if noBacklog}
-    <div class="empty-state" style="padding: 40px 20px; text-align: center;">
-      <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
-      <h3 style="margin: 0 0 8px 0; font-weight: 600;">No Backlog Found</h3>
-      <p style="margin: 0 0 16px 0; color: var(--vscode-descriptionForeground);">
+    <div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <h3>No Backlog Found</h3>
+      <p>
         This workspace doesn't have a <code>backlog/</code> folder.
       </p>
-      <p style="margin: 0; font-size: 12px; color: var(--vscode-descriptionForeground);">
+      <p>
         To use Backlog.md, create a <code>backlog/tasks/</code> folder<br />
         in your project root with markdown task files.
       </p>
@@ -255,13 +255,13 @@
 
 <div id="list-view" class="view-content" class:hidden={viewMode !== 'list'}>
   {#if noBacklog}
-    <div class="empty-state" style="padding: 40px 20px; text-align: center;">
-      <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
-      <h3 style="margin: 0 0 8px 0; font-weight: 600;">No Backlog Found</h3>
-      <p style="margin: 0 0 16px 0; color: var(--vscode-descriptionForeground);">
+    <div class="empty-state">
+      <div class="empty-state-icon">📋</div>
+      <h3>No Backlog Found</h3>
+      <p>
         This workspace doesn't have a <code>backlog/</code> folder.
       </p>
-      <p style="margin: 0; font-size: 12px; color: var(--vscode-descriptionForeground);">
+      <p>
         To use Backlog.md, create a <code>backlog/tasks/</code> folder<br />
         in your project root with markdown task files.
       </p>

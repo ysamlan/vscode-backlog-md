@@ -1,7 +1,7 @@
 ---
 id: TASK-78
 title: Add fallback values to all CSS variables in styles.css
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-05 18:33'
 labels:
