@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { BaseViewProvider } from './BaseViewProvider';
-import { WebviewMessage, DataSourceMode } from '../core/types';
+import { WebviewMessage, DataSourceMode, Task } from '../core/types';
 import { BacklogWriter } from '../core/BacklogWriter';
 
 /**
@@ -156,7 +156,9 @@ export class TasksViewProvider extends BaseViewProvider {
                 const columnTasks = tasks
                     .filter(t => t.status === col.status)
                     .sort((a, b) => {
-                        // Tasks with ordinal come before tasks without
+                        // Tasks WITH ordinal come first (sorted by ordinal)
+                        // Tasks WITHOUT ordinal come last (sorted by ID)
+                        // This matches upstream Backlog.md behavior
                         const aOrd = a.ordinal;
                         const bOrd = b.ordinal;
                         if (aOrd !== undefined && bOrd === undefined) return -1;
@@ -175,7 +177,7 @@ export class TasksViewProvider extends BaseViewProvider {
                         </div>
                         <div class="task-list" data-status="\${col.status}">
                             \${columnTasks.map(task => renderTaskCard(task)).join('')}
-                        </div>
+                                                    </div>
                     </div>
                 \`;
             }).join('');
@@ -248,6 +250,8 @@ export class TasksViewProvider extends BaseViewProvider {
                                     const columnTasks = milestoneTasks
                                         .filter(t => t.status === col.status)
                                         .sort((a, b) => {
+                                            // Tasks WITH ordinal come first (sorted by ordinal)
+                                            // Tasks WITHOUT ordinal come last (sorted by ID)
                                             const aOrd = a.ordinal;
                                             const bOrd = b.ordinal;
                                             if (aOrd !== undefined && bOrd === undefined) return -1;
@@ -263,7 +267,7 @@ export class TasksViewProvider extends BaseViewProvider {
                                             </div>
                                             <div class="task-list" data-status="\${col.status}" data-milestone="\${escapeHtml(milestoneKey)}">
                                                 \${columnTasks.map(task => renderTaskCard(task)).join('')}
-                                            </div>
+                                                                                            </div>
                                         </div>
                                     \`;
                                 }).join('')}
@@ -334,7 +338,7 @@ export class TasksViewProvider extends BaseViewProvider {
                 : '';
 
             return \`
-                <div class="task-card" tabindex="0" draggable="true" data-task-id="\${task.id}" data-ordinal="\${task.ordinal || 0}">
+                <div class="task-card" tabindex="0" draggable="true" data-task-id="\${task.id}" data-ordinal="\${task.ordinal !== undefined ? task.ordinal : ''}">
                     <div class="task-card-title">\${escapeHtml(task.title)}</div>
                     <div class="task-card-meta">
                         \${priorityBadge}
@@ -349,14 +353,40 @@ export class TasksViewProvider extends BaseViewProvider {
             const cards = document.querySelectorAll('.task-card');
             const lists = document.querySelectorAll('.task-list');
 
+            // Helper to remove all drop indicators
+            function clearDropIndicators() {
+                document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+                document.querySelectorAll('.task-list').forEach(list => {
+                    list.classList.remove('drop-target');
+                });
+            }
+
+            // Helper to show drop indicator at position
+            function showDropIndicator(list, beforeElement) {
+                clearDropIndicators();
+                list.classList.add('drop-target');
+
+                const indicator = document.createElement('div');
+                indicator.className = 'drop-indicator';
+
+                if (beforeElement) {
+                    list.insertBefore(indicator, beforeElement);
+                } else {
+                    list.appendChild(indicator);
+                }
+            }
+
             cards.forEach(card => {
                 card.addEventListener('dragstart', e => {
-                    card.classList.add('dragging');
+                    // Small delay for the visual effect to look smoother
+                    setTimeout(() => card.classList.add('dragging'), 0);
                     e.dataTransfer.setData('text/plain', card.dataset.taskId);
+                    e.dataTransfer.effectAllowed = 'move';
                 });
 
                 card.addEventListener('dragend', () => {
                     card.classList.remove('dragging');
+                    clearDropIndicators();
                 });
 
                 card.addEventListener('click', (e) => {
@@ -382,16 +412,25 @@ export class TasksViewProvider extends BaseViewProvider {
             lists.forEach(list => {
                 list.addEventListener('dragover', e => {
                     e.preventDefault();
-                    list.classList.add('drop-target');
+                    e.dataTransfer.dropEffect = 'move';
+
+                    const draggingCard = document.querySelector('.task-card.dragging');
+                    if (!draggingCard) return;
+
+                    const dropTarget = getDropTarget(e, list, draggingCard);
+                    showDropIndicator(list, dropTarget);
                 });
 
-                list.addEventListener('dragleave', () => {
-                    list.classList.remove('drop-target');
+                list.addEventListener('dragleave', (e) => {
+                    // Only clear if leaving the list entirely (not entering a child)
+                    if (!list.contains(e.relatedTarget)) {
+                        clearDropIndicators();
+                    }
                 });
 
                 list.addEventListener('drop', e => {
                     e.preventDefault();
-                    list.classList.remove('drop-target');
+                    clearDropIndicators();
 
                     const taskId = e.dataTransfer.getData('text/plain');
                     const card = document.querySelector(\`[data-task-id="\${taskId}"]\`);
@@ -401,12 +440,15 @@ export class TasksViewProvider extends BaseViewProvider {
                     const originalStatus = originalColumn?.dataset.status;
                     const newStatus = list.dataset.status;
 
+                    const dropTarget = getDropTarget(e, list, card);
+
+                    // Calculate ordinals for the dropped card and any no-ordinal cards
+                    // that need ordinals to maintain visual order on reload
+                    const ordinalUpdates = calculateOrdinalsForDrop(list, card, dropTarget);
+
                     if (originalStatus === newStatus) {
                         // Same column - reorder within column
-                        const dropTarget = getDropTarget(e, list, card);
                         if (!dropTarget && card === list.lastElementChild) return; // No change
-
-                        const newOrdinal = calculateNewOrdinal(dropTarget, list, card);
 
                         // Optimistic reorder
                         card.classList.add('saving');
@@ -415,28 +457,127 @@ export class TasksViewProvider extends BaseViewProvider {
                         } else {
                             list.appendChild(card);
                         }
-                        card.dataset.ordinal = String(newOrdinal);
+
+                        // Update data attributes for all affected cards
+                        ordinalUpdates.forEach(update => {
+                            const c = document.querySelector(\`[data-task-id="\${update.taskId}"]\`);
+                            if (c) c.dataset.ordinal = String(update.ordinal);
+                        });
 
                         vscode.postMessage({
-                            type: 'reorderTask',
-                            taskId: taskId,
-                            ordinal: newOrdinal
+                            type: 'reorderTasks',
+                            updates: ordinalUpdates
                         });
                     } else {
-                        // Different column - status change
+                        // Different column - status change with position
                         card.classList.add('saving');
                         card.dataset.originalStatus = originalStatus || '';
-                        list.appendChild(card);
+
+                        // Position card at drop location
+                        if (dropTarget) {
+                            list.insertBefore(card, dropTarget);
+                        } else {
+                            list.appendChild(card);
+                        }
+
+                        // Update data attributes for all affected cards
+                        ordinalUpdates.forEach(update => {
+                            const c = document.querySelector(\`[data-task-id="\${update.taskId}"]\`);
+                            if (c) c.dataset.ordinal = String(update.ordinal);
+                        });
                         updateColumnCounts();
+
+                        // Find the dropped card's ordinal from updates
+                        const droppedCardUpdate = ordinalUpdates.find(u => u.taskId === taskId);
 
                         vscode.postMessage({
                             type: 'updateTaskStatus',
                             taskId: taskId,
-                            status: newStatus
+                            status: newStatus,
+                            ordinal: droppedCardUpdate?.ordinal,
+                            additionalOrdinalUpdates: ordinalUpdates.filter(u => u.taskId !== taskId)
                         });
                     }
                 });
             });
+        }
+
+        // Calculate ordinals for the dropped card and any no-ordinal cards above it
+        // This ensures visual order is preserved on reload
+        function calculateOrdinalsForDrop(list, draggedCard, dropTarget) {
+            const DEFAULT_STEP = 1000;
+            const updates = [];
+
+            // Get all cards except the dragged one, in current visual order
+            const otherCards = [...list.querySelectorAll('.task-card')].filter(c => c !== draggedCard);
+
+            // Determine the drop index (where the card will be inserted)
+            let dropIndex = dropTarget ? otherCards.indexOf(dropTarget) : otherCards.length;
+
+            // Build the new visual order with the dropped card inserted
+            const newOrder = [...otherCards];
+            newOrder.splice(dropIndex, 0, draggedCard);
+
+            // Find all no-ordinal cards that are at or above the drop position
+            // These need ordinals so they don't jump to the end on reload
+            // (since no-ordinal cards sort to the end)
+            const cardsNeedingOrdinals = [];
+            for (let i = 0; i <= dropIndex; i++) {
+                const c = newOrder[i];
+                // Empty string means no ordinal (we use '' for undefined ordinals in data-ordinal)
+                const hasOrdinal = c.dataset.ordinal !== '' && c.dataset.ordinal !== undefined;
+                if (!hasOrdinal || c === draggedCard) {
+                    cardsNeedingOrdinals.push({ card: c, index: i });
+                }
+            }
+
+            // Calculate ordinals for cards that need them
+            // Strategy: find the highest existing ordinal above the first card needing one,
+            // then assign sequential ordinals
+            if (cardsNeedingOrdinals.length > 0) {
+                const firstNeedingIndex = cardsNeedingOrdinals[0].index;
+
+                // Find the ordinal of the card just before the first one needing ordinal
+                let baseOrdinal = 0;
+                if (firstNeedingIndex > 0) {
+                    const prevCard = newOrder[firstNeedingIndex - 1];
+                    // Only use the ordinal if it's actually set (not empty string)
+                    if (prevCard.dataset.ordinal !== '' && prevCard.dataset.ordinal !== undefined) {
+                        baseOrdinal = parseFloat(prevCard.dataset.ordinal) || 0;
+                    }
+                }
+
+                // Find the ordinal of the first card after our group that has an ordinal
+                // (to ensure we don't create conflicts)
+                let ceilingOrdinal = Infinity;
+                for (let i = dropIndex + 1; i < newOrder.length; i++) {
+                    const c = newOrder[i];
+                    // Check for actual ordinal (not empty string which means no ordinal)
+                    if (c.dataset.ordinal !== '' && c.dataset.ordinal !== undefined) {
+                        ceilingOrdinal = parseFloat(c.dataset.ordinal);
+                        break;
+                    }
+                }
+
+                // Calculate step size to fit all cards needing ordinals between base and ceiling
+                const count = cardsNeedingOrdinals.length;
+                let step = DEFAULT_STEP;
+                if (ceilingOrdinal !== Infinity) {
+                    const availableRange = ceilingOrdinal - baseOrdinal;
+                    step = Math.min(DEFAULT_STEP, availableRange / (count + 1));
+                }
+
+                // Assign ordinals
+                cardsNeedingOrdinals.forEach((item, i) => {
+                    const newOrdinal = baseOrdinal + step * (i + 1);
+                    updates.push({
+                        taskId: item.card.dataset.taskId,
+                        ordinal: newOrdinal
+                    });
+                });
+            }
+
+            return updates;
         }
 
         function getDropTarget(e, list, draggedCard) {
@@ -924,7 +1065,20 @@ export class TasksViewProvider extends BaseViewProvider {
 
         try {
           const writer = new BacklogWriter();
-          await writer.updateTaskStatus(taskId, message.status, this.parser);
+          // Update status and optionally ordinal (for cross-column drops with position)
+          const updates: Partial<Task> = { status: message.status };
+          if (message.ordinal !== undefined) {
+            updates.ordinal = message.ordinal;
+          }
+          await writer.updateTask(taskId, updates, this.parser);
+
+          // Also update any additional cards that needed ordinals assigned
+          if (message.additionalOrdinalUpdates && message.additionalOrdinalUpdates.length > 0) {
+            for (const update of message.additionalOrdinalUpdates) {
+              await writer.updateTask(update.taskId, { ordinal: update.ordinal }, this.parser);
+            }
+          }
+
           // Send success - no need to refresh since we did optimistic update
           this.postMessage({ type: 'taskUpdateSuccess', taskId });
         } catch (error) {
@@ -951,6 +1105,28 @@ export class TasksViewProvider extends BaseViewProvider {
           // For reorder errors, just remove saving state - no need to restore position
           // since the UI already shows the new position optimistically
           this.postMessage({ type: 'taskUpdateSuccess', taskId });
+        }
+        break;
+      }
+
+      case 'reorderTasks': {
+        if (!this.parser) break;
+        try {
+          const writer = new BacklogWriter();
+          // Update all tasks with new ordinals
+          for (const update of message.updates) {
+            await writer.updateTask(update.taskId, { ordinal: update.ordinal }, this.parser);
+          }
+          // Send success for each task
+          for (const update of message.updates) {
+            this.postMessage({ type: 'taskUpdateSuccess', taskId: update.taskId });
+          }
+        } catch (error) {
+          console.error('Error reordering tasks:', error);
+          // For reorder errors, just remove saving state
+          for (const update of message.updates) {
+            this.postMessage({ type: 'taskUpdateSuccess', taskId: update.taskId });
+          }
         }
         break;
       }

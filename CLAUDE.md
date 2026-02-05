@@ -104,6 +104,28 @@ bun add --dev <package>     # dev dependency
 - `acquireVsCodeApi()` is mocked to capture postMessage calls
 - Tests verify UI interactions send correct messages to extension
 
+**When to use Cypress webview tests:**
+
+Cypress tests (`bun run test:webview`) are REQUIRED for:
+
+- **Drag-and-drop interactions** - Unit tests cannot simulate HTML5 drag events
+- **Multi-element user flows** - Clicking, hovering, keyboard navigation sequences
+- **DOM-dependent behavior** - Where visual order, positioning, or layout affects logic
+- **State transitions** - Verifying UI updates in response to interactions
+
+Signs you need Cypress instead of (or in addition to) unit tests:
+
+- The behavior involves `addEventListener` for user events
+- You're testing "what message gets sent when user does X"
+- The logic depends on DOM element order or coordinates
+- You need to verify visual feedback (classes added, elements inserted)
+
+**Test fixture pattern:**
+
+- Create HTML fixtures in `cypress/webview-fixtures/`
+- Include realistic test data with edge cases (e.g., mixed ordinal/no-ordinal cards)
+- Use `data-cy` attributes for reliable selectors
+
 Reference repos for webview testing patterns:
 
 - [Nx Console](https://github.com/nrwl/nx-console/tree/master/apps/generate-ui-v2-e2e) - Cypress standalone

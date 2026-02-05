@@ -13,7 +13,7 @@
         "esbenp.prettier-vscode",
         "ms-vscode.vscode-typescript-next",
         "anthropic.claude-code",
-        "vira.vsc-vira-theme"
+        "teabyii.ayu"
       ],
       "settings": {
         "editor.formatOnSave": true,

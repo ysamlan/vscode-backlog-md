@@ -102,12 +102,19 @@ export interface BacklogConfig {
 export type WebviewMessage =
   | { type: 'refresh' }
   | { type: 'openTask'; taskId: string }
-  | { type: 'updateTaskStatus'; taskId: string; status: TaskStatus }
+  | {
+      type: 'updateTaskStatus';
+      taskId: string;
+      status: TaskStatus;
+      ordinal?: number;
+      additionalOrdinalUpdates?: Array<{ taskId: string; ordinal: number }>;
+    }
   | { type: 'updateTask'; taskId: string; updates: Partial<Task> }
   | { type: 'createTask'; task: Partial<Task> }
   | { type: 'archiveTask'; taskId: string }
   | { type: 'openFile'; filePath: string }
   | { type: 'reorderTask'; taskId: string; ordinal: number }
+  | { type: 'reorderTasks'; updates: Array<{ taskId: string; ordinal: number }> }
   | {
       type: 'toggleChecklistItem';
       taskId: string;

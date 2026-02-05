@@ -5,6 +5,8 @@ priority: high
 milestone: v1.1
 labels: [bug]
 created: 2026-02-02
+updated_date: 2026-02-05
+ordinal: 2000
 ---
 
 # Fix login redirect bug
