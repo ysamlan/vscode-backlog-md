@@ -1,9 +1,10 @@
 ---
 id: TASK-56
 title: Read tasks from multiple folders
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-03 03:14'
+updated_date: '2026-02-05 21:04'
 labels: []
 dependencies: []
 priority: medium

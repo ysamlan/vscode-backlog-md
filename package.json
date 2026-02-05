@@ -75,6 +75,16 @@
         "command": "backlog.showKanbanView",
         "title": "Switch to Kanban View",
         "icon": "$(layout)"
+      },
+      {
+        "command": "backlog.showDrafts",
+        "title": "Show Drafts",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "backlog.hideDrafts",
+        "title": "Hide Drafts",
+        "icon": "$(edit)"
       }
     ],
     "menus": {
@@ -95,9 +105,19 @@
           "group": "navigation@2"
         },
         {
+          "command": "backlog.showDrafts",
+          "when": "view == backlog.kanban && !backlog.showingDrafts",
+          "group": "navigation@3"
+        },
+        {
+          "command": "backlog.hideDrafts",
+          "when": "view == backlog.kanban && backlog.showingDrafts",
+          "group": "navigation@3"
+        },
+        {
           "command": "backlog.refresh",
           "when": "view == backlog.kanban",
-          "group": "navigation@3"
+          "group": "navigation@4"
         }
       ]
     },

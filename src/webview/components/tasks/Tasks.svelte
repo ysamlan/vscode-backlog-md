@@ -15,7 +15,9 @@
 
   // State
   let viewMode = $state<'kanban' | 'list'>('kanban');
+  let draftsMode = $state(false);
   let tasks = $state<TaskWithBlocks[]>([]);
+  let completedTasks = $state<TaskWithBlocks[]>([]);
   let columns = $state<StatusColumn[]>([
     { status: 'To Do', label: 'To Do' },
     { status: 'In Progress', label: 'In Progress' },
@@ -101,6 +103,14 @@
 
       case 'setFilter':
         currentFilter = message.filter;
+        break;
+
+      case 'draftsModeChanged':
+        draftsMode = message.enabled;
+        break;
+
+      case 'completedTasksUpdated':
+        completedTasks = message.tasks;
         break;
 
       case 'error':
@@ -199,9 +209,21 @@
   function handleSearchChange(query: string) {
     searchQuery = query;
   }
+
+  function handleCompleteTask(taskId: string) {
+    vscode.postMessage({ type: 'completeTask', taskId });
+  }
+
+  function handlePromoteDraft(taskId: string) {
+    vscode.postMessage({ type: 'promoteDraft', taskId });
+  }
+
+  function handleRequestCompletedTasks() {
+    vscode.postMessage({ type: 'requestCompletedTasks' });
+  }
 </script>
 
-<div id="kanban-view" class="view-content" class:hidden={viewMode !== 'kanban'}>
+<div id="kanban-view" class="view-content" class:hidden={viewMode !== 'kanban' || draftsMode}>
   {#if noBacklog}
     <div class="empty-state">
       <div class="empty-state-icon">📋</div>
@@ -253,7 +275,7 @@
   {/if}
 </div>
 
-<div id="list-view" class="view-content" class:hidden={viewMode !== 'list'}>
+<div id="list-view" class="view-content" class:hidden={viewMode !== 'list' && !draftsMode}>
   {#if noBacklog}
     <div class="empty-state">
       <div class="empty-state-icon">📋</div>
@@ -273,11 +295,16 @@
       {currentFilter}
       {currentMilestone}
       {searchQuery}
+      isDraftsView={draftsMode}
+      {completedTasks}
       onOpenTask={handleOpenTask}
       onFilterChange={handleFilterChange}
       onMilestoneChange={handleMilestoneChange}
       onSearchChange={handleSearchChange}
       onReorderTasks={handleReorderTasks}
+      onCompleteTask={handleCompleteTask}
+      onPromoteDraft={handlePromoteDraft}
+      onRequestCompletedTasks={handleRequestCompletedTasks}
     />
   {/if}
 </div>

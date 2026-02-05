@@ -23,6 +23,11 @@ export interface ChecklistItem {
 export type TaskSource = 'local' | 'remote' | 'completed' | 'local-branch';
 
 /**
+ * Which folder a task lives in within the backlog directory
+ */
+export type TaskFolder = 'tasks' | 'drafts' | 'completed';
+
+/**
  * Represents a Backlog.md task
  */
 export interface Task {
@@ -44,6 +49,7 @@ export interface Task {
   documentation?: string[];
   type?: string;
   parentTaskId?: string;
+  folder?: TaskFolder;
   filePath: string;
   createdAt?: string;
   updatedAt?: string;
@@ -124,7 +130,10 @@ export type WebviewMessage =
   | { type: 'toggleColumnCollapse'; status: string }
   | { type: 'toggleMilestoneGrouping'; enabled: boolean }
   | { type: 'toggleMilestoneCollapse'; milestone: string }
-  | { type: 'filterByStatus'; status: string };
+  | { type: 'filterByStatus'; status: string }
+  | { type: 'completeTask'; taskId: string }
+  | { type: 'promoteDraft'; taskId: string }
+  | { type: 'requestCompletedTasks' };
 
 /**
  * Data source mode for task viewing
@@ -148,4 +157,6 @@ export type ExtensionMessage =
   | { type: 'columnCollapseChanged'; collapsedColumns: string[] }
   | { type: 'milestoneGroupingChanged'; enabled: boolean }
   | { type: 'milestoneCollapseChanged'; collapsedMilestones: string[] }
-  | { type: 'setFilter'; filter: string };
+  | { type: 'setFilter'; filter: string }
+  | { type: 'draftsModeChanged'; enabled: boolean }
+  | { type: 'completedTasksUpdated'; tasks: Task[] };

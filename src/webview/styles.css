@@ -792,6 +792,77 @@ body {
   margin-left: 4px;
 }
 
+/* Draft and completed row styles */
+.task-table tr.completed-row {
+  opacity: 0.6;
+}
+
+.task-table tr.draft-row {
+  opacity: 0.85;
+}
+
+.draft-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #ffffff);
+}
+
+.drafts-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-foreground, #cccccc);
+  padding: 4px 0;
+}
+
+.actions-header {
+  width: 100px;
+  text-align: right;
+}
+
+.actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--vscode-button-secondaryBackground, #3a3d41);
+  border-radius: 3px;
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.action-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, #45484d);
+}
+
+.action-btn.promote-btn:hover {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border-color: var(--vscode-button-background, #0e639c);
+}
+
+.action-btn.complete-btn:hover {
+  background: var(--vscode-testing-iconPassed, #388a34);
+  color: #ffffff;
+  border-color: var(--vscode-testing-iconPassed, #388a34);
+}
+
 /* Toast notification */
 .toast {
   position: fixed;
@@ -1356,6 +1427,13 @@ body {
   color: var(--vscode-descriptionForeground, #858585);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.stat-sublabel {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #858585);
+  margin-top: 2px;
+  opacity: 0.7;
 }
 
 .dashboard-page .section {

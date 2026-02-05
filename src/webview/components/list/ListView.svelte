@@ -10,11 +10,16 @@
     currentFilter: string;
     currentMilestone: string;
     searchQuery: string;
+    isDraftsView?: boolean;
+    completedTasks?: TaskWithBlocks[];
     onOpenTask: (taskId: string) => void;
     onFilterChange: (filter: string) => void;
     onMilestoneChange: (milestone: string) => void;
     onSearchChange: (query: string) => void;
     onReorderTasks?: (updates: Array<{ taskId: string; ordinal: number }>) => void;
+    onCompleteTask?: (taskId: string) => void;
+    onPromoteDraft?: (taskId: string) => void;
+    onRequestCompletedTasks?: () => void;
   }
 
   let {
@@ -23,17 +28,24 @@
     currentFilter,
     currentMilestone,
     searchQuery,
+    isDraftsView = false,
+    completedTasks = [],
     onOpenTask,
     onFilterChange,
     onMilestoneChange,
     onSearchChange,
     onReorderTasks,
+    onCompleteTask,
+    onPromoteDraft,
+    onRequestCompletedTasks,
   }: Props = $props();
 
   let currentSort = $state<{ field: string; direction: 'asc' | 'desc' }>({
     field: 'status',
     direction: 'asc',
   });
+  let showingCompleted = $state(false);
+  let completedRequested = $state(false);
 
   // Get unique milestones from tasks (for dropdown)
   let taskMilestones = $derived([...new Set(tasks.map((t) => t.milestone).filter(Boolean))] as string[]);
@@ -45,21 +57,38 @@
 
   // Filter tasks
   let filteredTasks = $derived.by(() => {
+    // When showing completed tasks, use that list instead
+    if (showingCompleted) {
+      let filtered: TaskWithBlocks[] = completedTasks;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter(
+          (t) =>
+            t.title.toLowerCase().includes(query) ||
+            (t.description && t.description.toLowerCase().includes(query))
+        );
+      }
+      return filtered;
+    }
+
     let filtered = tasks;
 
-    switch (currentFilter) {
-      case 'todo':
-        filtered = filtered.filter((t) => t.status === 'To Do');
-        break;
-      case 'in-progress':
-        filtered = filtered.filter((t) => t.status === 'In Progress');
-        break;
-      case 'done':
-        filtered = filtered.filter((t) => t.status === 'Done');
-        break;
-      case 'high-priority':
-        filtered = filtered.filter((t) => t.priority === 'high');
-        break;
+    // In drafts view, show all drafts (no status filtering)
+    if (!isDraftsView) {
+      switch (currentFilter) {
+        case 'todo':
+          filtered = filtered.filter((t) => t.status === 'To Do');
+          break;
+        case 'in-progress':
+          filtered = filtered.filter((t) => t.status === 'In Progress');
+          break;
+        case 'done':
+          filtered = filtered.filter((t) => t.status === 'Done');
+          break;
+        case 'high-priority':
+          filtered = filtered.filter((t) => t.priority === 'high');
+          break;
+      }
     }
 
     if (searchQuery) {
@@ -241,6 +270,28 @@
     if (justDragged) return;
     onOpenTask(taskId);
   }
+
+  function handleCompletedFilter() {
+    if (showingCompleted) {
+      showingCompleted = false;
+    } else {
+      showingCompleted = true;
+      if (!completedRequested && onRequestCompletedTasks) {
+        completedRequested = true;
+        onRequestCompletedTasks();
+      }
+    }
+  }
+
+  function handleCompleteClick(e: Event, taskId: string) {
+    e.stopPropagation();
+    onCompleteTask?.(taskId);
+  }
+
+  function handlePromoteClick(e: Event, taskId: string) {
+    e.stopPropagation();
+    onPromoteDraft?.(taskId);
+  }
 </script>
 
 <div class="task-list-container">
@@ -255,59 +306,79 @@
     />
   </div>
 
-  <div class="filter-buttons">
-    <button
-      class="filter-btn"
-      class:active={currentFilter === 'all'}
-      data-filter="all"
-      onclick={() => onFilterChange('all')}
-    >
-      All
-    </button>
-    <button
-      class="filter-btn"
-      class:active={currentFilter === 'todo'}
-      data-filter="todo"
-      onclick={() => onFilterChange('todo')}
-    >
-      To Do
-    </button>
-    <button
-      class="filter-btn"
-      class:active={currentFilter === 'in-progress'}
-      data-filter="in-progress"
-      onclick={() => onFilterChange('in-progress')}
-    >
-      In Progress
-    </button>
-    <button
-      class="filter-btn"
-      class:active={currentFilter === 'done'}
-      data-filter="done"
-      onclick={() => onFilterChange('done')}
-    >
-      Done
-    </button>
-    <button
-      class="filter-btn"
-      class:active={currentFilter === 'high-priority'}
-      data-filter="high-priority"
-      onclick={() => onFilterChange('high-priority')}
-    >
-      High Priority
-    </button>
-    <select
-      class="milestone-filter"
-      value={currentMilestone}
-      onchange={(e) => onMilestoneChange((e.target as HTMLSelectElement).value)}
-      data-testid="milestone-filter"
-    >
-      <option value="">All Milestones</option>
-      {#each allMilestones as milestone (milestone)}
-        <option value={milestone}>{milestone}</option>
-      {/each}
-    </select>
-  </div>
+  {#if isDraftsView}
+    <div class="filter-buttons">
+      <span class="drafts-label" data-testid="drafts-label">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>
+        </svg>
+        Drafts
+      </span>
+    </div>
+  {:else}
+    <div class="filter-buttons">
+      <button
+        class="filter-btn"
+        class:active={currentFilter === 'all' && !showingCompleted}
+        data-filter="all"
+        onclick={() => { showingCompleted = false; onFilterChange('all'); }}
+      >
+        All
+      </button>
+      <button
+        class="filter-btn"
+        class:active={currentFilter === 'todo' && !showingCompleted}
+        data-filter="todo"
+        onclick={() => { showingCompleted = false; onFilterChange('todo'); }}
+      >
+        To Do
+      </button>
+      <button
+        class="filter-btn"
+        class:active={currentFilter === 'in-progress' && !showingCompleted}
+        data-filter="in-progress"
+        onclick={() => { showingCompleted = false; onFilterChange('in-progress'); }}
+      >
+        In Progress
+      </button>
+      <button
+        class="filter-btn"
+        class:active={currentFilter === 'done' && !showingCompleted}
+        data-filter="done"
+        onclick={() => { showingCompleted = false; onFilterChange('done'); }}
+      >
+        Done
+      </button>
+      <button
+        class="filter-btn"
+        class:active={currentFilter === 'high-priority' && !showingCompleted}
+        data-filter="high-priority"
+        onclick={() => { showingCompleted = false; onFilterChange('high-priority'); }}
+      >
+        High Priority
+      </button>
+      <button
+        class="filter-btn"
+        class:active={showingCompleted}
+        data-filter="completed"
+        data-testid="completed-filter"
+        onclick={handleCompletedFilter}
+      >
+        Completed
+      </button>
+      <select
+        class="milestone-filter"
+        value={currentMilestone}
+        onchange={(e) => onMilestoneChange((e.target as HTMLSelectElement).value)}
+        data-testid="milestone-filter"
+      >
+        <option value="">All Milestones</option>
+        {#each allMilestones as milestone (milestone)}
+          <option value={milestone}>{milestone}</option>
+        {/each}
+      </select>
+    </div>
+  {/if}
 
   <div id="taskListContent">
     {#if sortedTasks.length === 0}
@@ -346,6 +417,9 @@
             >
               Priority {getSortIndicator('priority')}
             </th>
+            {#if isDraftsView || !showingCompleted}
+              <th class="actions-header">Actions</th>
+            {/if}
           </tr>
         </thead>
         <tbody
@@ -360,17 +434,19 @@
               data-task-id={task.id}
               data-testid="task-row-{task.id}"
               tabindex="0"
-              draggable={isDragEnabled ? 'true' : undefined}
+              draggable={isDragEnabled && !isDraftsView && !showingCompleted ? 'true' : undefined}
               class:dragging={draggedTaskId === task.id}
               class:drop-before={dropTargetTaskId === task.id && dropPosition === 'before'}
               class:drop-after={dropTargetTaskId === task.id && dropPosition === 'after'}
+              class:completed-row={showingCompleted || task.source === 'completed'}
+              class:draft-row={isDraftsView}
               onclick={() => handleRowClickGuarded(task.id)}
               onkeydown={(e) => handleRowKeydown(e, task.id)}
               ondragstart={(e) => handleDragStart(e, task.id)}
               ondragend={handleDragEnd}
               ondragover={(e) => handleDragOver(e, task.id)}
             >
-              {#if isDragEnabled}
+              {#if isDragEnabled && !isDraftsView && !showingCompleted}
                 <td
                   class="drag-handle"
                   data-testid="drag-handle-{task.id}"
@@ -382,6 +458,9 @@
                 </td>
               {/if}
               <td>
+                {#if isDraftsView}
+                  <span class="draft-badge">DRAFT</span>
+                {/if}
                 {task.title}
                 {#if depsCount > 0 || blocksCount > 0}
                   <span
@@ -411,6 +490,37 @@
                   -
                 {/if}
               </td>
+              {#if isDraftsView}
+                <td class="actions-cell">
+                  <button
+                    class="action-btn promote-btn"
+                    data-testid="promote-btn-{task.id}"
+                    title="Promote to Task"
+                    onclick={(e) => handlePromoteClick(e, task.id)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>
+                    </svg>
+                    Promote
+                  </button>
+                </td>
+              {:else if !showingCompleted && task.status === 'Done'}
+                <td class="actions-cell">
+                  <button
+                    class="action-btn complete-btn"
+                    data-testid="complete-btn-{task.id}"
+                    title="Move to Completed"
+                    onclick={(e) => handleCompleteClick(e, task.id)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>
+                    </svg>
+                    Complete
+                  </button>
+                </td>
+              {:else if !showingCompleted}
+                <td class="actions-cell"></td>
+              {/if}
             </tr>
           {/each}
         </tbody>

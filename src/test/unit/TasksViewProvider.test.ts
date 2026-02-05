@@ -172,4 +172,91 @@ describe('TasksViewProvider', () => {
       );
     });
   });
+
+  describe('setDraftsMode', () => {
+    it('should post draftsModeChanged message when enabled', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+
+      provider.resolveWebviewView(
+        mockWebviewView as vscode.WebviewView,
+        {} as vscode.WebviewViewResolveContext,
+        {
+          isCancellationRequested: false,
+          onCancellationRequested: vi.fn(),
+        } as vscode.CancellationToken
+      );
+
+      provider.setDraftsMode(true);
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'draftsModeChanged',
+        enabled: true,
+      });
+    });
+
+    it('should post draftsModeChanged message when disabled', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+
+      provider.resolveWebviewView(
+        mockWebviewView as vscode.WebviewView,
+        {} as vscode.WebviewViewResolveContext,
+        {
+          isCancellationRequested: false,
+          onCancellationRequested: vi.fn(),
+        } as vscode.CancellationToken
+      );
+
+      provider.setDraftsMode(false);
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'draftsModeChanged',
+        enabled: false,
+      });
+    });
+  });
+
+  describe('requestCompletedTasks', () => {
+    it('should send completed tasks to webview', async () => {
+      const completedTasks = [
+        {
+          id: 'TASK-1',
+          title: 'Completed Task',
+          status: 'Done' as const,
+          folder: 'completed' as const,
+          source: 'completed' as const,
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/fake/backlog/completed/task-1.md',
+        },
+      ];
+
+      (mockParser as unknown as Record<string, unknown>).getCompletedTasks = vi
+        .fn()
+        .mockResolvedValue(completedTasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+
+      provider.resolveWebviewView(
+        mockWebviewView as vscode.WebviewView,
+        {} as vscode.WebviewViewResolveContext,
+        {
+          isCancellationRequested: false,
+          onCancellationRequested: vi.fn(),
+        } as vscode.CancellationToken
+      );
+
+      // Simulate receiving requestCompletedTasks message
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({ type: 'requestCompletedTasks' });
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'completedTasksUpdated',
+        tasks: completedTasks,
+      });
+    });
+  });
 });

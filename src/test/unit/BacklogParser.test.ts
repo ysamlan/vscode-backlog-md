@@ -1104,6 +1104,251 @@ These are implementation notes.
     });
   });
 
+  describe('Multi-folder support', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    describe('getTasksFromFolder', () => {
+      it('should read tasks from specified subfolder', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['task-1 - My-Task.md']);
+        vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: TASK-1
+title: My Task
+status: To Do
+---
+`);
+
+        const parser = new BacklogParser('/fake/backlog');
+        const tasks = await parser.getTasksFromFolder('tasks');
+
+        expect(tasks).toHaveLength(1);
+        expect(tasks[0].folder).toBe('tasks');
+        expect(tasks[0].id).toBe('TASK-1');
+      });
+
+      it('should return empty array when folder does not exist', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        const parser = new BacklogParser('/fake/backlog');
+        const tasks = await parser.getTasksFromFolder('drafts');
+
+        expect(tasks).toEqual([]);
+      });
+
+      it('should set the correct folder property on each task', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['draft-1 - My-Draft.md']);
+        vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: DRAFT-1
+title: My Draft
+status: Draft
+---
+`);
+
+        const parser = new BacklogParser('/fake/backlog');
+        const tasks = await parser.getTasksFromFolder('drafts');
+
+        expect(tasks).toHaveLength(1);
+        expect(tasks[0].folder).toBe('drafts');
+      });
+    });
+
+    describe('getDrafts', () => {
+      it('should return tasks with folder set to drafts', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['draft-1 - My-Draft.md']);
+        vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: DRAFT-1
+title: My Draft
+status: To Do
+---
+`);
+
+        const parser = new BacklogParser('/fake/backlog');
+        const drafts = await parser.getDrafts();
+
+        expect(drafts).toHaveLength(1);
+        expect(drafts[0].folder).toBe('drafts');
+        expect(drafts[0].status).toBe('Draft');
+      });
+
+      it('should enforce Draft status on all drafts', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['draft-1 - Active-Draft.md']);
+        vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: DRAFT-1
+title: Active Draft
+status: In Progress
+---
+`);
+
+        const parser = new BacklogParser('/fake/backlog');
+        const drafts = await parser.getDrafts();
+
+        expect(drafts).toHaveLength(1);
+        expect(drafts[0].status).toBe('Draft');
+      });
+
+      it('should return empty array when no drafts folder exists', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        const parser = new BacklogParser('/fake/backlog');
+        const drafts = await parser.getDrafts();
+
+        expect(drafts).toEqual([]);
+      });
+    });
+
+    describe('getCompletedTasks', () => {
+      it('should return tasks with folder set to completed', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['task-1 - Done-Task.md']);
+        vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: TASK-1
+title: Done Task
+status: Done
+---
+`);
+
+        const parser = new BacklogParser('/fake/backlog');
+        const completed = await parser.getCompletedTasks();
+
+        expect(completed).toHaveLength(1);
+        expect(completed[0].folder).toBe('completed');
+        expect(completed[0].source).toBe('completed');
+      });
+
+      it('should return empty array when no completed folder exists', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(false);
+
+        const parser = new BacklogParser('/fake/backlog');
+        const completed = await parser.getCompletedTasks();
+
+        expect(completed).toEqual([]);
+      });
+    });
+
+    describe('getTask across folders', () => {
+      it('should find task in tasks folder first', async () => {
+        const parser = new BacklogParser('/fake/backlog');
+
+        // Mock getTasksFromFolder to return tasks from different folders
+        vi.spyOn(parser, 'getTasksFromFolder').mockImplementation(async (folder: string) => {
+          if (folder === 'tasks') {
+            return [
+              {
+                id: 'TASK-1',
+                title: 'In Tasks',
+                status: 'To Do' as const,
+                folder: 'tasks' as const,
+                filePath: '/fake/backlog/tasks/task-1.md',
+                labels: [],
+                assignee: [],
+                dependencies: [],
+                acceptanceCriteria: [],
+                definitionOfDone: [],
+              },
+            ];
+          }
+          return [];
+        });
+
+        const task = await parser.getTask('TASK-1');
+        expect(task?.folder).toBe('tasks');
+        expect(task?.title).toBe('In Tasks');
+      });
+
+      it('should find task in drafts folder when not in tasks', async () => {
+        const parser = new BacklogParser('/fake/backlog');
+
+        vi.spyOn(parser, 'getTasksFromFolder').mockImplementation(async (folder: string) => {
+          if (folder === 'tasks') return [];
+          if (folder === 'drafts') {
+            return [
+              {
+                id: 'DRAFT-1',
+                title: 'In Drafts',
+                status: 'Draft' as const,
+                folder: 'drafts' as const,
+                filePath: '/fake/backlog/drafts/draft-1.md',
+                labels: [],
+                assignee: [],
+                dependencies: [],
+                acceptanceCriteria: [],
+                definitionOfDone: [],
+              },
+            ];
+          }
+          return [];
+        });
+
+        const task = await parser.getTask('DRAFT-1');
+        expect(task?.folder).toBe('drafts');
+      });
+
+      it('should find task in completed folder as last resort', async () => {
+        const parser = new BacklogParser('/fake/backlog');
+
+        vi.spyOn(parser, 'getTasksFromFolder').mockImplementation(async (folder: string) => {
+          if (folder === 'completed') {
+            return [
+              {
+                id: 'TASK-5',
+                title: 'Completed',
+                status: 'Done' as const,
+                folder: 'completed' as const,
+                filePath: '/fake/backlog/completed/task-5.md',
+                labels: [],
+                assignee: [],
+                dependencies: [],
+                acceptanceCriteria: [],
+                definitionOfDone: [],
+              },
+            ];
+          }
+          return [];
+        });
+
+        const task = await parser.getTask('TASK-5');
+        expect(task?.folder).toBe('completed');
+      });
+
+      it('should return undefined when task not found in any folder', async () => {
+        const parser = new BacklogParser('/fake/backlog');
+        vi.spyOn(parser, 'getTasksFromFolder').mockResolvedValue([]);
+
+        const task = await parser.getTask('TASK-999');
+        expect(task).toBeUndefined();
+      });
+    });
+
+    describe('Draft filename parsing', () => {
+      it('should parse draft- prefix in filename for ID extraction', () => {
+        const parser = new BacklogParser('/fake/path');
+        const content = `---
+title: My Draft Task
+status: Draft
+---
+`;
+        const task = parser.parseTaskContent(content, '/fake/path/draft-1 - My-Draft.md');
+        expect(task?.id).toBe('DRAFT-1');
+      });
+
+      it('should still parse task- prefix as before', () => {
+        const parser = new BacklogParser('/fake/path');
+        const content = `---
+title: Regular Task
+status: To Do
+---
+`;
+        const task = parser.parseTaskContent(content, '/fake/path/task-42 - Regular.md');
+        expect(task?.id).toBe('TASK-42');
+      });
+    });
+  });
+
   describe('Edge Cases: Section Parsing', () => {
     it('should handle description without markers', () => {
       const parser = new BacklogParser('/fake/path');

@@ -9,6 +9,7 @@ export type {
   TaskStatus,
   TaskPriority,
   TaskSource,
+  TaskFolder,
   ChecklistItem,
   Milestone,
   BacklogConfig,
@@ -22,6 +23,7 @@ export type {
  */
 export interface DashboardStats {
   totalTasks: number;
+  completedCount: number;
   byStatus: Record<string, number>;
   byPriority: Record<string, number>;
   milestones: MilestoneStats[];

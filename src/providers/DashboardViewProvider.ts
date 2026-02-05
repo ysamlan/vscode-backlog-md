@@ -7,6 +7,7 @@ import type { WebviewMessage, Task } from '../core/types';
  */
 interface DashboardStats {
   totalTasks: number;
+  completedCount: number;
   byStatus: Record<string, number>;
   byPriority: Record<string, number>;
   milestones: { name: string; total: number; done: number }[];
@@ -60,8 +61,11 @@ export class DashboardViewProvider extends BaseViewProvider {
     }
 
     try {
-      const tasks = await this.parser.getTasks();
-      const stats = this.computeStatistics(tasks);
+      const [tasks, completedTasks] = await Promise.all([
+        this.parser.getTasks(),
+        this.parser.getCompletedTasks(),
+      ]);
+      const stats = this.computeStatistics(tasks, completedTasks.length);
       this._view.webview.postMessage({ type: 'statsUpdated', stats });
     } catch (error) {
       console.error('[Backlog.md] Error refreshing Dashboard:', error);
@@ -72,7 +76,7 @@ export class DashboardViewProvider extends BaseViewProvider {
   /**
    * Compute statistics from tasks
    */
-  private computeStatistics(tasks: Task[]): DashboardStats {
+  private computeStatistics(tasks: Task[], completedCount: number = 0): DashboardStats {
     const byStatus: Record<string, number> = {
       'To Do': 0,
       'In Progress': 0,
@@ -121,6 +125,7 @@ export class DashboardViewProvider extends BaseViewProvider {
 
     return {
       totalTasks: tasks.length,
+      completedCount,
       byStatus,
       byPriority,
       milestones,

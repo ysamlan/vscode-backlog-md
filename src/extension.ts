@@ -102,9 +102,28 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Register drafts mode toggle commands
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.showDrafts', () => {
+      tasksProvider.setDraftsMode(true);
+      vscode.commands.executeCommand('setContext', 'backlog.showingDrafts', true);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.hideDrafts', () => {
+      tasksProvider.setDraftsMode(false);
+      vscode.commands.executeCommand('setContext', 'backlog.showingDrafts', false);
+    })
+  );
+
   // Initialize context for view mode (default is kanban)
   const savedViewMode = context.globalState.get<'kanban' | 'list'>('backlog.viewMode', 'kanban');
   vscode.commands.executeCommand('setContext', 'backlog.isListView', savedViewMode === 'list');
+
+  // Initialize context for drafts mode
+  const savedDraftsMode = context.globalState.get<boolean>('backlog.showingDrafts', false);
+  vscode.commands.executeCommand('setContext', 'backlog.showingDrafts', savedDraftsMode);
 
   // Register filter by status command (used by dashboard clickable cards)
   context.subscriptions.push(

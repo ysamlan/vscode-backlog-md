@@ -1125,6 +1125,110 @@ milestone: "v1.0-beta.1"
     });
   });
 
+  describe('promoteDraft', () => {
+    it('should move file from drafts/ to tasks/', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'DRAFT-1',
+        title: 'My Draft',
+        status: 'Draft',
+        folder: 'drafts',
+        filePath: '/fake/backlog/drafts/draft-1 - My-Draft.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: DRAFT-1
+title: My Draft
+status: Draft
+---
+`);
+
+      const result = await writer.promoteDraft('DRAFT-1', mockParser);
+
+      expect(fs.renameSync).toHaveBeenCalledWith(
+        '/fake/backlog/drafts/draft-1 - My-Draft.md',
+        '/fake/backlog/tasks/draft-1 - My-Draft.md'
+      );
+      expect(result).toBe('/fake/backlog/tasks/draft-1 - My-Draft.md');
+    });
+
+    it('should update status from Draft to To Do', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'DRAFT-1',
+        title: 'My Draft',
+        status: 'Draft',
+        folder: 'drafts',
+        filePath: '/fake/backlog/drafts/draft-1 - My-Draft.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: DRAFT-1
+title: My Draft
+status: Draft
+---
+`);
+
+      await writer.promoteDraft('DRAFT-1', mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.status).toBe('To Do');
+    });
+
+    it('should throw error when task not found', async () => {
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue(undefined);
+
+      await expect(writer.promoteDraft('DRAFT-999', mockParser)).rejects.toThrow(
+        'Task DRAFT-999 not found'
+      );
+    });
+
+    it('should create tasks directory if it does not exist', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'DRAFT-1',
+        title: 'My Draft',
+        status: 'Draft',
+        folder: 'drafts',
+        filePath: '/fake/backlog/drafts/draft-1 - My-Draft.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: DRAFT-1
+title: My Draft
+status: Draft
+---
+`);
+
+      await writer.promoteDraft('DRAFT-1', mockParser);
+
+      expect(fs.mkdirSync).toHaveBeenCalledWith('/fake/backlog/tasks', { recursive: true });
+    });
+  });
+
   describe('Conflict Detection', () => {
     describe('computeContentHash', () => {
       it('should return consistent hash for same content', () => {

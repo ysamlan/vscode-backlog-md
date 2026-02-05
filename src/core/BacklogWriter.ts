@@ -79,6 +79,38 @@ export class BacklogWriter {
   }
 
   /**
+   * Promote a draft to a regular task: moves from drafts/ to tasks/, updates status to 'To Do'
+   */
+  async promoteDraft(taskId: string, parser: BacklogParser): Promise<string> {
+    const task = await parser.getTask(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+
+    // Move file from drafts/ to tasks/
+    const backlogPath = path.dirname(path.dirname(task.filePath));
+    const destDir = path.join(backlogPath, 'tasks');
+    const fileName = path.basename(task.filePath);
+    const destPath = path.join(destDir, fileName);
+
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+    }
+
+    fs.renameSync(task.filePath, destPath);
+
+    // Update status from Draft to To Do
+    const content = fs.readFileSync(destPath, 'utf-8');
+    const { frontmatter, body } = this.extractFrontmatter(content);
+    frontmatter.status = 'To Do';
+    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    const updatedContent = this.reconstructFile(frontmatter, body);
+    fs.writeFileSync(destPath, updatedContent, 'utf-8');
+
+    return destPath;
+  }
+
+  /**
    * Move a task file to a destination folder
    */
   private async moveTaskToFolder(

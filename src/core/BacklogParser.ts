@@ -1,7 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
-import { Task, TaskStatus, TaskPriority, ChecklistItem, Milestone, BacklogConfig } from './types';
+import {
+  Task,
+  TaskStatus,
+  TaskPriority,
+  TaskFolder,
+  ChecklistItem,
+  Milestone,
+  BacklogConfig,
+} from './types';
 import { GitBranchService } from './GitBranchService';
 import { CrossBranchTaskLoader } from './CrossBranchTaskLoader';
 
@@ -39,23 +47,31 @@ export class BacklogParser {
    * Get all tasks from the backlog folder
    */
   async getTasks(): Promise<Task[]> {
-    const tasksPath = path.join(this.backlogPath, 'tasks');
-    console.log(`[Backlog.md Parser] Looking for tasks in: ${tasksPath}`);
+    return this.getTasksFromFolder('tasks');
+  }
 
-    if (!fs.existsSync(tasksPath)) {
-      console.log(`[Backlog.md Parser] Tasks path does not exist: ${tasksPath}`);
+  /**
+   * Get tasks from a specific subfolder within the backlog directory
+   */
+  async getTasksFromFolder(folderName: string): Promise<Task[]> {
+    const folderPath = path.join(this.backlogPath, folderName);
+    console.log(`[Backlog.md Parser] Looking for tasks in: ${folderPath}`);
+
+    if (!fs.existsSync(folderPath)) {
+      console.log(`[Backlog.md Parser] Path does not exist: ${folderPath}`);
       return [];
     }
 
-    const files = fs.readdirSync(tasksPath).filter((f) => f.endsWith('.md'));
+    const files = fs.readdirSync(folderPath).filter((f) => f.endsWith('.md'));
     console.log(`[Backlog.md Parser] Found ${files.length} .md files:`, files.slice(0, 5));
     const tasks: Task[] = [];
 
     for (const file of files) {
-      const filePath = path.join(tasksPath, file);
+      const filePath = path.join(folderPath, file);
       try {
         const task = await this.parseTaskFile(filePath);
         if (task) {
+          task.folder = folderName as TaskFolder;
           tasks.push(task);
         }
       } catch (error) {
@@ -63,16 +79,38 @@ export class BacklogParser {
       }
     }
 
-    console.log(`[Backlog.md Parser] Successfully parsed ${tasks.length} tasks`);
+    console.log(`[Backlog.md Parser] Successfully parsed ${tasks.length} tasks from ${folderName}`);
     return tasks;
   }
 
   /**
-   * Get a single task by ID
+   * Get draft tasks from the drafts/ folder.
+   * Enforces status: 'Draft' on all returned tasks.
+   */
+  async getDrafts(): Promise<Task[]> {
+    const tasks = await this.getTasksFromFolder('drafts');
+    return tasks.map((t) => ({ ...t, status: 'Draft' as TaskStatus }));
+  }
+
+  /**
+   * Get completed tasks from the completed/ folder.
+   * Sets source: 'completed' on all returned tasks.
+   */
+  async getCompletedTasks(): Promise<Task[]> {
+    const tasks = await this.getTasksFromFolder('completed');
+    return tasks.map((t) => ({ ...t, source: 'completed' as const }));
+  }
+
+  /**
+   * Get a single task by ID, searching tasks/, then drafts/, then completed/
    */
   async getTask(taskId: string): Promise<Task | undefined> {
-    const tasks = await this.getTasks();
-    return tasks.find((t) => t.id === taskId);
+    for (const folder of ['tasks', 'drafts', 'completed'] as const) {
+      const tasks = await this.getTasksFromFolder(folder);
+      const found = tasks.find((t) => t.id === taskId);
+      if (found) return found;
+    }
+    return undefined;
   }
 
   /**
@@ -203,7 +241,7 @@ export class BacklogParser {
 
     // Extract ID from filename
     const filename = path.basename(filePath, '.md');
-    const idMatch = filename.match(/^(task-\d+)/i);
+    const idMatch = filename.match(/^((?:task|draft)-\d+)/i);
     const id = idMatch ? idMatch[1].toUpperCase() : filename;
 
     // Initialize task with defaults

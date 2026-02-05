@@ -34,6 +34,7 @@ describe('DashboardViewProvider', () => {
 
     mockParser = {
       getTasks: vi.fn(),
+      getCompletedTasks: vi.fn().mockResolvedValue([]),
       getStatuses: vi.fn().mockResolvedValue(['To Do', 'In Progress', 'Done']),
       getMilestones: vi.fn().mockResolvedValue([]),
     } as unknown as BacklogParser;
@@ -343,6 +344,77 @@ describe('DashboardViewProvider', () => {
               expect.objectContaining({ name: 'v2.0', total: 1, done: 0 }),
               expect.objectContaining({ name: 'v1.0', total: 2, done: 1 }),
             ]),
+          }),
+        })
+      );
+    });
+
+    it('should include completedCount from completed folder', async () => {
+      const tasks: Task[] = [
+        {
+          id: 'T-1',
+          title: 'Task 1',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t1.md',
+        },
+      ];
+
+      const completedTasks: Task[] = [
+        {
+          id: 'T-2',
+          title: 'Completed 1',
+          status: 'Done',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/completed/t2.md',
+          source: 'completed',
+        },
+        {
+          id: 'T-3',
+          title: 'Completed 2',
+          status: 'Done',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/completed/t3.md',
+          source: 'completed',
+        },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+      (mockParser.getCompletedTasks as Mock).mockResolvedValue(completedTasks);
+
+      const provider = new DashboardViewProvider(extensionUri, mockParser);
+
+      provider.resolveWebviewView(
+        mockWebviewView as vscode.WebviewView,
+        {} as vscode.WebviewViewResolveContext,
+        {
+          isCancellationRequested: false,
+          onCancellationRequested: vi.fn(),
+        } as vscode.CancellationToken
+      );
+
+      if (messageHandler) {
+        await messageHandler({ type: 'refresh' });
+      }
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'statsUpdated',
+          stats: expect.objectContaining({
+            totalTasks: 1,
+            completedCount: 2,
           }),
         })
       );

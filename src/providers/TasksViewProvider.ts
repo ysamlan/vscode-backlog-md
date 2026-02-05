@@ -20,6 +20,7 @@ export class TasksViewProvider extends BaseViewProvider {
   private dataSourceReason?: string;
   private collapsedColumns: Set<string> = new Set();
   private collapsedMilestones: Set<string> = new Set();
+  private showingDrafts: boolean = false;
 
   protected get viewType(): string {
     return 'backlog.kanban';
@@ -41,6 +42,7 @@ export class TasksViewProvider extends BaseViewProvider {
         []
       );
       this.collapsedMilestones = new Set(savedCollapsedMilestones);
+      this.showingDrafts = this.context.globalState.get('backlog.showingDrafts', false);
     }
     return super.resolveWebviewView(webviewView, resolveContext, token);
   }
@@ -79,11 +81,15 @@ export class TasksViewProvider extends BaseViewProvider {
     }
 
     try {
-      // Use cross-branch loading when in cross-branch mode
-      const taskLoader =
-        this.dataSourceMode === 'cross-branch'
-          ? this.parser.getTasksWithCrossBranch()
-          : this.parser.getTasks();
+      // Determine which tasks to load based on mode
+      let taskLoader: Promise<Task[]>;
+      if (this.showingDrafts) {
+        taskLoader = this.parser.getDrafts();
+      } else if (this.dataSourceMode === 'cross-branch') {
+        taskLoader = this.parser.getTasksWithCrossBranch();
+      } else {
+        taskLoader = this.parser.getTasks();
+      }
 
       const [tasks, statuses, milestones] = await Promise.all([
         taskLoader,
@@ -100,6 +106,7 @@ export class TasksViewProvider extends BaseViewProvider {
       );
 
       // Send initial state along with data
+      this.postMessage({ type: 'draftsModeChanged', enabled: this.showingDrafts });
       this.postMessage({ type: 'viewModeChanged', viewMode: this.viewMode });
       this.postMessage({
         type: 'columnCollapseChanged',
@@ -226,6 +233,51 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
       }
 
+      case 'completeTask': {
+        if (!this.parser || !message.taskId) break;
+        const completeTarget = await this.parser.getTask(message.taskId);
+        const completeConfirmation = await vscode.window.showWarningMessage(
+          `Move task "${completeTarget?.title}" to completed?`,
+          { modal: true },
+          'Complete'
+        );
+
+        if (completeConfirmation === 'Complete') {
+          try {
+            const writer = new BacklogWriter();
+            await writer.completeTask(message.taskId, this.parser);
+            await this.refresh();
+          } catch (error) {
+            vscode.window.showErrorMessage(`Failed to complete: ${error}`);
+          }
+        }
+        break;
+      }
+
+      case 'promoteDraft': {
+        if (!this.parser || !message.taskId) break;
+        try {
+          const writer = new BacklogWriter();
+          await writer.promoteDraft(message.taskId, this.parser);
+          await this.refresh();
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to promote draft: ${error}`);
+        }
+        break;
+      }
+
+      case 'requestCompletedTasks': {
+        if (!this.parser) break;
+        try {
+          const completedTasks = await this.parser.getCompletedTasks();
+          this.postMessage({ type: 'completedTasksUpdated', tasks: completedTasks });
+        } catch (error) {
+          console.error('[Backlog.md] Error loading completed tasks:', error);
+          this.postMessage({ type: 'error', message: 'Failed to load completed tasks' });
+        }
+        break;
+      }
+
       case 'toggleColumnCollapse': {
         const status = message.status;
         if (this.collapsedColumns.has(status)) {
@@ -322,5 +374,17 @@ export class TasksViewProvider extends BaseViewProvider {
    */
   setFilter(filter: string): void {
     this.postMessage({ type: 'setFilter', filter });
+  }
+
+  /**
+   * Toggle drafts mode: shows draft tasks in list view
+   */
+  setDraftsMode(enabled: boolean): void {
+    this.showingDrafts = enabled;
+    if (this.context) {
+      this.context.globalState.update('backlog.showingDrafts', enabled);
+    }
+    this.postMessage({ type: 'draftsModeChanged', enabled });
+    this.refresh();
   }
 }
