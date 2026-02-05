@@ -126,10 +126,11 @@ RUN echo 'eval "$(mise activate zsh)"' >> /home/node/.zshrc && \
 # Install Claude
 RUN curl -fsSL https://claude.ai/install.sh | bash -s -- $CLAUDE_CODE_VERSION
 
-# Pre-install mise tools (Node + Bun) for caching and so we can install backlog.md
-RUN printf '[tools]\nnode = "22"\nbun = "latest"\n' > /workspace/mise.toml && \
-    mise trust --yes /workspace/mise.toml && \
-    mise install
+# Install bun globally just so we can install global deps (we'll use mise within the project to manage this)
+COPY --from=oven/bun:latest /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=oven/bun:latest /usr/local/bin/bunx /usr/local/bin/bunx
 
-RUN mise exec -- bun i -g backlog.md 
+RUN bun i -g agent-browser
+RUN agent-browser install --with-deps
+RUN bun i -g backlog.md 
 # you'll need to run `claude mcp add backlog --scope user -- backlog mcp start` the first time you use it

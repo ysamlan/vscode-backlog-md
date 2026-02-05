@@ -231,9 +231,72 @@ This project uses [Mise](https://mise.jdx.dev/) to manage Node.js and Bun versio
 
 Mise automatically activates when you enter the project directory (if shell integration is set up).
 
-### Known Issues / Tech Debt
+### Exploratory Testing with agent-browser
 
-- Some styling still uses inline styles in Svelte components (can be moved to shared CSS)
+Use the `agent-browser` skill and CLI for visual exploratory testing of webview UIs before writing Playwright e2e tests. This is useful for:
+
+- **Debugging e2e test failures**: Reproduce failures visually, inspect DOM state, check CSS variable resolution
+- **Exploratory testing before writing e2e tests**: Interact with the UI to understand flows and discover edge cases
+- **Visual regression checking**: Screenshot before/after changes at different viewport sizes
+
+**Setup:**
+
+```bash
+bun run build                # Build webview bundles first
+bun run vite &               # Start fixture dev server on port 5173
+```
+
+**Basic workflow:**
+
+**LOAD THE agent-browser skill** first! Do not skip this even if you think you know how to use the CLI tool.
+
+```bash
+agent-browser open http://localhost:5173/tasks.html   # Open a fixture
+agent-browser screenshot output.png                    # Capture state
+agent-browser snapshot -i                              # List interactive elements with @refs
+agent-browser click @e1                                # Interact using refs
+agent-browser eval "someJS()"                          # Run JS in page context
+```
+
+**Injecting webview data** (since there's no extension host, data must be injected via postMessage):
+
+```bash
+# Inject statuses first, then tasks
+agent-browser eval "window.postMessage({ type: 'statusesUpdated', statuses: ['Draft', 'To Do', 'In Progress', 'Done'] }, '*')"
+agent-browser eval "window.postMessage({ type: 'tasksUpdated', tasks: [...] }, '*')"
+
+# For dashboard (use correct field names from DashboardStats type):
+agent-browser eval "window.postMessage({ type: 'statsUpdated', stats: { totalTasks: 7, byStatus: {...}, byPriority: {...}, milestones: [{ name: 'v1.0', total: 4, done: 1 }] } }, '*')"
+
+# For task detail (use TaskDetailData type):
+agent-browser eval "window.postMessage({ type: 'taskData', data: { task: {...}, statuses: [...], priorities: [...], ... } }, '*')"
+```
+
+**Important notes:**
+
+- The VS Code mock is NOT auto-installed when navigating directly (only via Playwright's `installVsCodeMock`). Interactions that call `vscode.postMessage()` will log to console but won't be captured in a test helper.
+- Use `agent-browser eval` (not `evaluate`) to run JavaScript
+- `agent-browser scroll right` scrolls the page body, not inner scrollable elements. For elements with `overflow-x: auto` (like the kanban board), use `agent-browser eval "document.querySelector('.kanban-board').scrollLeft = 300"` instead.
+- Set viewport to test sidebar dimensions: `agent-browser set viewport 400 600`
+- Always re-run `agent-browser snapshot -i` after DOM changes to get fresh element refs
+- Data shapes must match the TypeScript interfaces exactly (e.g., `totalTasks` not `total`, `done` not `completed` on MilestoneStats)
+
+**Fixture URLs:**
+
+| URL                 | Webview          | Message to inject                  |
+| ------------------- | ---------------- | ---------------------------------- |
+| `/tasks.html`       | Kanban/List view | `statusesUpdated` + `tasksUpdated` |
+| `/dashboard.html`   | Dashboard stats  | `statsUpdated`                     |
+| `/task-detail.html` | Task editor      | `taskData`                         |
+
+**Testing error/empty states:**
+
+```bash
+# No backlog folder
+agent-browser eval "window.postMessage({ type: 'noBacklogFolder' }, '*')"
+# Switch view modes
+agent-browser eval "window.postMessage({ type: 'viewModeChanged', viewMode: 'list' }, '*')"
+```
 
 # Svelte MCP guidance
 
