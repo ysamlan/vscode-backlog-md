@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { BacklogParser } from '../core/BacklogParser';
-import { BacklogWriter, CreateTaskOptions } from '../core/BacklogWriter';
+import { BacklogWriter } from '../core/BacklogWriter';
 import { TaskDetailProvider } from './TaskDetailProvider';
 
 interface ViewProviders {
@@ -9,7 +10,9 @@ interface ViewProviders {
 }
 
 /**
- * Provides a webview panel for creating new tasks with a simple form
+ * Provides a webview panel for creating new tasks with a simple form.
+ * Creates a draft immediately on open, autosaves as the user types,
+ * and promotes the draft to a real task on submit.
  */
 export class TaskCreatePanel {
   private static currentPanel: TaskCreatePanel | undefined;
@@ -19,6 +22,10 @@ export class TaskCreatePanel {
   private readonly parser: BacklogParser;
   private readonly backlogPath: string;
   private readonly providers: ViewProviders;
+
+  private draftId: string | undefined;
+  private hasContent = false;
+  private closedIntentionally = false;
 
   private constructor(
     extensionUri: vscode.Uri,
@@ -51,8 +58,10 @@ export class TaskCreatePanel {
     });
 
     this.panel.onDidDispose(() => {
-      TaskCreatePanel.currentPanel = undefined;
+      this.handleDispose();
     });
+
+    this.initDraft();
   }
 
   /**
@@ -80,6 +89,20 @@ export class TaskCreatePanel {
   }
 
   /**
+   * Create a draft file immediately so autosave has a target
+   */
+  private async initDraft(): Promise<void> {
+    try {
+      const result = await this.writer.createDraft(this.backlogPath, this.parser);
+      // Panel may have been disposed during the async init
+      if (this.closedIntentionally) return;
+      this.draftId = result.id;
+    } catch {
+      // Draft creation failed — submit will still work by creating inline
+    }
+  }
+
+  /**
    * Handle messages from the webview
    */
   private async handleMessage(message: {
@@ -92,17 +115,45 @@ export class TaskCreatePanel {
         await this.handleCreateTask(message.title || '', message.description || '');
         break;
 
-      case 'cancel':
-        this.panel.dispose();
+      case 'autosave':
+        await this.handleAutosave(message.title || '', message.description || '');
+        break;
+
+      case 'discardDraft':
+        await this.handleDiscardDraft();
         break;
     }
   }
 
   /**
-   * Handle task creation request
+   * Handle autosave: update the draft file with current form contents
+   */
+  private async handleAutosave(title: string, description: string): Promise<void> {
+    if (!this.draftId) return;
+
+    try {
+      const trimmedTitle = title.trim();
+      await this.writer.updateTask(
+        this.draftId,
+        {
+          title: trimmedTitle || undefined,
+          description: description.trim() || undefined,
+        },
+        this.parser
+      );
+      if (trimmedTitle) {
+        this.hasContent = true;
+      }
+      await this.panel.webview.postMessage({ type: 'autosaved' });
+    } catch {
+      // Autosave failures are silent — user can still submit
+    }
+  }
+
+  /**
+   * Handle task creation: promote the draft to a real task
    */
   private async handleCreateTask(title: string, description: string): Promise<void> {
-    // Validate title
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       await this.panel.webview.postMessage({
@@ -113,32 +164,83 @@ export class TaskCreatePanel {
       return;
     }
 
-    // Build task options with defaults
-    const options: CreateTaskOptions = {
-      title: trimmedTitle,
-      description: description.trim() || undefined,
-      status: 'To Do',
-      priority: 'medium',
-    };
-
     try {
-      const result = await this.writer.createTask(this.backlogPath, options, this.parser);
+      if (this.draftId) {
+        // Save final content to the draft, then promote it
+        await this.writer.updateTask(
+          this.draftId,
+          { title: trimmedTitle, description: description.trim() || undefined },
+          this.parser
+        );
+        await this.writer.promoteDraft(this.draftId, this.parser);
+      } else {
+        // Fallback: no draft was created (init failed), create+promote inline
+        const result = await this.writer.createDraft(this.backlogPath, this.parser);
+        await this.writer.updateTask(
+          result.id,
+          { title: trimmedTitle, description: description.trim() || undefined },
+          this.parser
+        );
+        await this.writer.promoteDraft(result.id, this.parser);
+      }
 
-      vscode.window.showInformationMessage(`Created task ${result.id}`);
+      vscode.window.showInformationMessage(`Created task "${trimmedTitle}"`);
 
-      // Refresh views
       this.providers.tasksProvider.refresh();
 
-      // Dispose panel first, then open task detail
+      this.closedIntentionally = true;
       this.panel.dispose();
 
-      // Open the new task in detail view
-      this.providers.taskDetailProvider.openTask(result.id);
+      if (this.draftId) {
+        this.providers.taskDetailProvider.openTask(this.draftId);
+      }
     } catch (error) {
       await this.panel.webview.postMessage({
         type: 'error',
         message: `Failed to create task: ${error}`,
       });
+    }
+  }
+
+  /**
+   * Handle discard: always delete the draft, regardless of content
+   */
+  private async handleDiscardDraft(): Promise<void> {
+    if (this.draftId) {
+      await this.deleteDraft();
+    }
+    this.closedIntentionally = true;
+    this.panel.dispose();
+  }
+
+  /**
+   * Handle passive panel close (X button, tab close, navigating away).
+   * Deletes empty drafts, keeps drafts with content.
+   */
+  private async handleDispose(): Promise<void> {
+    TaskCreatePanel.currentPanel = undefined;
+
+    // If closed intentionally (submit/discard), cleanup already handled
+    if (this.closedIntentionally) return;
+
+    // Passive close: delete empty drafts, keep drafts with content
+    if (this.draftId && !this.hasContent) {
+      await this.deleteDraft();
+    }
+  }
+
+  /**
+   * Delete the current draft file from disk
+   */
+  private async deleteDraft(): Promise<void> {
+    if (!this.draftId) return;
+    try {
+      const task = await this.parser.getTask(this.draftId);
+      if (task?.filePath && fs.existsSync(task.filePath)) {
+        fs.unlinkSync(task.filePath);
+      }
+    } catch {
+      // Best-effort cleanup
     }
   }
 
@@ -152,18 +254,6 @@ export class TaskCreatePanel {
       text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
-  }
-
-  /**
-   * Escape HTML special characters
-   */
-  private escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
   }
 
   /**
@@ -299,6 +389,16 @@ export class TaskCreatePanel {
             color: var(--vscode-descriptionForeground);
             margin-top: 4px;
         }
+        .save-indicator {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            margin-left: 8px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .save-indicator.visible {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -322,7 +422,8 @@ export class TaskCreatePanel {
 
     <div class="button-group">
         <button id="createBtn" class="primary-button">Create Task</button>
-        <button id="cancelBtn" class="secondary-button">Cancel</button>
+        <button id="discardBtn" class="secondary-button">Discard Draft</button>
+        <span id="saveIndicator" class="save-indicator">Saved</span>
     </div>
 
     <script nonce="${nonce}">
@@ -331,17 +432,39 @@ export class TaskCreatePanel {
         const titleInput = document.getElementById('titleInput');
         const descriptionTextarea = document.getElementById('descriptionTextarea');
         const createBtn = document.getElementById('createBtn');
-        const cancelBtn = document.getElementById('cancelBtn');
+        const discardBtn = document.getElementById('discardBtn');
         const titleError = document.getElementById('titleError');
         const globalError = document.getElementById('globalError');
+        const saveIndicator = document.getElementById('saveIndicator');
 
-        // Clear title error on input
+        let autosaveTimer = null;
+
+        function scheduleAutosave() {
+            if (autosaveTimer) clearTimeout(autosaveTimer);
+            autosaveTimer = setTimeout(() => {
+                saveIndicator.textContent = 'Saving...';
+                saveIndicator.classList.add('visible');
+                vscode.postMessage({
+                    type: 'autosave',
+                    title: titleInput.value,
+                    description: descriptionTextarea.value
+                });
+            }, 1000);
+        }
+
+        // Clear title error on input + schedule autosave
         titleInput.addEventListener('input', () => {
             titleInput.classList.remove('error');
             titleError.classList.add('hidden');
+            scheduleAutosave();
         });
 
-        // Create task
+        // Autosave on description input
+        descriptionTextarea.addEventListener('input', () => {
+            scheduleAutosave();
+        });
+
+        // Create task (promote draft)
         createBtn.addEventListener('click', () => {
             const title = titleInput.value.trim();
             const description = descriptionTextarea.value;
@@ -365,9 +488,9 @@ export class TaskCreatePanel {
             });
         });
 
-        // Cancel
-        cancelBtn.addEventListener('click', () => {
-            vscode.postMessage({ type: 'cancel' });
+        // Discard draft
+        discardBtn.addEventListener('click', () => {
+            vscode.postMessage({ type: 'discardDraft' });
         });
 
         // Handle Enter key in title to create
@@ -378,10 +501,10 @@ export class TaskCreatePanel {
             }
         });
 
-        // Handle Escape to cancel
+        // Handle Escape to discard
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                vscode.postMessage({ type: 'cancel' });
+                vscode.postMessage({ type: 'discardDraft' });
             }
         });
 
@@ -408,6 +531,14 @@ export class TaskCreatePanel {
                     // Re-enable button
                     createBtn.disabled = false;
                     createBtn.textContent = 'Create Task';
+                    break;
+
+                case 'autosaved':
+                    saveIndicator.textContent = 'Saved';
+                    saveIndicator.classList.add('visible');
+                    setTimeout(() => {
+                        saveIndicator.classList.remove('visible');
+                    }, 2000);
                     break;
             }
         });
