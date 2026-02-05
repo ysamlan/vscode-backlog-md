@@ -55,6 +55,8 @@ VS Code extension providing a beautiful UI for browsing and managing Backlog.md 
 
 **CRITICAL**: Always run `bun run test && bun run lint && bun run typecheck` before marking a task as Done. Never skip this step.
 
+**CRITICAL**: Always mark backlog tasks as Done (via `task_edit` MCP tool) BEFORE committing work or telling the user the task is complete. Do not defer until after the commit or assume it's enough to just mention it in the commit message.
+
 **One commit per task**: When a backlog task is self-contained and testable, commit it individually before moving to the next task. This keeps the git history clean and makes it easier to review/revert changes.
 
 **Commit message format**:

@@ -1,10 +1,13 @@
 ---
 id: TASK-79
 title: Unify task ordering between kanban and list views
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-05'
-labels: [feature, ui]
+updated_date: '2026-02-05 19:38'
+labels:
+  - feature
+  - ui
 dependencies: []
 priority: medium
 ---
@@ -22,3 +25,9 @@ When the list view sorts by status (its default), tasks within each status group
 - Sorting by other fields (title, priority) still uses alphabetical/priority ordering
 - Existing sort direction toggle (asc/desc) still works
 <!-- SECTION:DESCRIPTION:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented in commit 5e29c1d. List view default sort (by status) now respects ordinal ordering within each status group, matching kanban view ordering.
+<!-- SECTION:FINAL_SUMMARY:END -->

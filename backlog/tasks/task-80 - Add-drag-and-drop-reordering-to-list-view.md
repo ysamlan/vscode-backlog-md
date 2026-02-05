@@ -1,11 +1,15 @@
 ---
 id: TASK-80
 title: Add drag-and-drop reordering to list view
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-05'
-labels: [feature, ui]
-dependencies: [TASK-79]
+updated_date: '2026-02-05 19:38'
+labels:
+  - feature
+  - ui
+dependencies:
+  - TASK-79
 priority: medium
 ---
 
@@ -24,3 +28,9 @@ Add drag-and-drop row reordering to the list view so users can manually order ta
 - When sorted by other fields (title, priority), drag reordering is disabled
 - Reordering persists across view switches (kanban shows same order)
 <!-- SECTION:DESCRIPTION:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented in commit 5e29c1d. List view supports drag-and-drop reordering with ordinal-based ordering.
+<!-- SECTION:FINAL_SUMMARY:END -->
