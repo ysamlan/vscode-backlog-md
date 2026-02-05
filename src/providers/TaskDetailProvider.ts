@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { BacklogParser } from '../core/BacklogParser';
 import { BacklogWriter, computeContentHash, FileConflictError } from '../core/BacklogWriter';
-import { Task } from '../core/types';
+import type { Task } from '../core/types';
 
 // Dynamic import for marked (ESM module)
 let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
@@ -17,7 +17,29 @@ async function parseMarkdown(markdown: string): Promise<string> {
 }
 
 /**
+ * Task detail data structure sent to the webview
+ */
+interface TaskDetailData {
+  task: Task;
+  statuses: string[];
+  priorities: string[];
+  uniqueLabels: string[];
+  uniqueAssignees: string[];
+  milestones: string[];
+  blocksTaskIds: string[];
+  isBlocked: boolean;
+  descriptionHtml: string;
+}
+
+/**
  * Provides a webview panel for displaying task details
+ *
+ * This provider loads a compiled Svelte component (TaskDetail.svelte) that handles
+ * all UI rendering. The provider is responsible for:
+ * - Loading the Svelte bundle and styles
+ * - Computing task data and sending it via postMessage
+ * - Handling field updates and checklist toggles from the webview
+ * - Conflict detection when files are modified externally
  */
 export class TaskDetailProvider {
   private static currentPanel: vscode.WebviewPanel | undefined;
@@ -41,18 +63,13 @@ export class TaskDetailProvider {
   /**
    * Handle file change events from the FileWatcher.
    * Refreshes the view if the changed file matches the currently displayed task.
-   * @param uri The URI of the changed file
-   * @param provider The TaskDetailProvider instance to use for refreshing
    */
   public static onFileChanged(uri: vscode.Uri, provider: TaskDetailProvider): void {
-    // Only proceed if panel exists and is showing a task
     if (!this.currentPanel || !this.currentTaskId || !this.currentFilePath) {
       return;
     }
 
-    // Check if the changed file matches the currently displayed task
     if (uri.fsPath === this.currentFilePath) {
-      // Check if file was deleted
       if (!fs.existsSync(uri.fsPath)) {
         vscode.window.showWarningMessage(
           `Task file was deleted: ${uri.fsPath.split('/').pop() || uri.fsPath}`
@@ -61,7 +78,6 @@ export class TaskDetailProvider {
         return;
       }
 
-      // Reload the task - this will also update the hash
       provider.openTask(this.currentTaskId);
     }
   }
@@ -91,7 +107,6 @@ export class TaskDetailProvider {
       TaskDetailProvider.currentFilePath = undefined;
     }
 
-    const statuses = await this.parser.getStatuses();
     const column = vscode.ViewColumn.One;
 
     // If we already have a panel, show it and update content
@@ -99,11 +114,7 @@ export class TaskDetailProvider {
       TaskDetailProvider.currentPanel.reveal(column);
       TaskDetailProvider.currentPanel.title = `${task.id}: ${task.title}`;
       TaskDetailProvider.currentTaskId = taskId;
-      TaskDetailProvider.currentPanel.webview.html = await this.getHtmlContent(
-        TaskDetailProvider.currentPanel.webview,
-        task,
-        statuses
-      );
+      await this.sendTaskData(TaskDetailProvider.currentPanel.webview, task);
       return;
     }
 
@@ -121,7 +132,10 @@ export class TaskDetailProvider {
 
     TaskDetailProvider.currentPanel = panel;
     TaskDetailProvider.currentTaskId = taskId;
-    panel.webview.html = await this.getHtmlContent(panel.webview, task, statuses);
+    panel.webview.html = this.getHtmlContent(panel.webview, task.title);
+
+    // Send task data after a short delay to ensure component is mounted
+    setTimeout(() => this.sendTaskData(panel.webview, task), 100);
 
     // Handle messages from the webview
     panel.webview.onDidReceiveMessage(async (message) => {
@@ -138,6 +152,95 @@ export class TaskDetailProvider {
   }
 
   /**
+   * Get URI for a resource file
+   */
+  private getResourceUri(webview: vscode.Webview, ...pathSegments: string[]): vscode.Uri {
+    return webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', ...pathSegments)
+    );
+  }
+
+  /**
+   * Generate HTML content for the webview (loads Svelte bundle)
+   */
+  private getHtmlContent(webview: vscode.Webview, taskTitle: string): string {
+    const styleUri = this.getResourceUri(webview, 'styles.css');
+    const scriptUri = this.getResourceUri(webview, 'task-detail.js');
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src ${webview.cspSource};">
+    <link href="${styleUri}" rel="stylesheet">
+    <title>${this.escapeHtml(taskTitle)}</title>
+</head>
+<body class="task-detail-page">
+    <div id="app"></div>
+    <script type="module" src="${scriptUri}"></script>
+</body>
+</html>`;
+  }
+
+  /**
+   * Send task data to the webview
+   */
+  private async sendTaskData(webview: vscode.Webview, task: Task): Promise<void> {
+    if (!this.parser) return;
+
+    try {
+      // Fetch all supporting data
+      const [statuses, uniqueLabels, uniqueAssignees, configMilestones, allTasks, blocksTaskIds] =
+        await Promise.all([
+          this.parser.getStatuses(),
+          this.parser.getUniqueLabels(),
+          this.parser.getUniqueAssignees(),
+          this.parser.getMilestones(),
+          this.parser.getTasks(),
+          this.parser.getBlockedByThisTask(task.id),
+        ]);
+
+      // Combine config milestones with unique milestones from tasks
+      const configMilestoneNames = configMilestones.map((m) => m.name);
+      const taskMilestones = [...new Set(allTasks.map((t) => t.milestone).filter(Boolean))];
+      const milestones = [
+        ...configMilestoneNames,
+        ...taskMilestones.filter((m) => !configMilestoneNames.includes(m!)),
+      ] as string[];
+
+      // Check if task is blocked by incomplete dependencies
+      let isBlocked = false;
+      if (task.dependencies.length > 0) {
+        const depTasks = await Promise.all(
+          task.dependencies.map((depId) => this.parser!.getTask(depId))
+        );
+        isBlocked = depTasks.some((depTask) => depTask && depTask.status !== 'Done');
+      }
+
+      // Parse description markdown
+      const descriptionHtml = task.description ? await parseMarkdown(task.description) : '';
+
+      const data: TaskDetailData = {
+        task,
+        statuses,
+        priorities: ['high', 'medium', 'low'],
+        uniqueLabels,
+        uniqueAssignees,
+        milestones,
+        blocksTaskIds,
+        isBlocked,
+        descriptionHtml,
+      };
+
+      webview.postMessage({ type: 'taskData', data });
+    } catch (error) {
+      console.error('[Backlog.md] Error sending task data:', error);
+      webview.postMessage({ type: 'error', message: 'Failed to load task data' });
+    }
+  }
+
+  /**
    * Handle messages from the webview
    */
   private async handleMessage(message: {
@@ -149,6 +252,12 @@ export class TaskDetailProvider {
     value?: string | string[];
   }): Promise<void> {
     switch (message.type) {
+      case 'refresh':
+        if (TaskDetailProvider.currentTaskId) {
+          await this.openTask(TaskDetailProvider.currentTaskId);
+        }
+        break;
+
       case 'openFile':
         if (TaskDetailProvider.currentTaskId && this.parser) {
           const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
@@ -178,7 +287,6 @@ export class TaskDetailProvider {
               message.itemId,
               this.parser
             );
-            // Refresh the view
             await this.openTask(TaskDetailProvider.currentTaskId);
           } catch (error) {
             vscode.window.showErrorMessage(`Failed to toggle checklist item: ${error}`);
@@ -188,7 +296,6 @@ export class TaskDetailProvider {
 
       case 'updateField':
         if (TaskDetailProvider.currentTaskId && this.parser && message.field) {
-          // Check if file still exists before attempting update
           const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
           if (!task?.filePath || !fs.existsSync(task.filePath)) {
             const choice = await vscode.window.showErrorMessage(
@@ -213,7 +320,6 @@ export class TaskDetailProvider {
             // Update stored hash after successful write
             const newContent = fs.readFileSync(task.filePath, 'utf-8');
             TaskDetailProvider.currentFileHash = computeContentHash(newContent);
-            // Refresh the view
             await this.openTask(TaskDetailProvider.currentTaskId);
           } catch (error) {
             if (error instanceof FileConflictError) {
@@ -272,17 +378,14 @@ export class TaskDetailProvider {
 
     switch (choice) {
       case 'Reload from Disk':
-        // Re-open task with fresh content (discards pending changes)
         await this.openTask(taskId);
         break;
 
       case 'Overwrite Anyway': {
-        // Force write by passing no expectedHash
         try {
           const updates: Record<string, unknown> = {};
           updates[field] = value;
           await this.writer.updateTask(taskId, updates, this.parser);
-          // Update hash after successful write
           if (task?.filePath && fs.existsSync(task.filePath)) {
             const newContent = fs.readFileSync(task.filePath, 'utf-8');
             TaskDetailProvider.currentFileHash = computeContentHash(newContent);
@@ -295,478 +398,11 @@ export class TaskDetailProvider {
       }
 
       case 'View Diff':
-        // Open the file in VS Code's editor so user can see current state
         if (task?.filePath) {
           await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
         }
         break;
     }
-  }
-
-  /**
-   * Generate a nonce for CSP
-   */
-  private getNonce(): string {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-      text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
-  }
-
-  /**
-   * Get URI for a resource file
-   */
-  private getResourceUri(webview: vscode.Webview, ...pathSegments: string[]): vscode.Uri {
-    return webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', ...pathSegments)
-    );
-  }
-
-  private async getHtmlContent(
-    webview: vscode.Webview,
-    task: Task,
-    statuses: string[]
-  ): Promise<string> {
-    const nonce = this.getNonce();
-    const styleUri = this.getResourceUri(webview, 'styles.css');
-
-    // Fetch unique labels, assignees, milestones, and reverse dependencies for autocomplete and dependency visualization
-    const [uniqueLabels, uniqueAssignees, configMilestones, allTasks, blocksTaskIds] =
-      await Promise.all([
-        this.parser!.getUniqueLabels(),
-        this.parser!.getUniqueAssignees(),
-        this.parser!.getMilestones(),
-        this.parser!.getTasks(),
-        this.parser!.getBlockedByThisTask(task.id),
-      ]);
-
-    // Combine config milestones with unique milestones from tasks (for orphaned milestones)
-    const configMilestoneNames = configMilestones.map((m) => m.name);
-    const taskMilestones = [...new Set(allTasks.map((t) => t.milestone).filter(Boolean))];
-    const allMilestones = [
-      ...configMilestoneNames,
-      ...taskMilestones.filter((m) => !configMilestoneNames.includes(m!)),
-    ];
-
-    // Check if any dependencies are not Done (task is blocked)
-    let isBlocked = false;
-    if (task.dependencies.length > 0) {
-      const depTasks = await Promise.all(
-        task.dependencies.map((depId) => this.parser!.getTask(depId))
-      );
-      isBlocked = depTasks.some((depTask) => depTask && depTask.status !== 'Done');
-    }
-
-    const priorityClass = task.priority ? `priority-${task.priority}` : '';
-    const statusClass = task.status.toLowerCase().replace(/\s+/g, '-');
-    const priorities = ['high', 'medium', 'low'];
-
-    // Generate status options
-    const statusOptionsHtml = statuses
-      .map(
-        (s) =>
-          `<option value="${this.escapeHtml(s)}" ${s === task.status ? 'selected' : ''}>${this.escapeHtml(s)}</option>`
-      )
-      .join('');
-
-    // Generate priority options
-    const priorityOptionsHtml = priorities
-      .map(
-        (p) =>
-          `<option value="${p}" ${p === task.priority ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`
-      )
-      .join('');
-
-    // Labels with remove buttons
-    const labelsHtml =
-      task.labels.length > 0
-        ? task.labels
-            .map(
-              (l) =>
-                `<span class="label editable-label" data-label="${this.escapeHtml(l)}">${this.escapeHtml(l)} <span class="remove-label">×</span></span>`
-            )
-            .join('')
-        : '';
-    const labelsJson = JSON.stringify(task.labels);
-
-    // Assignees with remove buttons (editable like labels)
-    const assigneesHtml =
-      task.assignee.length > 0
-        ? task.assignee
-            .map(
-              (a) =>
-                `<span class="assignee editable-assignee" data-assignee="${this.escapeHtml(a)}">${this.escapeHtml(a)} <span class="remove-assignee">×</span></span>`
-            )
-            .join('')
-        : '';
-    const assigneesJson = JSON.stringify(task.assignee);
-
-    // "Blocked By" - tasks this task depends on (must complete before this task)
-    const blockedByHtml =
-      task.dependencies.length > 0
-        ? task.dependencies
-            .map(
-              (d) =>
-                `<a href="#" class="dependency-link" data-task-id="${this.escapeHtml(d)}">${this.escapeHtml(d)}</a>`
-            )
-            .join(', ')
-        : '<span class="empty-value">None</span>';
-
-    // "Blocks" - tasks that depend on this task (cannot start until this completes)
-    const blocksHtml =
-      blocksTaskIds.length > 0
-        ? blocksTaskIds
-            .map(
-              (d) =>
-                `<a href="#" class="dependency-link" data-task-id="${this.escapeHtml(d)}">${this.escapeHtml(d)}</a>`
-            )
-            .join(', ')
-        : '<span class="empty-value">None</span>';
-
-    // Generate milestone options for dropdown
-    const milestoneOptionsHtml = allMilestones
-      .map(
-        (m) =>
-          `<option value="${this.escapeHtml(m!)}" ${m === task.milestone ? 'selected' : ''}>${this.escapeHtml(m!)}</option>`
-      )
-      .join('');
-
-    const descriptionValue = task.description || '';
-    const descriptionHtml = descriptionValue
-      ? await parseMarkdown(descriptionValue)
-      : '<em class="empty-value">No description</em>';
-
-    const acChecked = task.acceptanceCriteria.filter((i) => i.checked).length;
-    const acTotal = task.acceptanceCriteria.length;
-    const acProgress = acTotal > 0 ? `${acChecked} of ${acTotal} complete` : '';
-
-    const acceptanceCriteriaHtml =
-      task.acceptanceCriteria.length > 0
-        ? `<ul class="checklist">${task.acceptanceCriteria
-            .map(
-              (item) =>
-                `<li class="checklist-item ${item.checked ? 'checked' : ''}" data-list-type="acceptanceCriteria" data-item-id="${item.id}">
-              <span class="checkbox">${item.checked ? '☑' : '☐'}</span>
-              <span class="checklist-text">${this.escapeHtml(item.text)}</span>
-            </li>`
-            )
-            .join('')}</ul>`
-        : '<span class="empty-value">None defined</span>';
-
-    const dodChecked = task.definitionOfDone.filter((i) => i.checked).length;
-    const dodTotal = task.definitionOfDone.length;
-    const dodProgress = dodTotal > 0 ? `${dodChecked} of ${dodTotal} complete` : '';
-
-    const definitionOfDoneHtml =
-      task.definitionOfDone.length > 0
-        ? `<ul class="checklist">${task.definitionOfDone
-            .map(
-              (item) =>
-                `<li class="checklist-item ${item.checked ? 'checked' : ''}" data-list-type="definitionOfDone" data-item-id="${item.id}">
-              <span class="checkbox">${item.checked ? '☑' : '☐'}</span>
-              <span class="checklist-text">${this.escapeHtml(item.text)}</span>
-            </li>`
-            )
-            .join('')}</ul>`
-        : '<span class="empty-value">None defined</span>';
-
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-    <link href="${styleUri}" rel="stylesheet">
-    <title>${this.escapeHtml(task.title)}</title>
-</head>
-<body class="task-detail-page">
-    <div class="task-header">
-        <div class="task-id">${this.escapeHtml(task.id)}</div>
-        <input type="text" class="editable-title" id="titleInput" value="${this.escapeHtml(task.title)}" />
-        <div class="task-badges">
-            <select class="dropdown-select status-select status-${statusClass}" id="statusSelect">
-                ${statusOptionsHtml}
-            </select>
-            <select class="dropdown-select priority-select ${priorityClass}" id="prioritySelect">
-                <option value="">No Priority</option>
-                ${priorityOptionsHtml}
-            </select>
-            ${isBlocked ? '<span class="blocked-badge">Blocked</span>' : ''}
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Details</div>
-        <div class="meta-grid">
-            <div class="meta-item">
-                <div class="meta-label">Labels</div>
-                <div class="labels-container" id="labelsContainer" data-labels='${labelsJson}'>
-                    ${labelsHtml}
-                    <input type="text" class="add-label-input" id="addLabelInput" placeholder="+ Add" list="labelSuggestions" />
-                </div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-label">Assignees</div>
-                <div class="assignees-container" id="assigneesContainer" data-assignees='${assigneesJson}'>
-                    ${assigneesHtml}
-                    <input type="text" class="add-assignee-input" id="addAssigneeInput" placeholder="+ Add" list="assigneeSuggestions" />
-                </div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-label">Milestone</div>
-                <div>
-                    <select class="dropdown-select milestone-select" id="milestoneSelect">
-                        <option value="">None</option>
-                        ${milestoneOptionsHtml}
-                    </select>
-                </div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-label">Blocked By</div>
-                <div>${blockedByHtml}</div>
-            </div>
-            <div class="meta-item">
-                <div class="meta-label">Blocks</div>
-                <div>${blocksHtml}</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-header">
-            <div class="section-title">Description</div>
-            <button class="edit-btn" id="editDescriptionBtn">Edit</button>
-        </div>
-        <div class="description-container">
-            <div class="markdown-content description-view" id="descriptionView">${descriptionHtml}</div>
-            <textarea class="description-textarea hidden" id="descriptionTextarea" placeholder="Add a description...">${this.escapeHtml(descriptionValue)}</textarea>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-header">
-            <div class="section-title">Acceptance Criteria</div>
-            ${acProgress ? `<span class="progress-indicator ${acChecked === acTotal ? 'complete' : ''}">${acProgress}</span>` : ''}
-        </div>
-        ${acceptanceCriteriaHtml}
-    </div>
-
-    <div class="section">
-        <div class="section-header">
-            <div class="section-title">Definition of Done</div>
-            ${dodProgress ? `<span class="progress-indicator ${dodChecked === dodTotal ? 'complete' : ''}">${dodProgress}</span>` : ''}
-        </div>
-        ${definitionOfDoneHtml}
-    </div>
-
-    <div class="actions">
-        <button class="open-file-btn" id="openFileBtn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Open Raw Markdown
-        </button>
-        <button class="archive-btn" id="archiveBtn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
-            Archive Task
-        </button>
-    </div>
-
-    <!-- Autocomplete datalists -->
-    <datalist id="labelSuggestions">
-        ${uniqueLabels.map((l) => `<option value="${this.escapeHtml(l)}">`).join('')}
-    </datalist>
-    <datalist id="assigneeSuggestions">
-        ${uniqueAssignees.map((a) => `<option value="${this.escapeHtml(a)}">`).join('')}
-    </datalist>
-
-    <script nonce="${nonce}">
-        const vscode = acquireVsCodeApi();
-
-        // Open raw markdown file
-        document.getElementById('openFileBtn').addEventListener('click', () => {
-            vscode.postMessage({ type: 'openFile' });
-        });
-
-        // Navigate to dependency task
-        document.querySelectorAll('.dependency-link').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const taskId = link.dataset.taskId;
-                vscode.postMessage({ type: 'openTask', taskId });
-            });
-        });
-
-        // Toggle checklist items
-        document.querySelectorAll('.checklist-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const listType = item.dataset.listType;
-                const itemId = parseInt(item.dataset.itemId, 10);
-                vscode.postMessage({
-                    type: 'toggleChecklistItem',
-                    listType,
-                    itemId
-                });
-            });
-        });
-
-        // Edit title
-        const titleInput = document.getElementById('titleInput');
-        let originalTitle = titleInput.value;
-        titleInput.addEventListener('blur', () => {
-            const newTitle = titleInput.value.trim();
-            if (newTitle && newTitle !== originalTitle) {
-                originalTitle = newTitle;
-                vscode.postMessage({ type: 'updateField', field: 'title', value: newTitle });
-            }
-        });
-        titleInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                titleInput.blur();
-            } else if (e.key === 'Escape') {
-                titleInput.value = originalTitle;
-                titleInput.blur();
-            }
-        });
-
-        // Status dropdown
-        const statusSelect = document.getElementById('statusSelect');
-        statusSelect.addEventListener('change', () => {
-            vscode.postMessage({ type: 'updateField', field: 'status', value: statusSelect.value });
-        });
-
-        // Priority dropdown
-        const prioritySelect = document.getElementById('prioritySelect');
-        prioritySelect.addEventListener('change', () => {
-            const value = prioritySelect.value || undefined;
-            vscode.postMessage({ type: 'updateField', field: 'priority', value });
-        });
-
-        // Milestone dropdown
-        const milestoneSelect = document.getElementById('milestoneSelect');
-        milestoneSelect.addEventListener('change', () => {
-            const value = milestoneSelect.value || undefined;
-            vscode.postMessage({ type: 'updateField', field: 'milestone', value });
-        });
-
-        // Description view/edit toggle
-        const descriptionView = document.getElementById('descriptionView');
-        const descriptionTextarea = document.getElementById('descriptionTextarea');
-        const editDescriptionBtn = document.getElementById('editDescriptionBtn');
-        let isEditingDescription = false;
-        let descriptionTimeout;
-
-        function toggleDescriptionEdit(editing) {
-            isEditingDescription = editing;
-            if (editing) {
-                descriptionView.classList.add('hidden');
-                descriptionTextarea.classList.remove('hidden');
-                descriptionTextarea.focus();
-                editDescriptionBtn.textContent = 'Done';
-            } else {
-                descriptionView.classList.remove('hidden');
-                descriptionTextarea.classList.add('hidden');
-                editDescriptionBtn.textContent = 'Edit';
-            }
-        }
-
-        editDescriptionBtn.addEventListener('click', () => {
-            if (isEditingDescription) {
-                // Save and switch to view mode
-                vscode.postMessage({ type: 'updateField', field: 'description', value: descriptionTextarea.value });
-            } else {
-                toggleDescriptionEdit(true);
-            }
-        });
-
-        // Also allow clicking the view to edit
-        descriptionView.addEventListener('click', () => {
-            toggleDescriptionEdit(true);
-        });
-
-        descriptionTextarea.addEventListener('input', () => {
-            clearTimeout(descriptionTimeout);
-            descriptionTimeout = setTimeout(() => {
-                vscode.postMessage({ type: 'updateField', field: 'description', value: descriptionTextarea.value });
-            }, 1000); // Debounce: save after 1s of no typing
-        });
-
-        // Escape to cancel, blur to save
-        descriptionTextarea.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                toggleDescriptionEdit(false);
-            }
-        });
-
-        // Labels management
-        const labelsContainer = document.getElementById('labelsContainer');
-        const addLabelInput = document.getElementById('addLabelInput');
-        let currentLabels = JSON.parse(labelsContainer.dataset.labels || '[]');
-
-        // Remove label
-        document.querySelectorAll('.remove-label').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const labelSpan = btn.parentElement;
-                const labelToRemove = labelSpan.dataset.label;
-                currentLabels = currentLabels.filter(l => l !== labelToRemove);
-                vscode.postMessage({ type: 'updateField', field: 'labels', value: currentLabels });
-            });
-        });
-
-        // Add label
-        addLabelInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const newLabel = addLabelInput.value.trim();
-                if (newLabel && !currentLabels.includes(newLabel)) {
-                    currentLabels.push(newLabel);
-                    vscode.postMessage({ type: 'updateField', field: 'labels', value: currentLabels });
-                }
-                addLabelInput.value = '';
-            } else if (e.key === 'Escape') {
-                addLabelInput.value = '';
-                addLabelInput.blur();
-            }
-        });
-
-        // Assignees management
-        const assigneesContainer = document.getElementById('assigneesContainer');
-        const addAssigneeInput = document.getElementById('addAssigneeInput');
-        let currentAssignees = JSON.parse(assigneesContainer.dataset.assignees || '[]');
-
-        // Remove assignee
-        document.querySelectorAll('.remove-assignee').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const assigneeSpan = btn.parentElement;
-                const assigneeToRemove = assigneeSpan.dataset.assignee;
-                currentAssignees = currentAssignees.filter(a => a !== assigneeToRemove);
-                vscode.postMessage({ type: 'updateField', field: 'assignee', value: currentAssignees });
-            });
-        });
-
-        // Add assignee
-        addAssigneeInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                const newAssignee = addAssigneeInput.value.trim();
-                if (newAssignee && !currentAssignees.includes(newAssignee)) {
-                    currentAssignees.push(newAssignee);
-                    vscode.postMessage({ type: 'updateField', field: 'assignee', value: currentAssignees });
-                }
-                addAssigneeInput.value = '';
-            } else if (e.key === 'Escape') {
-                addAssigneeInput.value = '';
-                addAssigneeInput.blur();
-            }
-        });
-
-        // Archive task
-        document.getElementById('archiveBtn').addEventListener('click', () => {
-            vscode.postMessage({ type: 'archiveTask', taskId: '${task.id}' });
-        });
-    </script>
-</body>
-</html>`;
   }
 
   private escapeHtml(text: string): string {

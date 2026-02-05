@@ -32,3 +32,18 @@ export interface MilestoneStats {
   total: number;
   done: number;
 }
+
+/**
+ * Task detail view data sent from extension
+ */
+export interface TaskDetailData {
+  task: import('../../core/types').Task;
+  statuses: string[];
+  priorities: string[];
+  uniqueLabels: string[];
+  uniqueAssignees: string[];
+  milestones: string[];
+  blocksTaskIds: string[];
+  isBlocked: boolean;
+  descriptionHtml: string;
+}

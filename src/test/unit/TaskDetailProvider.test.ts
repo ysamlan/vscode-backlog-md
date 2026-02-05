@@ -33,6 +33,7 @@ describe('TaskDetailProvider', () => {
       html: '',
       asWebviewUri: vi.fn((uri) => uri),
       onDidReceiveMessage: vi.fn(),
+      postMessage: vi.fn().mockResolvedValue(true),
       cspSource: 'test-csp',
     };
 
