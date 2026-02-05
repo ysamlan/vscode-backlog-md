@@ -115,15 +115,24 @@ export function calculateOrdinalsForDrop(
 }
 
 /**
+ * Compare two cards by ordinal (matching upstream Backlog.md behavior):
+ * - Cards WITH ordinal come first, sorted by ordinal ascending
+ * - Cards WITHOUT ordinal come last, sorted by ID
+ *
+ * Usable as a standalone comparator (e.g. as a tiebreaker in list view sorting).
+ */
+export function compareByOrdinal(a: CardData, b: CardData): number {
+  if (hasOrdinal(a) && !hasOrdinal(b)) return -1;
+  if (!hasOrdinal(a) && hasOrdinal(b)) return 1;
+  if (hasOrdinal(a) && hasOrdinal(b)) return a.ordinal! - b.ordinal!;
+  return a.taskId.localeCompare(b.taskId);
+}
+
+/**
  * Sort cards by ordinal (matching upstream Backlog.md behavior):
  * - Cards WITH ordinal come first, sorted by ordinal ascending
  * - Cards WITHOUT ordinal come last, sorted by ID
  */
 export function sortCardsByOrdinal(cards: CardData[]): CardData[] {
-  return [...cards].sort((a, b) => {
-    if (hasOrdinal(a) && !hasOrdinal(b)) return -1;
-    if (!hasOrdinal(a) && hasOrdinal(b)) return 1;
-    if (hasOrdinal(a) && hasOrdinal(b)) return a.ordinal! - b.ordinal!;
-    return a.taskId.localeCompare(b.taskId);
-  });
+  return [...cards].sort(compareByOrdinal);
 }

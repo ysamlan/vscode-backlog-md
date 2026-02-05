@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Task, Milestone } from '../../lib/types';
+  import { compareByOrdinal, calculateOrdinalsForDrop, type CardData } from '../../../core/ordinalUtils';
 
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
 
@@ -13,6 +14,7 @@
     onFilterChange: (filter: string) => void;
     onMilestoneChange: (milestone: string) => void;
     onSearchChange: (query: string) => void;
+    onReorderTasks?: (updates: Array<{ taskId: string; ordinal: number }>) => void;
   }
 
   let {
@@ -25,6 +27,7 @@
     onFilterChange,
     onMilestoneChange,
     onSearchChange,
+    onReorderTasks,
   }: Props = $props();
 
   let currentSort = $state<{ field: string; direction: 'asc' | 'desc' }>({
@@ -95,6 +98,14 @@
 
       if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return currentSort.direction === 'asc' ? 1 : -1;
+
+      // Ordinal tiebreaker when sorting by status (matches kanban ordering)
+      if (currentSort.field === 'status') {
+        const cardA: CardData = { taskId: a.id, ordinal: a.ordinal };
+        const cardB: CardData = { taskId: b.id, ordinal: b.ordinal };
+        return compareByOrdinal(cardA, cardB);
+      }
+
       return 0;
     });
   });
@@ -111,10 +122,6 @@
       currentSort.field = field;
       currentSort.direction = 'asc';
     }
-  }
-
-  function handleRowClick(taskId: string) {
-    onOpenTask(taskId);
   }
 
   function handleRowKeydown(e: KeyboardEvent, taskId: string) {
@@ -136,6 +143,103 @@
 
   function getStatusClass(status: string): string {
     return status.toLowerCase().replace(' ', '-');
+  }
+
+  // Drag-and-drop state
+  let isDragEnabled = $derived(currentSort.field === 'status');
+  let draggedTaskId = $state<string | null>(null);
+  let dropTargetTaskId = $state<string | null>(null);
+  let dropPosition = $state<'before' | 'after' | null>(null);
+  let justDragged = $state(false);
+
+  function handleDragStart(e: DragEvent, taskId: string) {
+    if (!isDragEnabled) return;
+    draggedTaskId = taskId;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', taskId);
+    }
+  }
+
+  function handleDragEnd() {
+    draggedTaskId = null;
+    dropTargetTaskId = null;
+    dropPosition = null;
+    // Suppress row click after drag
+    justDragged = true;
+    setTimeout(() => { justDragged = false; }, 0);
+  }
+
+  function handleDragOver(e: DragEvent, taskId: string) {
+    if (!isDragEnabled || !draggedTaskId || draggedTaskId === taskId) return;
+
+    // Only allow reordering within the same status group
+    const draggedTask = sortedTasks.find((t) => t.id === draggedTaskId);
+    const targetTask = sortedTasks.find((t) => t.id === taskId);
+    if (!draggedTask || !targetTask || draggedTask.status !== targetTask.status) return;
+
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+
+    // Determine drop position based on mouse Y within row
+    const row = (e.target as HTMLElement).closest('tr');
+    if (row) {
+      const rect = row.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      dropTargetTaskId = taskId;
+      dropPosition = e.clientY < midY ? 'before' : 'after';
+    }
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    // Only clear if leaving the tbody entirely
+    const related = e.relatedTarget as HTMLElement | null;
+    if (!related || !related.closest?.('tbody')) {
+      dropTargetTaskId = null;
+      dropPosition = null;
+    }
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    if (!isDragEnabled || !draggedTaskId || !dropTargetTaskId || !dropPosition || !onReorderTasks) {
+      handleDragEnd();
+      return;
+    }
+
+    const draggedTask = sortedTasks.find((t) => t.id === draggedTaskId);
+    const targetTask = sortedTasks.find((t) => t.id === dropTargetTaskId);
+    if (!draggedTask || !targetTask || draggedTask.status !== targetTask.status) {
+      handleDragEnd();
+      return;
+    }
+
+    // Get tasks in the same status group (in current sorted order)
+    const statusGroup = sortedTasks.filter((t) => t.status === draggedTask.status);
+
+    // Build card data for the status group
+    const existingCards: CardData[] = statusGroup.map((t) => ({
+      taskId: t.id,
+      ordinal: t.ordinal,
+    }));
+
+    // Calculate drop index
+    const targetIndex = statusGroup.findIndex((t) => t.id === dropTargetTaskId);
+    const dropIndex = dropPosition === 'after' ? targetIndex + 1 : targetIndex;
+
+    const droppedCard: CardData = { taskId: draggedTaskId, ordinal: draggedTask.ordinal };
+    const updates = calculateOrdinalsForDrop(existingCards, droppedCard, dropIndex);
+
+    if (updates.length > 0) {
+      onReorderTasks(updates);
+    }
+
+    handleDragEnd();
+  }
+
+  function handleRowClickGuarded(taskId: string) {
+    if (justDragged) return;
+    onOpenTask(taskId);
   }
 </script>
 
@@ -212,6 +316,9 @@
       <table class="task-table">
         <thead>
           <tr>
+            {#if isDragEnabled}
+              <th class="drag-handle-header"></th>
+            {/if}
             <th
               data-sort="title"
               onclick={() => handleSort('title')}
@@ -241,7 +348,11 @@
             </th>
           </tr>
         </thead>
-        <tbody>
+        <tbody
+          ondragover={(e) => { if (isDragEnabled) e.preventDefault(); }}
+          ondragleave={handleDragLeave}
+          ondrop={handleDrop}
+        >
           {#each sortedTasks as task (task.id)}
             {@const depsCount = task.dependencies?.length ?? 0}
             {@const blocksCount = task.blocksTaskIds?.length ?? 0}
@@ -249,9 +360,27 @@
               data-task-id={task.id}
               data-testid="task-row-{task.id}"
               tabindex="0"
-              onclick={() => handleRowClick(task.id)}
+              draggable={isDragEnabled ? 'true' : undefined}
+              class:dragging={draggedTaskId === task.id}
+              class:drop-before={dropTargetTaskId === task.id && dropPosition === 'before'}
+              class:drop-after={dropTargetTaskId === task.id && dropPosition === 'after'}
+              onclick={() => handleRowClickGuarded(task.id)}
               onkeydown={(e) => handleRowKeydown(e, task.id)}
+              ondragstart={(e) => handleDragStart(e, task.id)}
+              ondragend={handleDragEnd}
+              ondragover={(e) => handleDragOver(e, task.id)}
             >
+              {#if isDragEnabled}
+                <td
+                  class="drag-handle"
+                  data-testid="drag-handle-{task.id}"
+                  onclick={(e) => e.stopPropagation()}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>
+                  </svg>
+                </td>
+              {/if}
               <td>
                 {task.title}
                 {#if depsCount > 0 || blocksCount > 0}

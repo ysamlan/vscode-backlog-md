@@ -282,6 +282,112 @@ test.describe('Tasks View', () => {
     });
   });
 
+  test.describe('List View - Ordinal Ordering', () => {
+    test.beforeEach(async ({ page }) => {
+      await setupTasksView(page);
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'list' });
+      await page.waitForTimeout(50);
+    });
+
+    test('tasks within same status group are ordered by ordinal', async ({ page }) => {
+      // Default sort is by status ascending
+      // "To Do" group: TASK-1 (ordinal: 1000) should come before TASK-2 and TASK-3 (no ordinal)
+      const rows = page.locator('tbody tr');
+      const taskIds: string[] = [];
+      const count = await rows.count();
+      for (let i = 0; i < count; i++) {
+        const id = await rows.nth(i).getAttribute('data-task-id');
+        taskIds.push(id!);
+      }
+
+      // To Do group: TASK-1 (ordinal 1000), then TASK-2 and TASK-3 (no ordinal, by ID)
+      const todoTasks = taskIds.filter((id) => ['TASK-1', 'TASK-2', 'TASK-3'].includes(id));
+      expect(todoTasks).toEqual(['TASK-1', 'TASK-2', 'TASK-3']);
+
+      // In Progress group: TASK-4 (ordinal 500), TASK-5 (ordinal 1500)
+      const inProgressTasks = taskIds.filter((id) => ['TASK-4', 'TASK-5'].includes(id));
+      expect(inProgressTasks).toEqual(['TASK-4', 'TASK-5']);
+
+      // Done group: TASK-6, TASK-7 (no ordinal, by ID)
+      const doneTasks = taskIds.filter((id) => ['TASK-6', 'TASK-7'].includes(id));
+      expect(doneTasks).toEqual(['TASK-6', 'TASK-7']);
+    });
+  });
+
+  test.describe('List View - Drag and Drop', () => {
+    test.beforeEach(async ({ page }) => {
+      await setupTasksView(page);
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'list' });
+      await page.waitForTimeout(50);
+    });
+
+    test('shows drag handles when sorted by status', async ({ page }) => {
+      // Default sort is status - drag handles should be visible
+      await expect(page.locator('[data-testid="drag-handle-TASK-1"]')).toBeVisible();
+      await expect(page.locator('[data-testid="drag-handle-TASK-4"]')).toBeVisible();
+    });
+
+    test('hides drag handles when sorted by title', async ({ page }) => {
+      // Click title header to sort by title
+      await page.locator('th[data-sort="title"]').click();
+      await page.waitForTimeout(50);
+
+      // Drag handles should not be visible
+      await expect(page.locator('[data-testid="drag-handle-TASK-1"]')).toHaveCount(0);
+    });
+
+    test('hides drag handles when sorted by priority', async ({ page }) => {
+      await page.locator('th[data-sort="priority"]').click();
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="drag-handle-TASK-1"]')).toHaveCount(0);
+    });
+
+    test('drag handles reappear when switching back to status sort', async ({ page }) => {
+      // Switch to title sort
+      await page.locator('th[data-sort="title"]').click();
+      await page.waitForTimeout(50);
+      await expect(page.locator('.drag-handle')).toHaveCount(0);
+
+      // Switch back to status sort
+      await page.locator('th[data-sort="status"]').click();
+      await page.waitForTimeout(50);
+      await expect(page.locator('[data-testid="drag-handle-TASK-1"]')).toBeVisible();
+    });
+
+    test('reorder within same status sends reorderTasks message', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      // Drag TASK-1 after TASK-2 (both are "To Do")
+      const source = page.locator('[data-testid="drag-handle-TASK-1"]');
+      const target = page.locator('[data-testid="task-row-TASK-2"]');
+
+      // Perform drag operation
+      const targetBox = await target.boundingBox();
+      if (!targetBox) throw new Error('Target not found');
+
+      await source.dragTo(target, {
+        targetPosition: { x: targetBox.width / 2, y: targetBox.height * 0.75 },
+      });
+
+      await page.waitForTimeout(100);
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toBeDefined();
+      expect(message!.type).toBe('reorderTasks');
+      expect(message!.updates).toBeDefined();
+      expect(Array.isArray(message!.updates)).toBe(true);
+
+      // Verify the updates contain ordinal assignments
+      const updates = message!.updates as Array<{ taskId: string; ordinal: number }>;
+      expect(updates.length).toBeGreaterThan(0);
+
+      // TASK-1 should be in the updates (it was the dragged card)
+      const task1Update = updates.find((u) => u.taskId === 'TASK-1');
+      expect(task1Update).toBeDefined();
+    });
+  });
+
   test.describe('No Backlog State', () => {
     test('shows no backlog message', async ({ page }) => {
       await installVsCodeMock(page);

@@ -732,6 +732,37 @@ body {
   cursor: pointer;
 }
 
+/* List view drag handle */
+.drag-handle-header {
+  width: 28px;
+  padding: 8px 4px !important;
+}
+
+.drag-handle {
+  width: 28px;
+  padding: 8px 4px !important;
+  cursor: grab;
+  color: var(--vscode-descriptionForeground, #858585);
+  text-align: center;
+}
+
+.drag-handle:hover {
+  color: var(--vscode-foreground, #cccccc);
+}
+
+/* List view drag states */
+.task-table tr.dragging {
+  opacity: 0.4;
+}
+
+.task-table tr.drop-before td {
+  border-top: 2px solid var(--vscode-focusBorder, #007acc);
+}
+
+.task-table tr.drop-after td {
+  border-bottom: 2px solid var(--vscode-focusBorder, #007acc);
+}
+
 .empty-state {
   color: var(--vscode-descriptionForeground, #858585);
   text-align: center;

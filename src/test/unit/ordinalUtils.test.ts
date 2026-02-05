@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   hasOrdinal,
+  compareByOrdinal,
   calculateOrdinalsForDrop,
   sortCardsByOrdinal,
   CardData,
@@ -16,6 +17,35 @@ describe('ordinalUtils', () => {
 
     it('should return false for cards without ordinals', () => {
       expect(hasOrdinal({ taskId: 'A', ordinal: undefined })).toBe(false);
+    });
+  });
+
+  describe('compareByOrdinal', () => {
+    it('should rank ordinal cards before no-ordinal cards', () => {
+      const a: CardData = { taskId: 'A', ordinal: 1000 };
+      const b: CardData = { taskId: 'B', ordinal: undefined };
+      expect(compareByOrdinal(a, b)).toBeLessThan(0);
+      expect(compareByOrdinal(b, a)).toBeGreaterThan(0);
+    });
+
+    it('should sort by ordinal value when both have ordinals', () => {
+      const a: CardData = { taskId: 'A', ordinal: 2000 };
+      const b: CardData = { taskId: 'B', ordinal: 1000 };
+      expect(compareByOrdinal(a, b)).toBeGreaterThan(0);
+      expect(compareByOrdinal(b, a)).toBeLessThan(0);
+    });
+
+    it('should sort by taskId when neither has ordinal', () => {
+      const a: CardData = { taskId: 'TASK-1', ordinal: undefined };
+      const b: CardData = { taskId: 'TASK-2', ordinal: undefined };
+      expect(compareByOrdinal(a, b)).toBeLessThan(0);
+      expect(compareByOrdinal(b, a)).toBeGreaterThan(0);
+    });
+
+    it('should return 0 for equal ordinals and same taskId', () => {
+      const a: CardData = { taskId: 'A', ordinal: 1000 };
+      const b: CardData = { taskId: 'A', ordinal: 1000 };
+      expect(compareByOrdinal(a, b)).toBe(0);
     });
   });
 

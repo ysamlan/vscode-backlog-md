@@ -277,6 +277,7 @@
       onFilterChange={handleFilterChange}
       onMilestoneChange={handleMilestoneChange}
       onSearchChange={handleSearchChange}
+      onReorderTasks={handleReorderTasks}
     />
   {/if}
 </div>
