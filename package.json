@@ -127,16 +127,19 @@
   },
   "scripts": {
     "compile": "bun scripts/build.ts",
+    "compile:webview": "vite build --config vite.webview.config.ts",
     "watch": "bun scripts/build.ts --watch",
     "build:css": "bunx @tailwindcss/cli -i ./src/webview/styles.css -o ./dist/webview/styles.css",
-    "build": "bun run build:css && bun run compile",
+    "build": "bun run build:css && bun run compile:webview && bun run compile",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "bun run build && tsc -p tsconfig.e2e.json && bash scripts/run-e2e.sh",
     "test:webview": "concurrently --kill-others --success first \"vite\" \"wait-on http://localhost:5173 && cypress run\"",
     "test:webview:open": "concurrently --kill-others \"vite\" \"wait-on http://localhost:5173 && cypress open\"",
+    "test:playwright": "playwright test",
+    "test:playwright:ui": "playwright test --ui",
     "webview:serve": "vite",
-    "lint": "eslint src",
+    "lint": "eslint src e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
@@ -154,7 +157,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@playwright/test": "^1.58.1",
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@tailwindcss/cli": "^4.1.0",
+    "@testing-library/svelte": "^5.3.1",
     "@types/chai": "^5.2.3",
     "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.10",
@@ -180,6 +186,7 @@
   },
   "dependencies": {
     "js-yaml": "^4.1.1",
-    "marked": "^17.0.1"
+    "marked": "^17.0.1",
+    "svelte": "^5.49.2"
   }
 }

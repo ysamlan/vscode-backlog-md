@@ -10,7 +10,20 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['scripts/*.ts', 'vitest.config.ts'],
+          allowDefaultProject: [
+            'scripts/*.ts',
+            'vitest.config.ts',
+            'vite.config.ts',
+            'vite.webview.config.ts',
+            'playwright.config.ts',
+            'e2e/*.ts',
+            'e2e/fixtures/*.ts',
+            'src/webview/entries/*.ts',
+            'src/webview/lib/*.ts',
+            'src/webview/stores/*.ts',
+          ],
+          // Increase limit from 8 to 20 for config files and webview code
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -26,6 +39,14 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/', 'node_modules/', 'out/', '*.js', '*.cjs', 'src/test/e2e/'],
+    ignores: [
+      'dist/',
+      'node_modules/',
+      'out/',
+      '*.js',
+      '*.cjs',
+      'src/test/e2e/',
+      'src/webview/**/*.svelte',
+    ],
   }
 );

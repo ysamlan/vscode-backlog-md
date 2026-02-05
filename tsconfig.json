@@ -2,7 +2,7 @@
   "compilerOptions": {
     "module": "Node16",
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "moduleResolution": "Node16",
     "outDir": "dist",
     "rootDir": "src",
@@ -16,5 +16,5 @@
     "resolveJsonModule": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/test/e2e/**/*"]
+  "exclude": ["node_modules", "dist", "src/test/e2e/**/*", "src/webview/**/*"]
 }
