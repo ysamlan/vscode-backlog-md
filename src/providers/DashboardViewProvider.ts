@@ -1,9 +1,26 @@
 import * as vscode from 'vscode';
 import { BaseViewProvider } from './BaseViewProvider';
-import { WebviewMessage, Task } from '../core/types';
+import type { WebviewMessage, Task } from '../core/types';
+
+/**
+ * Dashboard statistics data structure
+ */
+interface DashboardStats {
+  totalTasks: number;
+  byStatus: Record<string, number>;
+  byPriority: Record<string, number>;
+  milestones: { name: string; total: number; done: number }[];
+}
 
 /**
  * Provides a dashboard webview with project statistics
+ *
+ * This provider loads a compiled Svelte component (Dashboard.svelte) that handles
+ * all UI rendering. The provider is responsible for:
+ * - Loading the Svelte bundle and styles
+ * - Computing statistics from tasks
+ * - Sending stats to the webview via postMessage
+ * - Handling filterByStatus messages from the webview
  */
 export class DashboardViewProvider extends BaseViewProvider {
   protected get viewType(): string {
@@ -11,174 +28,22 @@ export class DashboardViewProvider extends BaseViewProvider {
   }
 
   protected getHtmlContent(webview: vscode.Webview): string {
-    const nonce = this.getNonce();
     const styleUri = this.getResourceUri(webview, 'styles.css');
+    const scriptUri = this.getResourceUri(webview, 'dashboard.js');
 
+    // CSP allows our script and ES module imports from the same origin
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src ${webview.cspSource};">
     <link href="${styleUri}" rel="stylesheet">
     <title>Dashboard</title>
 </head>
 <body class="dashboard-page">
-    <div id="dashboard-content">
-        <div class="empty-state">Loading statistics...</div>
-    </div>
-    <script nonce="${nonce}">
-        const vscode = acquireVsCodeApi();
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function setupClickHandlers() {
-            const container = document.getElementById('dashboard-content');
-            container.querySelectorAll('.stat-card.clickable[data-status]').forEach(card => {
-                card.addEventListener('click', () => {
-                    vscode.postMessage({ type: 'filterByStatus', status: card.dataset.status });
-                });
-            });
-        }
-
-        function renderDashboard(stats) {
-            const container = document.getElementById('dashboard-content');
-
-            if (stats.totalTasks === 0) {
-                container.innerHTML = \`
-                    <div class="empty-state">
-                        <div style="font-size: 48px; margin-bottom: 16px;">&#128202;</div>
-                        <h3>No Tasks Yet</h3>
-                        <p>Create tasks in your backlog/ folder to see statistics.</p>
-                    </div>
-                \`;
-                return;
-            }
-
-            const completionPct = stats.totalTasks > 0
-                ? Math.round((stats.byStatus.Done / stats.totalTasks) * 100)
-                : 0;
-
-            container.innerHTML = \`
-                <div class="stats-grid">
-                    <div class="stat-card stat-todo clickable" data-status="To Do">
-                        <div class="stat-value">\${stats.byStatus['To Do'] || 0}</div>
-                        <div class="stat-label">To Do</div>
-                    </div>
-                    <div class="stat-card stat-in-progress clickable" data-status="In Progress">
-                        <div class="stat-value">\${stats.byStatus['In Progress'] || 0}</div>
-                        <div class="stat-label">In Progress</div>
-                    </div>
-                    <div class="stat-card stat-done clickable" data-status="Done">
-                        <div class="stat-value">\${stats.byStatus['Done'] || 0}</div>
-                        <div class="stat-label">Done</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">\${stats.totalTasks}</div>
-                        <div class="stat-label">Total (\${completionPct}%)</div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <div class="section-title">Status Breakdown</div>
-                    <div class="status-breakdown">
-                        \${Object.entries(stats.byStatus).map(([status, count]) => {
-                            const pct = stats.totalTasks > 0 ? Math.round((count / stats.totalTasks) * 100) : 0;
-                            const statusClass = status.toLowerCase().replace(/\\s+/g, '-');
-                            return \`
-                                <div class="status-row">
-                                    <span class="status-name">\${escapeHtml(status)}</span>
-                                    <div class="status-bar-container">
-                                        <div class="status-bar status-bar-\${statusClass}" style="width: \${pct}%"></div>
-                                    </div>
-                                    <span class="status-count">\${count}</span>
-                                </div>
-                            \`;
-                        }).join('')}
-                    </div>
-                </div>
-
-                <div class="section">
-                    <div class="section-title">Priority Distribution</div>
-                    <div class="priority-breakdown">
-                        <div class="priority-item priority-high">
-                            <span class="priority-label">High</span>
-                            <span class="priority-count">\${stats.byPriority.high || 0}</span>
-                        </div>
-                        <div class="priority-item priority-medium">
-                            <span class="priority-label">Medium</span>
-                            <span class="priority-count">\${stats.byPriority.medium || 0}</span>
-                        </div>
-                        <div class="priority-item priority-low">
-                            <span class="priority-label">Low</span>
-                            <span class="priority-count">\${stats.byPriority.low || 0}</span>
-                        </div>
-                        <div class="priority-item priority-none">
-                            <span class="priority-label">None</span>
-                            <span class="priority-count">\${stats.byPriority.none || 0}</span>
-                        </div>
-                    </div>
-                </div>
-
-                \${stats.milestones.length > 0 ? \`
-                    <div class="section">
-                        <div class="section-title">Milestone Progress</div>
-                        <div class="milestone-list">
-                            \${stats.milestones.map(m => {
-                                const pct = m.total > 0 ? Math.round((m.done / m.total) * 100) : 0;
-                                return \`
-                                    <div class="milestone-item">
-                                        <div class="milestone-info">
-                                            <span class="milestone-name">\${escapeHtml(m.name)}</span>
-                                            <span class="milestone-stats">\${m.done}/\${m.total} tasks</span>
-                                        </div>
-                                        <div class="milestone-bar-container">
-                                            <div class="milestone-bar" style="width: \${pct}%"></div>
-                                        </div>
-                                        <span class="milestone-pct">\${pct}%</span>
-                                    </div>
-                                \`;
-                            }).join('')}
-                        </div>
-                    </div>
-                \` : ''}
-            \`;
-        }
-
-        function renderNoBacklogState() {
-            const container = document.getElementById('dashboard-content');
-            container.innerHTML = \`
-                <div class="empty-state">
-                    <div style="font-size: 48px; margin-bottom: 16px;">&#128203;</div>
-                    <h3>No Backlog Found</h3>
-                    <p>This workspace doesn't have a <code>backlog/</code> folder.</p>
-                </div>
-            \`;
-        }
-
-        window.addEventListener('message', event => {
-            const message = event.data;
-            switch (message.type) {
-                case 'statsUpdated':
-                    renderDashboard(message.stats);
-                    setupClickHandlers();
-                    break;
-                case 'noBacklogFolder':
-                    renderNoBacklogState();
-                    break;
-                case 'error':
-                    console.error(message.message);
-                    break;
-            }
-        });
-
-        // Request initial data
-        vscode.postMessage({ type: 'refresh' });
-    </script>
+    <div id="app"></div>
+    <script type="module" src="${scriptUri}"></script>
 </body>
 </html>`;
   }
@@ -272,11 +137,4 @@ export class DashboardViewProvider extends BaseViewProvider {
         break;
     }
   }
-}
-
-interface DashboardStats {
-  totalTasks: number;
-  byStatus: Record<string, number>;
-  byPriority: Record<string, number>;
-  milestones: { name: string; total: number; done: number }[];
 }

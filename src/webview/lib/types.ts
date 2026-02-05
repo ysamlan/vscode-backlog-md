@@ -16,3 +16,19 @@ export type {
   ExtensionMessage,
   DataSourceMode,
 } from '../../core/types';
+
+/**
+ * Dashboard statistics data structure
+ */
+export interface DashboardStats {
+  totalTasks: number;
+  byStatus: Record<string, number>;
+  byPriority: Record<string, number>;
+  milestones: MilestoneStats[];
+}
+
+export interface MilestoneStats {
+  name: string;
+  total: number;
+  done: number;
+}
