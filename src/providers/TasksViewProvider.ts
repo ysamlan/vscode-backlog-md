@@ -15,7 +15,7 @@ import { computeSubtasks } from '../core/BacklogParser';
  * - Persisting view preferences (viewMode, milestoneGrouping, collapsed columns)
  */
 export class TasksViewProvider extends BaseViewProvider {
-  private viewMode: 'kanban' | 'list' | 'drafts' | 'archived' = 'kanban';
+  private viewMode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' = 'kanban';
   private milestoneGrouping: boolean = false;
   private dataSourceMode: DataSourceMode = 'local-only';
   private dataSourceReason?: string;
@@ -37,7 +37,10 @@ export class TasksViewProvider extends BaseViewProvider {
       const legacyDrafts = this.context.globalState.get<boolean>('backlog.showingDrafts', false);
       this.viewMode = legacyDrafts
         ? 'drafts'
-        : this.context.globalState.get('backlog.viewMode', 'kanban');
+        : this.context.globalState.get<'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard'>(
+            'backlog.viewMode',
+            'kanban'
+          );
       this.milestoneGrouping = this.context.globalState.get('backlog.milestoneGrouping', false);
       const savedCollapsed = this.context.globalState.get<string[]>('backlog.collapsedColumns', []);
       this.collapsedColumns = new Set(savedCollapsed);
@@ -52,6 +55,7 @@ export class TasksViewProvider extends BaseViewProvider {
 
   protected getHtmlContent(webview: vscode.Webview): string {
     const styleUri = this.getResourceUri(webview, 'styles.css');
+    const componentStyleUri = this.getResourceUri(webview, 'tasks.css');
     const scriptUri = this.getResourceUri(webview, 'tasks.js');
 
     // CSP allows our script and ES module imports from the same origin
@@ -62,6 +66,7 @@ export class TasksViewProvider extends BaseViewProvider {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src ${webview.cspSource};">
     <link href="${styleUri}" rel="stylesheet">
+    <link href="${componentStyleUri}" rel="stylesheet">
     <title>Tasks</title>
 </head>
 <body class="tasks-page">
@@ -85,6 +90,11 @@ export class TasksViewProvider extends BaseViewProvider {
 
     try {
       // Determine which tasks to load based on mode
+      if (this.viewMode === 'dashboard') {
+        await this.refreshDashboard();
+        return;
+      }
+
       let taskLoader: Promise<Task[]>;
       if (this.viewMode === 'archived') {
         taskLoader = this.parser.getArchivedTasks();
@@ -151,6 +161,11 @@ export class TasksViewProvider extends BaseViewProvider {
       this.postMessage({ type: 'statusesUpdated', statuses });
       this.postMessage({ type: 'milestonesUpdated', milestones });
       this.postMessage({ type: 'tasksUpdated', tasks: tasksWithBlocks });
+
+      // Send draft count for tab badge
+      const draftCount =
+        this.viewMode === 'drafts' ? tasks.length : (await this.parser.getDrafts()).length;
+      this.postMessage({ type: 'draftCountUpdated', count: draftCount });
     } catch (error) {
       console.error('[Backlog.md] Error refreshing Tasks view:', error);
       this.postMessage({ type: 'error', message: 'Failed to load tasks' });
@@ -347,6 +362,11 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
       }
 
+      case 'filterByStatus': {
+        vscode.commands.executeCommand('backlog.filterByStatus', message.status);
+        break;
+      }
+
       case 'requestCreateTask': {
         vscode.commands.executeCommand('backlog.createTask');
         break;
@@ -435,13 +455,14 @@ export class TasksViewProvider extends BaseViewProvider {
    * Set the view mode (kanban, list, or drafts) from external command.
    * Drafts mode is treated as a special list view showing draft tasks.
    */
-  setViewMode(mode: 'kanban' | 'list' | 'drafts' | 'archived'): void {
+  setViewMode(mode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard'): void {
     if (this.viewMode === mode) return;
     const previousMode = this.viewMode;
     this.viewMode = mode;
 
     const isDrafts = mode === 'drafts';
     const isArchived = mode === 'archived';
+    const isDashboard = mode === 'dashboard';
 
     if (this.context) {
       this.context.globalState.update('backlog.viewMode', mode);
@@ -452,14 +473,26 @@ export class TasksViewProvider extends BaseViewProvider {
     this.postMessage({ type: 'activeTabChanged', tab: mode });
     // Backward compatibility: also send legacy messages
     this.postMessage({ type: 'draftsModeChanged', enabled: isDrafts });
-    this.postMessage({
-      type: 'viewModeChanged',
-      viewMode: isDrafts || isArchived ? 'list' : mode,
-    });
+    if (!isDashboard) {
+      this.postMessage({
+        type: 'viewModeChanged',
+        viewMode: isDrafts || isArchived ? 'list' : mode,
+      });
+    }
 
-    // Refresh to load correct task set when switching to/from drafts or archived
+    // Refresh dashboard stats when switching to dashboard
+    if (isDashboard) {
+      this.refreshDashboard();
+      return;
+    }
+
+    // Refresh to load correct task set when switching to/from drafts, archived, or dashboard
     const needsRefresh =
-      isDrafts || isArchived || previousMode === 'drafts' || previousMode === 'archived';
+      isDrafts ||
+      isArchived ||
+      previousMode === 'drafts' ||
+      previousMode === 'archived' ||
+      previousMode === 'dashboard';
     if (needsRefresh) {
       this.refresh();
     }
@@ -470,5 +503,87 @@ export class TasksViewProvider extends BaseViewProvider {
    */
   setFilter(filter: string): void {
     this.postMessage({ type: 'setFilter', filter });
+  }
+
+  /**
+   * Refresh dashboard statistics and send to webview
+   */
+  async refreshDashboard(): Promise<void> {
+    if (!this._view || !this.parser) return;
+
+    try {
+      const [tasks, completedTasks] = await Promise.all([
+        this.parser.getTasks(),
+        this.parser.getCompletedTasks(),
+      ]);
+      const stats = this.computeStatistics(tasks, completedTasks.length);
+      this.postMessage({ type: 'statsUpdated', stats });
+    } catch (error) {
+      console.error('[Backlog.md] Error refreshing dashboard stats:', error);
+      this.postMessage({ type: 'error', message: 'Failed to load statistics' });
+    }
+  }
+
+  /**
+   * Compute statistics from tasks
+   */
+  private computeStatistics(
+    tasks: Task[],
+    completedCount: number = 0
+  ): {
+    totalTasks: number;
+    completedCount: number;
+    byStatus: Record<string, number>;
+    byPriority: Record<string, number>;
+    milestones: Array<{ name: string; total: number; done: number }>;
+  } {
+    const byStatus: Record<string, number> = {
+      'To Do': 0,
+      'In Progress': 0,
+      Done: 0,
+    };
+
+    const byPriority: Record<string, number> = {
+      high: 0,
+      medium: 0,
+      low: 0,
+      none: 0,
+    };
+
+    const milestoneMap = new Map<string, { total: number; done: number }>();
+
+    for (const task of tasks) {
+      byStatus[task.status] = (byStatus[task.status] || 0) + 1;
+
+      const priority = task.priority || 'none';
+      byPriority[priority] = (byPriority[priority] || 0) + 1;
+
+      if (task.milestone) {
+        if (!milestoneMap.has(task.milestone)) {
+          milestoneMap.set(task.milestone, { total: 0, done: 0 });
+        }
+        const m = milestoneMap.get(task.milestone)!;
+        m.total++;
+        if (task.status === 'Done') {
+          m.done++;
+        }
+      }
+    }
+
+    const milestones = Array.from(milestoneMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => {
+        const aPct = a.total > 0 ? a.done / a.total : 0;
+        const bPct = b.total > 0 ? b.done / b.total : 0;
+        return aPct - bPct;
+      });
+
+    return {
+      totalTasks: tasks.length,
+      completedCount,
+      byStatus,
+      byPriority,
+      milestones,
+    };
   }
 }

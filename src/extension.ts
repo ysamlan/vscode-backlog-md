@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { TasksViewProvider } from './providers/TasksViewProvider';
 import { TaskDetailProvider } from './providers/TaskDetailProvider';
-import { DashboardViewProvider } from './providers/DashboardViewProvider';
 import { BacklogParser } from './core/BacklogParser';
 import { BacklogWriter } from './core/BacklogWriter';
 import { TaskCreatePanel } from './providers/TaskCreatePanel';
@@ -50,13 +49,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
   console.log('[Backlog.md] Tasks view provider registered');
 
-  // Register Dashboard view provider
-  const dashboardProvider = new DashboardViewProvider(context.extensionUri, parser, context);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('backlog.dashboard', dashboardProvider)
-  );
-  console.log('[Backlog.md] Dashboard view provider registered');
-
   // Create Task Detail provider for opening task details in editor
   const taskDetailProvider = new TaskDetailProvider(context.extensionUri, parser);
   console.log('[Backlog.md] Task detail provider created');
@@ -76,14 +68,14 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.openDashboard', () => {
-      vscode.commands.executeCommand('backlog.dashboard.focus');
+      tasksProvider.setViewMode('dashboard');
+      vscode.commands.executeCommand('backlog.kanban.focus');
     })
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.refresh', () => {
       tasksProvider.refresh();
-      dashboardProvider.refresh();
     })
   );
 
@@ -120,7 +112,7 @@ export function activate(context: vscode.ExtensionContext) {
   const savedDraftsMode = context.globalState.get<boolean>('backlog.showingDrafts', false);
   const savedViewMode = savedDraftsMode
     ? 'drafts'
-    : context.globalState.get<'kanban' | 'list' | 'drafts' | 'archived'>(
+    : context.globalState.get<'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard'>(
         'backlog.viewMode',
         'kanban'
       );
@@ -190,7 +182,6 @@ export function activate(context: vscode.ExtensionContext) {
     fileWatcher.onDidChange((uri) => {
       console.log('[Backlog.md] File change detected, refreshing views');
       tasksProvider.refresh();
-      dashboardProvider.refresh();
       TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
     });
   }

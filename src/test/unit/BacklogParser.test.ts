@@ -66,6 +66,10 @@ This is the task description.
         { status: 'In Progress', expected: 'In Progress' },
         { status: 'Done', expected: 'Done' },
         { status: 'Draft', expected: 'Draft' },
+        { status: 'Review', expected: 'Review' },
+        { status: 'QA', expected: 'QA' },
+        { status: 'Backlog', expected: 'Backlog' },
+        { status: 'Blocked', expected: 'Blocked' },
       ];
 
       for (const { status, expected } of testCases) {
@@ -78,6 +82,30 @@ status: ${status}
         const task = parser.parseTaskContent(content, '/fake/task-1.md');
         expect(task?.status).toBe(expected);
       }
+    });
+
+    it('should preserve custom status values', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Custom Status Test
+status: Code Review
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/task-1.md');
+      expect(task?.status).toBe('Code Review');
+    });
+
+    it('should preserve custom status with unicode prefix stripped', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: "◑ Waiting"
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/task-1.md');
+      expect(task?.status).toBe('Waiting');
     });
 
     it('should parse multiple assignees as multi-line array', () => {

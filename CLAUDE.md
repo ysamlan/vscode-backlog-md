@@ -250,7 +250,7 @@ bun run vite &               # Start fixture dev server on port 5173
 
 **Basic workflow:**
 
-**LOAD THE agent-browser skill** first! Do not skip this even if you think you know how to use the CLI tool.
+**LOAD THE agent-browser skill** first when exploratory testing! Do not skip this even if you think you know how to use the CLI tool.
 
 ```bash
 agent-browser open http://localhost:5173/tasks.html   # Open a fixture
@@ -283,12 +283,17 @@ agent-browser eval "window.postMessage({ type: 'taskData', data: { task: {...}, 
 - Always re-run `agent-browser snapshot -i` after DOM changes to get fresh element refs
 - Data shapes must match the TypeScript interfaces exactly (e.g., `totalTasks` not `total`, `done` not `completed` on MilestoneStats)
 
+**Fixture theme variables:**
+
+The fixtures load `vscode-theme-dark-plus.css` which sets all 44 `--vscode-*` CSS variables to VS Code Dark+ defaults. This makes fixtures render with realistic colors outside VS Code. To test with a different theme, create a new CSS file with the same variables and swap the `<link>` in the HTML fixtures.
+
+> **Note:** The user's VS Code theme may differ from the Dark+ defaults in fixtures. Visual differences between agent-browser screenshots and the real extension are expected — structure and layout should match, but accent colors may differ.
+
 **Fixture URLs:**
 
 | URL                 | Webview          | Message to inject                  |
 | ------------------- | ---------------- | ---------------------------------- |
 | `/tasks.html`       | Kanban/List view | `statusesUpdated` + `tasksUpdated` |
-| `/dashboard.html`   | Dashboard stats  | `statsUpdated`                     |
 | `/task-detail.html` | Task editor      | `taskData`                         |
 
 **Testing error/empty states:**

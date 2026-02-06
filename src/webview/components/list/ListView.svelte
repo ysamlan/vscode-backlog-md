@@ -50,8 +50,12 @@
     field: 'status',
     direction: 'asc',
   });
+  let currentLabel = $state('');
   let showingCompleted = $state(false);
   let completedRequested = $state(false);
+
+  // Get unique labels from tasks (for dropdown)
+  let allLabels = $derived([...new Set(tasks.flatMap((t) => t.labels))].sort());
 
   // Get unique milestones from tasks (for dropdown)
   let taskMilestones = $derived([...new Set(tasks.map((t) => t.milestone).filter(Boolean))] as string[]);
@@ -108,6 +112,10 @@
 
     if (currentMilestone) {
       filtered = filtered.filter((t) => t.milestone === currentMilestone);
+    }
+
+    if (currentLabel) {
+      filtered = filtered.filter((t) => t.labels.includes(currentLabel));
     }
 
     return filtered;

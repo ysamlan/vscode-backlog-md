@@ -119,7 +119,7 @@ export class BacklogParser {
    */
   async getDrafts(): Promise<Task[]> {
     const tasks = await this.getTasksFromFolder('drafts');
-    return tasks.map((t) => ({ ...t, status: 'Draft' as TaskStatus }));
+    return tasks.map((t) => ({ ...t, status: 'Draft' }));
   }
 
   /**
@@ -473,18 +473,17 @@ export class BacklogParser {
   }
 
   private parseStatus(value: string): TaskStatus {
-    const cleanValue = value.replace(/^[○◒●◑]\s*/, '').toLowerCase();
+    const cleanValue = value.replace(/^[○◒●◑]\s*/, '');
+    const lower = cleanValue.toLowerCase();
 
-    if (cleanValue.includes('done') || cleanValue.includes('complete')) {
-      return 'Done';
-    }
-    if (cleanValue.includes('progress')) {
-      return 'In Progress';
-    }
-    if (cleanValue.includes('draft')) {
-      return 'Draft';
-    }
-    return 'To Do';
+    // Normalize known statuses
+    if (lower.includes('done') || lower.includes('complete')) return 'Done';
+    if (lower.includes('progress')) return 'In Progress';
+    if (lower.includes('draft')) return 'Draft';
+    if (lower === 'to do' || lower === 'todo') return 'To Do';
+
+    // Preserve custom statuses as-is
+    return cleanValue;
   }
 
   private parsePriority(value: string): TaskPriority | undefined {

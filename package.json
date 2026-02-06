@@ -87,20 +87,7 @@
         "icon": "$(archive)"
       }
     ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "backlog.createTask",
-          "when": "view == backlog.kanban",
-          "group": "navigation@1"
-        },
-        {
-          "command": "backlog.refresh",
-          "when": "view == backlog.kanban",
-          "group": "navigation@2"
-        }
-      ]
-    },
+    "menus": {},
     "viewsContainers": {
       "activitybar": [
         {
@@ -116,11 +103,6 @@
           "type": "webview",
           "id": "backlog.kanban",
           "name": "Tasks"
-        },
-        {
-          "type": "webview",
-          "id": "backlog.dashboard",
-          "name": "Dashboard"
         }
       ]
     }

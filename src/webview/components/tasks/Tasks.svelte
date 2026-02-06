@@ -1,14 +1,13 @@
 <script lang="ts">
-  import type { Task, Milestone, TaskStatus } from '../../lib/types';
+  import type { Task, Milestone, TaskStatus, DashboardStats, TabMode } from '../../lib/types';
   import { vscode, onMessage } from '../../stores/vscode.svelte';
   import KanbanBoard from '../kanban/KanbanBoard.svelte';
   import ListView from '../list/ListView.svelte';
+  import Dashboard from '../dashboard/Dashboard.svelte';
   import TabBar from '../shared/TabBar.svelte';
   import Toast from '../shared/Toast.svelte';
   import KeyboardShortcutsPopup from '../shared/KeyboardShortcutsPopup.svelte';
   import { onMount } from 'svelte';
-
-  type TabMode = 'kanban' | 'list' | 'drafts' | 'archived';
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
 
   interface StatusColumn {
@@ -31,6 +30,9 @@
   let collapsedMilestones = $state(new Set<string>());
   let noBacklog = $state(false);
 
+  // Dashboard state
+  let dashboardStats = $state<DashboardStats | null>(null);
+
   // List view state
   let currentFilter = $state('all');
   let currentMilestone = $state('');
@@ -38,6 +40,9 @@
 
   // Toast state
   let toastMessage = $state<string | null>(null);
+
+  // Draft count for tab badge
+  let draftCount = $state(0);
 
   // Keyboard shortcuts popup state
   let showShortcuts = $state(false);
@@ -129,6 +134,14 @@
         completedTasks = message.tasks;
         break;
 
+      case 'draftCountUpdated':
+        draftCount = message.count;
+        break;
+
+      case 'statsUpdated':
+        dashboardStats = message.stats;
+        break;
+
       case 'error':
         console.error('[Tasks]', message.message);
         break;
@@ -184,6 +197,7 @@
         case 'x': handleTabChange('list'); break;
         case 'c': handleTabChange('drafts'); break;
         case 'v': handleTabChange('archived'); break;
+        case 'd': handleTabChange('dashboard'); break;
         case 'j': focusSibling('[data-task-id]', 1); break;
         case 'k': focusSibling('[data-task-id]', -1); break;
         case 'h': focusAdjacentColumn(-1); break;
@@ -316,7 +330,13 @@
   }
 </script>
 
-<TabBar {activeTab} onTabChange={handleTabChange} />
+<TabBar
+  {activeTab}
+  {draftCount}
+  onTabChange={handleTabChange}
+  onCreateTask={() => vscode.postMessage({ type: 'requestCreateTask' })}
+  onRefresh={() => vscode.postMessage({ type: 'refresh' })}
+/>
 
 {#if noBacklog}
   <div class="empty-state">
@@ -406,6 +426,10 @@
       onRestoreTask={handleRestoreTask}
       onDeleteTask={handleDeleteTask}
     />
+  </div>
+{:else if activeTab === 'dashboard'}
+  <div id="dashboard-view" class="view-content">
+    <Dashboard stats={dashboardStats} {noBacklog} />
   </div>
 {/if}
 

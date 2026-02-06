@@ -33,7 +33,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         tasks: resolve(__dirname, 'src/webview/entries/tasks.ts'),
-        dashboard: resolve(__dirname, 'src/webview/entries/dashboard.ts'),
         'task-detail': resolve(__dirname, 'src/webview/entries/task-detail.ts'),
       },
       output: {

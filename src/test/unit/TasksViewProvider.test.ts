@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import * as vscode from 'vscode';
 import { createMockExtensionContext } from '../mocks/vscode';
 import { TasksViewProvider } from '../../providers/TasksViewProvider';
 import { BacklogParser } from '../../core/BacklogParser';
+import { Task } from '../../core/types';
 
 describe('TasksViewProvider', () => {
   let extensionUri: vscode.Uri;
@@ -37,6 +38,7 @@ describe('TasksViewProvider', () => {
       getStatuses: vi.fn().mockResolvedValue(['To Do', 'In Progress', 'Done']),
       getMilestones: vi.fn().mockResolvedValue([]),
       getBlockedByThisTask: vi.fn().mockResolvedValue([]),
+      getCompletedTasks: vi.fn().mockResolvedValue([]),
     } as unknown as BacklogParser;
   });
 
@@ -495,6 +497,435 @@ describe('TasksViewProvider', () => {
         type: 'completedTasksUpdated',
         tasks: completedTasks,
       });
+    });
+  });
+
+  describe('setViewMode with dashboard', () => {
+    it('should send activeTabChanged with dashboard tab', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      provider.setViewMode('dashboard');
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'activeTabChanged',
+        tab: 'dashboard',
+      });
+    });
+
+    it('should not send viewModeChanged for dashboard mode', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      provider.setViewMode('dashboard');
+
+      expect(mockWebview.postMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'viewModeChanged' })
+      );
+    });
+
+    it('should persist dashboard mode to globalState', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.setViewMode('dashboard');
+
+      expect(mockContext.globalState.get('backlog.viewMode')).toBe('dashboard');
+    });
+
+    it('should refresh dashboard stats when switching to dashboard', async () => {
+      const tasks: Task[] = [
+        {
+          id: 'T-1',
+          title: 'Task 1',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t1.md',
+        },
+        {
+          id: 'T-2',
+          title: 'Task 2',
+          status: 'In Progress',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t2.md',
+        },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      provider.setViewMode('dashboard');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'statsUpdated',
+          stats: expect.objectContaining({
+            totalTasks: 2,
+            byStatus: expect.objectContaining({
+              'To Do': 1,
+              'In Progress': 1,
+            }),
+          }),
+        })
+      );
+    });
+  });
+
+  describe('computeStatistics (via refreshDashboard)', () => {
+    it('should compute correct counts by status', async () => {
+      const tasks: Task[] = [
+        {
+          id: 'T-1',
+          title: 'Task 1',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t1.md',
+        },
+        {
+          id: 'T-2',
+          title: 'Task 2',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t2.md',
+        },
+        {
+          id: 'T-3',
+          title: 'Task 3',
+          status: 'In Progress',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t3.md',
+        },
+        {
+          id: 'T-4',
+          title: 'Task 4',
+          status: 'Done',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t4.md',
+        },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.setViewMode('dashboard');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'statsUpdated',
+          stats: expect.objectContaining({
+            totalTasks: 4,
+            byStatus: expect.objectContaining({
+              'To Do': 2,
+              'In Progress': 1,
+              Done: 1,
+            }),
+          }),
+        })
+      );
+    });
+
+    it('should compute correct priority counts', async () => {
+      const tasks: Task[] = [
+        {
+          id: 'T-1',
+          title: 'Task 1',
+          status: 'To Do',
+          priority: 'high',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t1.md',
+        },
+        {
+          id: 'T-2',
+          title: 'Task 2',
+          status: 'To Do',
+          priority: 'medium',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t2.md',
+        },
+        {
+          id: 'T-3',
+          title: 'Task 3',
+          status: 'To Do',
+          priority: 'low',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t3.md',
+        },
+        {
+          id: 'T-4',
+          title: 'Task 4',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t4.md',
+        },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.setViewMode('dashboard');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'statsUpdated',
+          stats: expect.objectContaining({
+            byPriority: expect.objectContaining({
+              high: 1,
+              medium: 1,
+              low: 1,
+              none: 1,
+            }),
+          }),
+        })
+      );
+    });
+
+    it('should compute milestone statistics', async () => {
+      const tasks: Task[] = [
+        {
+          id: 'T-1',
+          title: 'Task 1',
+          status: 'To Do',
+          milestone: 'v1.0',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t1.md',
+        },
+        {
+          id: 'T-2',
+          title: 'Task 2',
+          status: 'Done',
+          milestone: 'v1.0',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t2.md',
+        },
+        {
+          id: 'T-3',
+          title: 'Task 3',
+          status: 'To Do',
+          milestone: 'v2.0',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t3.md',
+        },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.setViewMode('dashboard');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'statsUpdated',
+          stats: expect.objectContaining({
+            milestones: expect.arrayContaining([
+              expect.objectContaining({ name: 'v2.0', total: 1, done: 0 }),
+              expect.objectContaining({ name: 'v1.0', total: 2, done: 1 }),
+            ]),
+          }),
+        })
+      );
+    });
+
+    it('should count custom statuses in dashboard stats', async () => {
+      const baseTask = {
+        title: 'Task',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/t.md',
+      };
+
+      const tasks: Task[] = [
+        { ...baseTask, id: 'T-1', status: 'Review' },
+        { ...baseTask, id: 'T-2', status: 'Review' },
+        { ...baseTask, id: 'T-3', status: 'QA' },
+        { ...baseTask, id: 'T-4', status: 'To Do' },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.setViewMode('dashboard');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'statsUpdated',
+          stats: expect.objectContaining({
+            totalTasks: 4,
+            byStatus: expect.objectContaining({
+              Review: 2,
+              QA: 1,
+              'To Do': 1,
+            }),
+          }),
+        })
+      );
+    });
+
+    it('should include completedCount from completed folder', async () => {
+      const tasks: Task[] = [
+        {
+          id: 'T-1',
+          title: 'Task 1',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/t1.md',
+        },
+      ];
+
+      const completedTasks: Task[] = [
+        {
+          id: 'T-2',
+          title: 'Completed 1',
+          status: 'Done',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/completed/t2.md',
+          source: 'completed',
+        },
+        {
+          id: 'T-3',
+          title: 'Completed 2',
+          status: 'Done',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/completed/t3.md',
+          source: 'completed',
+        },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+      (mockParser.getCompletedTasks as Mock).mockResolvedValue(completedTasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.setViewMode('dashboard');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'statsUpdated',
+          stats: expect.objectContaining({
+            totalTasks: 1,
+            completedCount: 2,
+          }),
+        })
+      );
+    });
+  });
+
+  describe('handleMessage filterByStatus', () => {
+    it('should execute backlog.filterByStatus command', async () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({ type: 'filterByStatus', status: 'To Do' });
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+        'backlog.filterByStatus',
+        'To Do'
+      );
+    });
+
+    it('should execute backlog.filterByStatus with In Progress status', async () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({ type: 'filterByStatus', status: 'In Progress' });
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+        'backlog.filterByStatus',
+        'In Progress'
+      );
     });
   });
 });

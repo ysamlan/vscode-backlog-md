@@ -1,4 +1,9 @@
 /**
+ * Tab modes for the unified Tasks view
+ */
+export type TabMode = 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard';
+
+/**
  * Re-export core types for use in webview components
  *
  * This provides a clean import path for webview code to access

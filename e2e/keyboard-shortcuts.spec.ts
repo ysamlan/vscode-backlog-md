@@ -107,7 +107,7 @@ test.describe('Keyboard Shortcuts', () => {
       await setupTasksView(page);
     });
 
-    test('z/x/c/v keys switch views', async ({ page }) => {
+    test('z/x/c/v/d keys switch views', async ({ page }) => {
       // Start in kanban view (default)
       await expect(page.locator('#kanban-view')).toBeVisible();
 
@@ -138,6 +138,13 @@ test.describe('Keyboard Shortcuts', () => {
       await expect(page.locator('#archived-view')).toBeVisible();
       const archivedMsg = await getLastSetViewModeMessage(page);
       expect(archivedMsg).toMatchObject({ type: 'setViewMode', mode: 'archived' });
+
+      // Press d - switch to dashboard view
+      await clearPostedMessages(page);
+      await page.keyboard.press('d');
+      await expect(page.locator('#dashboard-view')).toBeVisible();
+      const dashboardMsg = await getLastSetViewModeMessage(page);
+      expect(dashboardMsg).toMatchObject({ type: 'setViewMode', mode: 'dashboard' });
     });
   });
 

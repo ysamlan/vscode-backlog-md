@@ -192,22 +192,16 @@ test.describe('Tasks View', () => {
     });
 
     test('shows kanban view by default', async ({ page }) => {
-      const kanbanView = page.locator('#kanban-view');
-      await expect(kanbanView).not.toHaveClass(/hidden/);
-
-      const listView = page.locator('#list-view');
-      await expect(listView).toHaveClass(/hidden/);
+      await expect(page.locator('#kanban-view')).toBeVisible();
+      await expect(page.locator('#list-view')).not.toBeVisible();
     });
 
     test('switches to list view when viewModeChanged message received', async ({ page }) => {
       await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'list' });
       await page.waitForTimeout(50);
 
-      const kanbanView = page.locator('#kanban-view');
-      await expect(kanbanView).toHaveClass(/hidden/);
-
-      const listView = page.locator('#list-view');
-      await expect(listView).not.toHaveClass(/hidden/);
+      await expect(page.locator('#kanban-view')).not.toBeVisible();
+      await expect(page.locator('#list-view')).toBeVisible();
     });
   });
 
@@ -397,8 +391,8 @@ test.describe('Tasks View', () => {
       await postMessageToWebview(page, { type: 'noBacklogFolder' });
       await page.waitForTimeout(50);
 
-      // Should show in kanban view (which is visible by default)
-      await expect(page.locator('#kanban-view').getByText('No Backlog Found')).toBeVisible();
+      // Should show "No Backlog Found" empty state
+      await expect(page.getByText('No Backlog Found')).toBeVisible();
     });
   });
 

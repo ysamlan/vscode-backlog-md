@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMessage, vscode } from '../../stores/vscode.svelte';
   import type { DashboardStats } from '../../lib/types';
   import StatsGrid from './StatsGrid.svelte';
   import StatusBreakdown from './StatusBreakdown.svelte';
@@ -7,31 +6,23 @@
   import MilestoneList from './MilestoneList.svelte';
   import EmptyState from './EmptyState.svelte';
 
-  type ViewState = 'loading' | 'stats' | 'no-tasks' | 'no-backlog';
+  let {
+    stats = null,
+    noBacklog = false,
+  }: {
+    stats: DashboardStats | null;
+    noBacklog?: boolean;
+  } = $props();
 
-  let viewState: ViewState = $state('loading');
-  let stats: DashboardStats | null = $state(null);
-
-  // Listen for messages from the extension
-  onMessage((message) => {
-    switch (message.type) {
-      case 'statsUpdated':
-        stats = message.stats as DashboardStats;
-        viewState = stats.totalTasks === 0 ? 'no-tasks' : 'stats';
-        break;
-      case 'noBacklogFolder':
-        viewState = 'no-backlog';
-        break;
-      case 'error':
-        console.error('[Dashboard]', message.message);
-        break;
-    }
-  });
-
-  // Request initial data on mount
-  $effect(() => {
-    vscode.postMessage({ type: 'refresh' });
-  });
+  const viewState = $derived(
+    noBacklog
+      ? 'no-backlog'
+      : stats === null
+        ? 'loading'
+        : stats.totalTasks === 0
+          ? 'no-tasks'
+          : 'stats'
+  );
 </script>
 
 <div id="dashboard-content">

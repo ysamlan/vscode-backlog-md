@@ -1,7 +1,8 @@
 /**
- * Task status values matching Backlog.md format
+ * Task status values matching Backlog.md format.
+ * Supports arbitrary custom statuses from config.yml in addition to the built-in ones.
  */
-export type TaskStatus = 'Draft' | 'To Do' | 'In Progress' | 'Done';
+export type TaskStatus = string;
 
 /**
  * Task priority levels
@@ -138,7 +139,7 @@ export type WebviewMessage =
   | { type: 'createSubtask'; parentTaskId: string }
   | { type: 'restoreTask'; taskId: string }
   | { type: 'deleteTask'; taskId: string }
-  | { type: 'setViewMode'; mode: 'kanban' | 'list' | 'drafts' | 'archived' }
+  | { type: 'setViewMode'; mode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' }
   | { type: 'requestCreateTask' };
 
 /**
@@ -166,4 +167,15 @@ export type ExtensionMessage =
   | { type: 'setFilter'; filter: string }
   | { type: 'draftsModeChanged'; enabled: boolean }
   | { type: 'completedTasksUpdated'; tasks: Task[] }
-  | { type: 'activeTabChanged'; tab: 'kanban' | 'list' | 'drafts' | 'archived' };
+  | { type: 'activeTabChanged'; tab: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' }
+  | { type: 'draftCountUpdated'; count: number }
+  | {
+      type: 'statsUpdated';
+      stats: {
+        totalTasks: number;
+        completedCount: number;
+        byStatus: Record<string, number>;
+        byPriority: Record<string, number>;
+        milestones: Array<{ name: string; total: number; done: number }>;
+      };
+    };

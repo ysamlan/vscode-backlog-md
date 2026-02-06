@@ -1,7 +1,8 @@
 /**
- * Dashboard Webview E2E Tests
+ * Dashboard Tab E2E Tests
  *
- * Tests the Dashboard Svelte component in isolation using the VS Code mock.
+ * Tests the Dashboard tab within the unified Tasks webview.
+ * Dashboard is now embedded inside the Tasks component as a 5th tab.
  */
 import { test, expect } from '@playwright/test';
 import {
@@ -15,6 +16,7 @@ import type { DashboardStats } from '../src/webview/lib/types';
 // Sample stats for testing
 const sampleStats: DashboardStats = {
   totalTasks: 10,
+  completedCount: 0,
   byStatus: {
     'To Do': 3,
     'In Progress': 4,
@@ -34,6 +36,7 @@ const sampleStats: DashboardStats = {
 
 const emptyStats: DashboardStats = {
   totalTasks: 0,
+  completedCount: 0,
   byStatus: {
     'To Do': 0,
     'In Progress': 0,
@@ -48,23 +51,35 @@ const emptyStats: DashboardStats = {
   milestones: [],
 };
 
-test.describe('Dashboard', () => {
+async function switchToDashboard(page: ReturnType<typeof test.info>['page']) {
+  await page.click('[data-testid="tab-dashboard"]');
+  await page.waitForTimeout(50);
+}
+
+test.describe('Dashboard Tab', () => {
   test.beforeEach(async ({ page }) => {
     await installVsCodeMock(page);
-    await page.goto('/dashboard.html');
+    await page.goto('/tasks.html');
+    await page.waitForTimeout(100);
+
+    // Send initial task data so view is populated
+    await postMessageToWebview(page, {
+      type: 'statusesUpdated',
+      statuses: ['To Do', 'In Progress', 'Done'],
+    });
+    await postMessageToWebview(page, { type: 'tasksUpdated', tasks: [] });
+    await page.waitForTimeout(50);
   });
 
-  test('shows loading state initially', async ({ page }) => {
-    // The component requests data on mount, so we should briefly see loading
-    // We need to be quick to catch this before the mock responds
+  test('shows loading state when switching to dashboard tab', async ({ page }) => {
+    await switchToDashboard(page);
+
+    // Dashboard shows loading until stats are received
     await expect(page.locator('.empty-state')).toContainText('Loading');
   });
 
   test('displays stats when statsUpdated message is received', async ({ page }) => {
-    // Wait for component to mount and request refresh
-    await page.waitForTimeout(100);
-
-    // Send stats to the webview
+    await switchToDashboard(page);
     await postMessageToWebview(page, { type: 'statsUpdated', stats: sampleStats });
 
     // Verify stats grid shows correct values
@@ -78,7 +93,7 @@ test.describe('Dashboard', () => {
   });
 
   test('displays status breakdown bars', async ({ page }) => {
-    await page.waitForTimeout(100);
+    await switchToDashboard(page);
     await postMessageToWebview(page, { type: 'statsUpdated', stats: sampleStats });
 
     // Verify status breakdown section exists
@@ -89,7 +104,7 @@ test.describe('Dashboard', () => {
   });
 
   test('displays priority distribution', async ({ page }) => {
-    await page.waitForTimeout(100);
+    await switchToDashboard(page);
     await postMessageToWebview(page, { type: 'statsUpdated', stats: sampleStats });
 
     // Verify priority section
@@ -101,7 +116,7 @@ test.describe('Dashboard', () => {
   });
 
   test('displays milestone progress when milestones exist', async ({ page }) => {
-    await page.waitForTimeout(100);
+    await switchToDashboard(page);
     await postMessageToWebview(page, { type: 'statsUpdated', stats: sampleStats });
 
     // Verify milestone section exists
@@ -115,7 +130,7 @@ test.describe('Dashboard', () => {
 
   test('hides milestone section when no milestones', async ({ page }) => {
     const statsNoMilestones = { ...sampleStats, milestones: [] };
-    await page.waitForTimeout(100);
+    await switchToDashboard(page);
     await postMessageToWebview(page, { type: 'statsUpdated', stats: statsNoMilestones });
 
     // Milestone section should not exist
@@ -123,23 +138,15 @@ test.describe('Dashboard', () => {
   });
 
   test('shows empty state when no tasks', async ({ page }) => {
-    await page.waitForTimeout(100);
+    await switchToDashboard(page);
     await postMessageToWebview(page, { type: 'statsUpdated', stats: emptyStats });
 
     // Should show "No Tasks Yet" empty state
     await expect(page.locator('.empty-state h3')).toHaveText('No Tasks Yet');
   });
 
-  test('shows no backlog state', async ({ page }) => {
-    await page.waitForTimeout(100);
-    await postMessageToWebview(page, { type: 'noBacklogFolder' });
-
-    // Should show "No Backlog Found" empty state
-    await expect(page.locator('.empty-state h3')).toHaveText('No Backlog Found');
-  });
-
   test('clicking stat card sends filterByStatus message', async ({ page }) => {
-    await page.waitForTimeout(100);
+    await switchToDashboard(page);
     await postMessageToWebview(page, { type: 'statsUpdated', stats: sampleStats });
     await clearPostedMessages(page);
 
@@ -152,7 +159,7 @@ test.describe('Dashboard', () => {
   });
 
   test('clicking In Progress card sends filterByStatus message', async ({ page }) => {
-    await page.waitForTimeout(100);
+    await switchToDashboard(page);
     await postMessageToWebview(page, { type: 'statsUpdated', stats: sampleStats });
     await clearPostedMessages(page);
 
@@ -163,7 +170,7 @@ test.describe('Dashboard', () => {
   });
 
   test('clicking Done card sends filterByStatus message', async ({ page }) => {
-    await page.waitForTimeout(100);
+    await switchToDashboard(page);
     await postMessageToWebview(page, { type: 'statsUpdated', stats: sampleStats });
     await clearPostedMessages(page);
 
@@ -173,11 +180,22 @@ test.describe('Dashboard', () => {
     expect(message).toEqual({ type: 'filterByStatus', status: 'Done' });
   });
 
-  test('sends refresh message on mount', async ({ page }) => {
-    // Wait for component to mount and send refresh
-    await page.waitForTimeout(200);
+  test('dashboard tab is present and clickable', async ({ page }) => {
+    const dashboardTab = page.locator('[data-testid="tab-dashboard"]');
+    await expect(dashboardTab).toBeVisible();
 
-    const message = await getLastPostedMessage(page);
-    expect(message).toEqual({ type: 'refresh' });
+    await dashboardTab.click();
+    await expect(dashboardTab).toHaveAttribute('aria-selected', 'true');
+  });
+
+  test('d key switches to dashboard view', async ({ page }) => {
+    await clearPostedMessages(page);
+    await page.keyboard.press('d');
+    await page.waitForTimeout(50);
+
+    // Dashboard tab should now be active
+    const dashboardTab = page.locator('[data-testid="tab-dashboard"]');
+    await expect(dashboardTab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#dashboard-view')).toBeVisible();
   });
 });

@@ -58,6 +58,10 @@
               <kbd>v</kbd>
               <span>Archived view</span>
             </div>
+            <div class="shortcut-row">
+              <kbd>d</kbd>
+              <span>Dashboard view</span>
+            </div>
           </div>
         </div>
 
