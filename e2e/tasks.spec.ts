@@ -382,6 +382,213 @@ test.describe('Tasks View', () => {
     });
   });
 
+  test.describe('Draft Count Badge', () => {
+    test.beforeEach(async ({ page }) => {
+      await setupTasksView(page);
+    });
+
+    test('shows draft count badge when draftCountUpdated message has count > 0', async ({
+      page,
+    }) => {
+      await postMessageToWebview(page, { type: 'draftCountUpdated', count: 3 });
+      await page.waitForTimeout(50);
+
+      // &nbsp; renders as \u00a0 in the DOM
+      const draftsTab = page.locator('[data-testid="tab-drafts"] .tab-label');
+      await expect(draftsTab).toHaveText('Drafts\u00a0(3)');
+    });
+
+    test('shows just "Drafts" without badge when count is 0', async ({ page }) => {
+      await postMessageToWebview(page, { type: 'draftCountUpdated', count: 0 });
+      await page.waitForTimeout(50);
+
+      const draftsTab = page.locator('[data-testid="tab-drafts"] .tab-label');
+      await expect(draftsTab).toHaveText('Drafts');
+    });
+
+    test('updates badge when count changes', async ({ page }) => {
+      // First set count to 5
+      await postMessageToWebview(page, { type: 'draftCountUpdated', count: 5 });
+      await page.waitForTimeout(50);
+
+      const draftsTab = page.locator('[data-testid="tab-drafts"] .tab-label');
+      await expect(draftsTab).toHaveText('Drafts\u00a0(5)');
+
+      // Now update to 2
+      await postMessageToWebview(page, { type: 'draftCountUpdated', count: 2 });
+      await page.waitForTimeout(50);
+
+      await expect(draftsTab).toHaveText('Drafts\u00a0(2)');
+    });
+
+    test('removes badge when count drops to 0', async ({ page }) => {
+      // Start with a count
+      await postMessageToWebview(page, { type: 'draftCountUpdated', count: 4 });
+      await page.waitForTimeout(50);
+
+      const draftsTab = page.locator('[data-testid="tab-drafts"] .tab-label');
+      await expect(draftsTab).toHaveText('Drafts\u00a0(4)');
+
+      // Drop to zero
+      await postMessageToWebview(page, { type: 'draftCountUpdated', count: 0 });
+      await page.waitForTimeout(50);
+
+      await expect(draftsTab).toHaveText('Drafts');
+    });
+  });
+
+  test.describe('List View - Label Filtering', () => {
+    const labeledTasks: (Task & { blocksTaskIds?: string[] })[] = [
+      {
+        id: 'TASK-L1',
+        title: 'Setup CI pipeline',
+        status: 'To Do',
+        labels: ['devops', 'infra'],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-l1.md',
+        ordinal: 1000,
+      },
+      {
+        id: 'TASK-L2',
+        title: 'Fix login bug',
+        status: 'In Progress',
+        labels: ['bug', 'ui'],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-l2.md',
+        ordinal: 2000,
+      },
+      {
+        id: 'TASK-L3',
+        title: 'Add dark mode',
+        status: 'To Do',
+        labels: ['ui', 'feature'],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-l3.md',
+        ordinal: 3000,
+      },
+      {
+        id: 'TASK-L4',
+        title: 'Write tests',
+        status: 'Done',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-l4.md',
+        ordinal: 4000,
+      },
+    ];
+
+    async function setupLabelView(page: ReturnType<typeof test.info>['page']) {
+      await installVsCodeMock(page);
+      await page.goto('/tasks.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'list' });
+      await postMessageToWebview(page, {
+        type: 'statusesUpdated',
+        statuses: ['To Do', 'In Progress', 'Done'],
+      });
+      await postMessageToWebview(page, { type: 'milestonesUpdated', milestones: [] });
+      await postMessageToWebview(page, { type: 'tasksUpdated', tasks: labeledTasks });
+      await page.waitForTimeout(100);
+    }
+
+    test('label filter dropdown populates with unique sorted labels', async ({ page }) => {
+      await setupLabelView(page);
+
+      const labelFilter = page.locator('[data-testid="label-filter"]');
+      await expect(labelFilter).toBeVisible();
+
+      // Should have "All Labels" + 5 unique labels (bug, devops, feature, infra, ui)
+      const options = labelFilter.locator('option');
+      await expect(options).toHaveCount(6);
+      await expect(options.nth(0)).toHaveText('All Labels');
+      await expect(options.nth(1)).toHaveText('bug');
+      await expect(options.nth(2)).toHaveText('devops');
+      await expect(options.nth(3)).toHaveText('feature');
+      await expect(options.nth(4)).toHaveText('infra');
+      await expect(options.nth(5)).toHaveText('ui');
+    });
+
+    test('selecting a label filters tasks correctly', async ({ page }) => {
+      await setupLabelView(page);
+
+      // All 4 tasks visible initially
+      await expect(page.locator('tbody tr')).toHaveCount(4);
+
+      // Filter by "ui" label - should show TASK-L2 and TASK-L3
+      await page.locator('[data-testid="label-filter"]').selectOption('ui');
+      await page.waitForTimeout(50);
+
+      const rows = page.locator('tbody tr');
+      await expect(rows).toHaveCount(2);
+      await expect(page.locator('[data-testid="task-row-TASK-L2"]')).toBeVisible();
+      await expect(page.locator('[data-testid="task-row-TASK-L3"]')).toBeVisible();
+    });
+
+    test('selecting "All Labels" resets the filter', async ({ page }) => {
+      await setupLabelView(page);
+
+      // Filter by "bug"
+      await page.locator('[data-testid="label-filter"]').selectOption('bug');
+      await page.waitForTimeout(50);
+      await expect(page.locator('tbody tr')).toHaveCount(1);
+
+      // Reset to all
+      await page.locator('[data-testid="label-filter"]').selectOption('');
+      await page.waitForTimeout(50);
+      await expect(page.locator('tbody tr')).toHaveCount(4);
+    });
+
+    test('label pills are visible on rows with labels', async ({ page }) => {
+      await setupLabelView(page);
+
+      // TASK-L1 should show devops and infra labels
+      const l1Labels = page.locator('[data-testid="row-labels-TASK-L1"] .task-label');
+      await expect(l1Labels).toHaveCount(2);
+      await expect(l1Labels.nth(0)).toHaveText('devops');
+      await expect(l1Labels.nth(1)).toHaveText('infra');
+
+      // TASK-L2 should show bug and ui labels
+      const l2Labels = page.locator('[data-testid="row-labels-TASK-L2"] .task-label');
+      await expect(l2Labels).toHaveCount(2);
+      await expect(l2Labels.nth(0)).toHaveText('bug');
+      await expect(l2Labels.nth(1)).toHaveText('ui');
+
+      // TASK-L4 has no labels, so row-labels should not exist
+      await expect(page.locator('[data-testid="row-labels-TASK-L4"]')).toHaveCount(0);
+    });
+
+    test('label filter dropdown is hidden when no tasks have labels', async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/tasks.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'list' });
+      await postMessageToWebview(page, {
+        type: 'statusesUpdated',
+        statuses: ['To Do', 'In Progress', 'Done'],
+      });
+      await postMessageToWebview(page, { type: 'milestonesUpdated', milestones: [] });
+      // Use sampleTasks which have no labels
+      await postMessageToWebview(page, { type: 'tasksUpdated', tasks: sampleTasks });
+      await page.waitForTimeout(100);
+
+      await expect(page.locator('[data-testid="label-filter"]')).toHaveCount(0);
+    });
+  });
+
   test.describe('No Backlog State', () => {
     test('shows no backlog message', async ({ page }) => {
       await installVsCodeMock(page);
