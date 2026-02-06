@@ -1,6 +1,10 @@
 project_name: "Test Workspace"
 default_status: "To Do"
+default_assignee: "@lead"
+default_reporter: "@pm"
+default_editor: "code"
 statuses: ["To Do", "In Progress", "Done"]
+priorities: ["high", "medium", "low"]
 labels: ["bug", "feature", "docs"]
 milestones:
   - name: "v1.0"
@@ -9,5 +13,22 @@ milestones:
     description: "Bug fixes and improvements"
   - name: "v2.0"
     description: "Major feature update"
+definition_of_done:
+  - "Code reviewed"
+  - "Tests passing"
+  - "Documentation updated"
 date_format: yyyy-mm-dd
+max_column_width: 5
+auto_open_browser: false
+default_port: 3000
+remote_operations: false
+auto_commit: false
+bypass_git_hooks: false
+check_active_branches: false
+active_branch_days: 30
 task_prefix: "task"
+task_resolution_strategy: most_recent
+zero_padded_ids: false
+timezone_preference: "UTC"
+include_date_time_in_dates: false
+on_status_change: "auto_commit"

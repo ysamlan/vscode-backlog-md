@@ -37,6 +37,7 @@ interface RawFrontmatter {
   updated_date?: string;
   updated?: string;
   ordinal?: number;
+  reporter?: string;
 }
 
 /**
@@ -153,6 +154,33 @@ export class BacklogParser {
   }
 
   /**
+   * Convert a camelCase string to snake_case
+   */
+  private camelToSnake(str: string): string {
+    return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  }
+
+  /**
+   * Normalize config object keys from camelCase to snake_case.
+   * Backlog.md supports both formats in config files.
+   */
+  private normalizeConfigKeys(raw: Record<string, unknown>): BacklogConfig {
+    const normalized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      const snakeKey = this.camelToSnake(key);
+      // Only use the snake_case version if not already set
+      if (!(snakeKey in normalized)) {
+        normalized[snakeKey] = value;
+      }
+      // Also keep the original key if it's already snake_case
+      if (key === snakeKey && !(key in normalized)) {
+        normalized[key] = value;
+      }
+    }
+    return normalized as BacklogConfig;
+  }
+
+  /**
    * Get the backlog configuration from config.yml
    */
   async getConfig(): Promise<BacklogConfig> {
@@ -168,8 +196,9 @@ export class BacklogParser {
 
     try {
       const content = fs.readFileSync(configPath, 'utf-8');
-      const config = yaml.load(content) as BacklogConfig | null;
-      return config || {};
+      const raw = yaml.load(content) as Record<string, unknown> | null;
+      if (!raw) return {};
+      return this.normalizeConfigKeys(raw);
     } catch (error) {
       console.error(`[Backlog.md Parser] Error parsing config file:`, error);
       return {};
@@ -436,10 +465,10 @@ export class BacklogParser {
       task.dependencies = this.normalizeStringArray(fm.dependencies);
     }
     if (fm.created_date || fm.created) {
-      task.createdAt = String(fm.created_date || fm.created);
+      task.createdAt = this.normalizeDateValue(fm.created_date || fm.created);
     }
     if (fm.updated_date || fm.updated) {
-      task.updatedAt = String(fm.updated_date || fm.updated);
+      task.updatedAt = this.normalizeDateValue(fm.updated_date || fm.updated);
     }
     if (fm.parent_task_id || fm.parent) {
       task.parentTaskId = String(fm.parent_task_id || fm.parent);
@@ -456,6 +485,9 @@ export class BacklogParser {
     if (fm.type) {
       task.type = String(fm.type);
     }
+    if (fm.reporter) {
+      task.reporter = String(fm.reporter);
+    }
     if (typeof fm.ordinal === 'number') {
       task.ordinal = fm.ordinal;
     }
@@ -470,6 +502,17 @@ export class BacklogParser {
       return value.map((v) => String(v).trim()).filter(Boolean);
     }
     return [String(value).trim()].filter(Boolean);
+  }
+
+  /**
+   * Normalize a date value that may be a Date object (from yaml.load)
+   * or a string into a YYYY-MM-DD format string.
+   */
+  private normalizeDateValue(value: unknown): string {
+    if (value instanceof Date) {
+      return value.toISOString().split('T')[0];
+    }
+    return String(value);
   }
 
   private parseStatus(value: string): TaskStatus {

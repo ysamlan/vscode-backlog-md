@@ -80,13 +80,22 @@ export type TaskResolutionStrategy = 'most_recent' | 'most_progressed';
 
 /**
  * Backlog.md configuration from config.yml
+ *
+ * Field names use snake_case to match the canonical YAML format.
+ * The parser normalizes camelCase variants (e.g., autoCommit -> auto_commit)
+ * so both formats work in config files.
  */
 export interface BacklogConfig {
   project_name?: string;
   default_status?: string;
+  default_assignee?: string;
+  default_reporter?: string;
+  default_editor?: string;
   statuses?: string[];
+  priorities?: string[];
   labels?: string[];
   milestones?: Milestone[];
+  definition_of_done?: string[];
   date_format?: string;
   max_column_width?: number;
   auto_open_browser?: boolean;
@@ -97,6 +106,9 @@ export interface BacklogConfig {
   check_active_branches?: boolean;
   active_branch_days?: number;
   task_prefix?: string;
+  timezone_preference?: string;
+  include_date_time_in_dates?: boolean;
+  on_status_change?: string;
 
   // Cross-branch config options (upstream compatibility)
   task_resolution_strategy?: TaskResolutionStrategy;
