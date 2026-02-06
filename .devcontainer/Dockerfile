@@ -3,6 +3,9 @@
 # https://github.com/redhat-developer/vscode-extension-tester/issues/506
 FROM mcr.microsoft.com/devcontainers/javascript-node:22
 
+ARG TZ
+ENV TZ="$TZ"
+
 ARG CLAUDE_CODE_VERSION=latest
 
 # Install additional development tools and Electron/VS Code dependencies
@@ -110,7 +113,7 @@ ENV UV_PROJECT_ENVIRONMENT=.venv_devcontainer
 ENV UV_LINK_MODE=copy
 
 # Default powerline10k theme
-ARG ZSH_IN_DOCKER_VERSION=1.2.0
+ARG ZSH_IN_DOCKER_VERSION=1.2.1
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
     -p git \
     -p fzf \

@@ -3,7 +3,10 @@
   "build": {
     "dockerfile": "Dockerfile",
     // amd64 required for vscode-extension-tester support
-    "options": ["--platform=linux/amd64"]
+    "options": ["--platform=linux/amd64"],
+    "args": {
+      "TZ": "${localEnv:TZ:America/New_York}"
+    }
   },
   "postCreateCommand": "mise trust --yes && mise install --yes && bun install",
   "customizations": {
@@ -48,6 +51,5 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  // "postStartCommand": "git config core.hooksPath .githooks",
   "waitFor": "postStartCommand"
 }
