@@ -21,7 +21,6 @@ export class TasksViewProvider extends BaseViewProvider {
   private dataSourceReason?: string;
   private collapsedColumns: Set<string> = new Set();
   private collapsedMilestones: Set<string> = new Set();
-  private showingDrafts: boolean = false;
 
   protected get viewType(): string {
     return 'backlog.kanban';
@@ -39,7 +38,6 @@ export class TasksViewProvider extends BaseViewProvider {
       this.viewMode = legacyDrafts
         ? 'drafts'
         : this.context.globalState.get('backlog.viewMode', 'kanban');
-      this.showingDrafts = this.viewMode === 'drafts';
       this.milestoneGrouping = this.context.globalState.get('backlog.milestoneGrouping', false);
       const savedCollapsed = this.context.globalState.get<string[]>('backlog.collapsedColumns', []);
       this.collapsedColumns = new Set(savedCollapsed);
@@ -90,7 +88,7 @@ export class TasksViewProvider extends BaseViewProvider {
       let taskLoader: Promise<Task[]>;
       if (this.viewMode === 'archived') {
         taskLoader = this.parser.getArchivedTasks();
-      } else if (this.showingDrafts) {
+      } else if (this.viewMode === 'drafts') {
         taskLoader = this.parser.getDrafts();
       } else if (this.dataSourceMode === 'cross-branch') {
         taskLoader = this.parser.getTasksWithCrossBranch();
@@ -132,7 +130,10 @@ export class TasksViewProvider extends BaseViewProvider {
       // Send initial state along with data
       this.postMessage({ type: 'activeTabChanged', tab: this.viewMode });
       // Backward compatibility: also send legacy messages
-      this.postMessage({ type: 'draftsModeChanged', enabled: this.showingDrafts });
+      this.postMessage({
+        type: 'draftsModeChanged',
+        enabled: this.viewMode === 'drafts',
+      });
       this.postMessage({
         type: 'viewModeChanged',
         viewMode:
@@ -436,14 +437,11 @@ export class TasksViewProvider extends BaseViewProvider {
    */
   setViewMode(mode: 'kanban' | 'list' | 'drafts' | 'archived'): void {
     if (this.viewMode === mode) return;
-    const wasArchived = this.viewMode === 'archived';
+    const previousMode = this.viewMode;
     this.viewMode = mode;
 
     const isDrafts = mode === 'drafts';
     const isArchived = mode === 'archived';
-    const draftsChanged = this.showingDrafts !== isDrafts;
-    const archivedChanged = wasArchived !== isArchived;
-    this.showingDrafts = isDrafts;
 
     if (this.context) {
       this.context.globalState.update('backlog.viewMode', mode);
@@ -460,7 +458,9 @@ export class TasksViewProvider extends BaseViewProvider {
     });
 
     // Refresh to load correct task set when switching to/from drafts or archived
-    if (draftsChanged || archivedChanged) {
+    const needsRefresh =
+      isDrafts || isArchived || previousMode === 'drafts' || previousMode === 'archived';
+    if (needsRefresh) {
       this.refresh();
     }
   }

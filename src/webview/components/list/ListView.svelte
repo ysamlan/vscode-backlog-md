@@ -211,13 +211,11 @@
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onOpenTask(taskId);
-    }
-    if (e.key === 'ArrowDown') {
+    } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       const next = (e.target as HTMLElement).nextElementSibling as HTMLElement;
       if (next?.dataset.taskId) next.focus();
-    }
-    if (e.key === 'ArrowUp') {
+    } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const prev = (e.target as HTMLElement).previousElementSibling as HTMLElement;
       if (prev?.dataset.taskId) prev.focus();
@@ -326,14 +324,10 @@
   }
 
   function handleCompletedFilter() {
-    if (showingCompleted) {
-      showingCompleted = false;
-    } else {
-      showingCompleted = true;
-      if (!completedRequested && onRequestCompletedTasks) {
-        completedRequested = true;
-        onRequestCompletedTasks();
-      }
+    showingCompleted = !showingCompleted;
+    if (showingCompleted && !completedRequested && onRequestCompletedTasks) {
+      completedRequested = true;
+      onRequestCompletedTasks();
     }
   }
 

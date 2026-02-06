@@ -135,43 +135,25 @@
     }
   });
 
-  function focusNextTask() {
-    const rows = Array.from(document.querySelectorAll('[data-task-id]')) as HTMLElement[];
-    if (rows.length === 0) return;
+  function focusSibling(selector: string, direction: 1 | -1) {
+    const elements = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
+    if (elements.length === 0) return;
     const focused = document.activeElement as HTMLElement;
-    const currentIndex = rows.indexOf(focused);
-    const next = rows[currentIndex + 1] ?? rows[0];
-    next?.focus();
+    const currentIndex = elements.indexOf(focused);
+    const nextIndex = currentIndex + direction;
+    const target = elements[nextIndex] ?? elements[direction === 1 ? 0 : elements.length - 1];
+    target?.focus();
   }
 
-  function focusPrevTask() {
-    const rows = Array.from(document.querySelectorAll('[data-task-id]')) as HTMLElement[];
-    if (rows.length === 0) return;
-    const focused = document.activeElement as HTMLElement;
-    const currentIndex = rows.indexOf(focused);
-    const prev = rows[currentIndex - 1] ?? rows[rows.length - 1];
-    prev?.focus();
-  }
-
-  function focusNextColumn() {
+  function focusAdjacentColumn(direction: 1 | -1) {
     const cols = Array.from(document.querySelectorAll('.kanban-column')) as HTMLElement[];
     if (cols.length === 0) return;
     const focused = document.activeElement as HTMLElement;
     const currentCol = focused?.closest('.kanban-column') as HTMLElement;
     const currentIndex = currentCol ? cols.indexOf(currentCol) : -1;
-    const nextCol = cols[currentIndex + 1] ?? cols[0];
-    const firstCard = nextCol?.querySelector('[data-task-id]') as HTMLElement;
-    firstCard?.focus();
-  }
-
-  function focusPrevColumn() {
-    const cols = Array.from(document.querySelectorAll('.kanban-column')) as HTMLElement[];
-    if (cols.length === 0) return;
-    const focused = document.activeElement as HTMLElement;
-    const currentCol = focused?.closest('.kanban-column') as HTMLElement;
-    const currentIndex = currentCol ? cols.indexOf(currentCol) : -1;
-    const prevCol = cols[currentIndex - 1] ?? cols[cols.length - 1];
-    const firstCard = prevCol?.querySelector('[data-task-id]') as HTMLElement;
+    const nextIndex = currentIndex + direction;
+    const targetCol = cols[nextIndex] ?? cols[direction === 1 ? 0 : cols.length - 1];
+    const firstCard = targetCol?.querySelector('[data-task-id]') as HTMLElement;
     firstCard?.focus();
   }
 
@@ -184,52 +166,36 @@
         return;
       }
 
+      if (e.key === 'Escape') {
+        showShortcuts = false;
+        return;
+      }
+
+      if (e.key === '?') {
+        showShortcuts = !showShortcuts;
+        return;
+      }
+
+      // All other shortcuts are suppressed while the popup is open
+      if (showShortcuts) return;
+
       switch (e.key) {
-        case '?':
-          showShortcuts = !showShortcuts;
+        case 'z': handleTabChange('kanban'); break;
+        case 'x': handleTabChange('list'); break;
+        case 'c': handleTabChange('drafts'); break;
+        case 'v': handleTabChange('archived'); break;
+        case 'j': focusSibling('[data-task-id]', 1); break;
+        case 'k': focusSibling('[data-task-id]', -1); break;
+        case 'h': focusAdjacentColumn(-1); break;
+        case 'l': focusAdjacentColumn(1); break;
+        case 'n': vscode.postMessage({ type: 'requestCreateTask' }); break;
+        case 'r': vscode.postMessage({ type: 'refresh' }); break;
+        case '/': {
+          e.preventDefault();
+          const searchInput = document.querySelector('[data-testid="search-input"]') as HTMLInputElement;
+          searchInput?.focus();
           break;
-        case 'z':
-          if (!showShortcuts) handleTabChange('kanban');
-          break;
-        case 'x':
-          if (!showShortcuts) handleTabChange('list');
-          break;
-        case 'c':
-          if (!showShortcuts) handleTabChange('drafts');
-          break;
-        case 'v':
-          if (!showShortcuts) handleTabChange('archived');
-          break;
-        case 'j':
-          if (!showShortcuts) focusNextTask();
-          break;
-        case 'k':
-          if (!showShortcuts) focusPrevTask();
-          break;
-        case 'h':
-          if (!showShortcuts) focusPrevColumn();
-          break;
-        case 'l':
-          if (!showShortcuts) focusNextColumn();
-          break;
-        case 'n':
-          if (!showShortcuts) vscode.postMessage({ type: 'requestCreateTask' });
-          break;
-        case 'r':
-          if (!showShortcuts) vscode.postMessage({ type: 'refresh' });
-          break;
-        case '/':
-          if (!showShortcuts) {
-            e.preventDefault();
-            const searchInput = document.querySelector('[data-testid="search-input"]') as HTMLInputElement;
-            if (searchInput) {
-              searchInput.focus();
-            }
-          }
-          break;
-        case 'Escape':
-          showShortcuts = false;
-          break;
+        }
       }
     }
 
