@@ -80,6 +80,11 @@
         "command": "backlog.showDraftsView",
         "title": "Switch to Drafts View",
         "icon": "$(edit)"
+      },
+      {
+        "command": "backlog.showArchivedView",
+        "title": "Switch to Archived View",
+        "icon": "$(archive)"
       }
     ],
     "menus": {
@@ -90,24 +95,9 @@
           "group": "navigation@1"
         },
         {
-          "command": "backlog.showListView",
-          "when": "view == backlog.kanban && backlog.viewMode != 'list'",
-          "group": "navigation@2"
-        },
-        {
-          "command": "backlog.showKanbanView",
-          "when": "view == backlog.kanban && backlog.viewMode != 'kanban'",
-          "group": "navigation@3"
-        },
-        {
-          "command": "backlog.showDraftsView",
-          "when": "view == backlog.kanban && backlog.viewMode != 'drafts'",
-          "group": "navigation@4"
-        },
-        {
           "command": "backlog.refresh",
           "when": "view == backlog.kanban",
-          "group": "navigation@5"
+          "group": "navigation@2"
         }
       ]
     },

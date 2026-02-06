@@ -109,11 +109,21 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.showArchivedView', () => {
+      tasksProvider.setViewMode('archived');
+      vscode.commands.executeCommand('setContext', 'backlog.viewMode', 'archived');
+    })
+  );
+
   // Initialize context for view mode: derive from saved state
   const savedDraftsMode = context.globalState.get<boolean>('backlog.showingDrafts', false);
   const savedViewMode = savedDraftsMode
     ? 'drafts'
-    : context.globalState.get<'kanban' | 'list' | 'drafts'>('backlog.viewMode', 'kanban');
+    : context.globalState.get<'kanban' | 'list' | 'drafts' | 'archived'>(
+        'backlog.viewMode',
+        'kanban'
+      );
   vscode.commands.executeCommand('setContext', 'backlog.viewMode', savedViewMode);
 
   // Register filter by status command (used by dashboard clickable cards)

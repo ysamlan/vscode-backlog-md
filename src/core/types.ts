@@ -25,7 +25,7 @@ export type TaskSource = 'local' | 'remote' | 'completed' | 'local-branch';
 /**
  * Which folder a task lives in within the backlog directory
  */
-export type TaskFolder = 'tasks' | 'drafts' | 'completed';
+export type TaskFolder = 'tasks' | 'drafts' | 'completed' | 'archive';
 
 /**
  * Represents a Backlog.md task
@@ -135,7 +135,11 @@ export type WebviewMessage =
   | { type: 'promoteDraft'; taskId: string }
   | { type: 'discardDraft'; taskId: string }
   | { type: 'requestCompletedTasks' }
-  | { type: 'createSubtask'; parentTaskId: string };
+  | { type: 'createSubtask'; parentTaskId: string }
+  | { type: 'restoreTask'; taskId: string }
+  | { type: 'deleteTask'; taskId: string }
+  | { type: 'setViewMode'; mode: 'kanban' | 'list' | 'drafts' | 'archived' }
+  | { type: 'requestCreateTask' };
 
 /**
  * Data source mode for task viewing
@@ -161,4 +165,5 @@ export type ExtensionMessage =
   | { type: 'milestoneCollapseChanged'; collapsedMilestones: string[] }
   | { type: 'setFilter'; filter: string }
   | { type: 'draftsModeChanged'; enabled: boolean }
-  | { type: 'completedTasksUpdated'; tasks: Task[] };
+  | { type: 'completedTasksUpdated'; tasks: Task[] }
+  | { type: 'activeTabChanged'; tab: 'kanban' | 'list' | 'drafts' | 'archived' };

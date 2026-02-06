@@ -15,7 +15,7 @@ import { computeSubtasks } from '../core/BacklogParser';
  * - Persisting view preferences (viewMode, milestoneGrouping, collapsed columns)
  */
 export class TasksViewProvider extends BaseViewProvider {
-  private viewMode: 'kanban' | 'list' | 'drafts' = 'kanban';
+  private viewMode: 'kanban' | 'list' | 'drafts' | 'archived' = 'kanban';
   private milestoneGrouping: boolean = false;
   private dataSourceMode: DataSourceMode = 'local-only';
   private dataSourceReason?: string;
@@ -88,7 +88,9 @@ export class TasksViewProvider extends BaseViewProvider {
     try {
       // Determine which tasks to load based on mode
       let taskLoader: Promise<Task[]>;
-      if (this.showingDrafts) {
+      if (this.viewMode === 'archived') {
+        taskLoader = this.parser.getArchivedTasks();
+      } else if (this.showingDrafts) {
         taskLoader = this.parser.getDrafts();
       } else if (this.dataSourceMode === 'cross-branch') {
         taskLoader = this.parser.getTasksWithCrossBranch();
@@ -127,11 +129,14 @@ export class TasksViewProvider extends BaseViewProvider {
         })
       );
 
-      // Send initial state along with data (drafts uses list layout)
+      // Send initial state along with data
+      this.postMessage({ type: 'activeTabChanged', tab: this.viewMode });
+      // Backward compatibility: also send legacy messages
       this.postMessage({ type: 'draftsModeChanged', enabled: this.showingDrafts });
       this.postMessage({
         type: 'viewModeChanged',
-        viewMode: this.viewMode === 'drafts' ? 'list' : this.viewMode,
+        viewMode:
+          this.viewMode === 'drafts' || this.viewMode === 'archived' ? 'list' : this.viewMode,
       });
       this.postMessage({
         type: 'columnCollapseChanged',
@@ -291,6 +296,39 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
       }
 
+      case 'restoreTask': {
+        if (!this.parser || !message.taskId) break;
+        try {
+          const writer = new BacklogWriter();
+          await writer.restoreArchivedTask(message.taskId, this.parser);
+          await this.refresh();
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to restore task: ${error}`);
+        }
+        break;
+      }
+
+      case 'deleteTask': {
+        if (!this.parser || !message.taskId) break;
+        const taskToDelete = await this.parser.getTask(message.taskId);
+        const deleteConfirmation = await vscode.window.showWarningMessage(
+          `Permanently delete task "${taskToDelete?.title}"? This cannot be undone.`,
+          { modal: true },
+          'Delete'
+        );
+
+        if (deleteConfirmation === 'Delete') {
+          try {
+            const writer = new BacklogWriter();
+            await writer.deleteTask(message.taskId, this.parser);
+            await this.refresh();
+          } catch (error) {
+            vscode.window.showErrorMessage(`Failed to delete task: ${error}`);
+          }
+        }
+        break;
+      }
+
       case 'requestCompletedTasks': {
         if (!this.parser) break;
         try {
@@ -300,6 +338,16 @@ export class TasksViewProvider extends BaseViewProvider {
           console.error('[Backlog.md] Error loading completed tasks:', error);
           this.postMessage({ type: 'error', message: 'Failed to load completed tasks' });
         }
+        break;
+      }
+
+      case 'setViewMode': {
+        this.setViewMode(message.mode);
+        break;
+      }
+
+      case 'requestCreateTask': {
+        vscode.commands.executeCommand('backlog.createTask');
         break;
       }
 
@@ -386,12 +434,15 @@ export class TasksViewProvider extends BaseViewProvider {
    * Set the view mode (kanban, list, or drafts) from external command.
    * Drafts mode is treated as a special list view showing draft tasks.
    */
-  setViewMode(mode: 'kanban' | 'list' | 'drafts'): void {
+  setViewMode(mode: 'kanban' | 'list' | 'drafts' | 'archived'): void {
     if (this.viewMode === mode) return;
+    const wasArchived = this.viewMode === 'archived';
     this.viewMode = mode;
 
     const isDrafts = mode === 'drafts';
+    const isArchived = mode === 'archived';
     const draftsChanged = this.showingDrafts !== isDrafts;
+    const archivedChanged = wasArchived !== isArchived;
     this.showingDrafts = isDrafts;
 
     if (this.context) {
@@ -399,12 +450,17 @@ export class TasksViewProvider extends BaseViewProvider {
       this.context.globalState.update('backlog.showingDrafts', isDrafts);
     }
 
-    // Drafts view uses list layout
+    // Send unified tab message
+    this.postMessage({ type: 'activeTabChanged', tab: mode });
+    // Backward compatibility: also send legacy messages
     this.postMessage({ type: 'draftsModeChanged', enabled: isDrafts });
-    this.postMessage({ type: 'viewModeChanged', viewMode: isDrafts ? 'list' : mode });
+    this.postMessage({
+      type: 'viewModeChanged',
+      viewMode: isDrafts || isArchived ? 'list' : mode,
+    });
 
-    // Refresh to load correct task set when switching to/from drafts
-    if (draftsChanged) {
+    // Refresh to load correct task set when switching to/from drafts or archived
+    if (draftsChanged || archivedChanged) {
       this.refresh();
     }
   }
