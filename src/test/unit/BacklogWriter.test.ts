@@ -433,6 +433,25 @@ Old description
       expect(writtenContent).toContain('id: ISSUE-1');
     });
 
+    it('should return uppercase ID regardless of config prefix case', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ task_prefix: 'task' }),
+      } as unknown as BacklogParser;
+
+      const result = await writer.createTask(
+        '/fake/backlog',
+        { title: 'Test Task' },
+        mockParserWithConfig
+      );
+
+      expect(result.id).toBe('TASK-1');
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('id: TASK-1');
+    });
+
     it('should fallback to TASK prefix when config has no task_prefix', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       mockReaddirSync([]);
@@ -1226,6 +1245,133 @@ status: Draft
       await writer.promoteDraft('DRAFT-1', mockParser);
 
       expect(fs.mkdirSync).toHaveBeenCalledWith('/fake/backlog/tasks', { recursive: true });
+    });
+  });
+
+  describe('createDraft', () => {
+    it('should create a draft file in drafts/ folder', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createDraft('/fake/backlog');
+
+      expect(result.id).toBe('DRAFT-1');
+      expect(result.filePath).toContain('drafts');
+      expect(result.filePath).toContain('draft-1 - Untitled.md');
+      expect(fs.writeFileSync).toHaveBeenCalled();
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      expect(match).toBeTruthy();
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.id).toBe('DRAFT-1');
+      expect(frontmatter.title).toBe('Untitled');
+      expect(frontmatter.status).toBe('Draft');
+    });
+
+    it('should generate sequential draft IDs', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['draft-1 - Untitled.md', 'draft-3 - Some-Draft.md']);
+
+      const result = await writer.createDraft('/fake/backlog');
+
+      expect(result.id).toBe('DRAFT-4');
+      expect(result.filePath).toContain('draft-4 - Untitled.md');
+    });
+
+    it('should return uppercase ID', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createDraft('/fake/backlog');
+
+      expect(result.id).toBe('DRAFT-1');
+      expect(result.id).toMatch(/^DRAFT-\d+$/);
+    });
+
+    it('should create drafts directory if missing', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      mockReaddirSync([]);
+
+      await writer.createDraft('/fake/backlog');
+
+      expect(fs.mkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining('drafts'),
+        expect.objectContaining({ recursive: true })
+      );
+    });
+  });
+
+  describe('createSubtask', () => {
+    it('should create subtask with dot-notation ID', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createSubtask('TASK-2', '/fake/backlog', mockParser);
+
+      expect(result.id).toBe('TASK-2.1');
+      expect(result.filePath).toContain('task-2.1 - Untitled.md');
+      expect(fs.writeFileSync).toHaveBeenCalled();
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      expect(match).toBeTruthy();
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.id).toBe('TASK-2.1');
+      expect(frontmatter.title).toBe('Untitled');
+      expect(frontmatter.status).toBe('To Do');
+      expect(frontmatter.parent_task_id).toBe('TASK-2');
+    });
+
+    it('should find next sub-number with existing subtasks', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['task-2 - Parent.md', 'task-2.1 - First-Sub.md', 'task-2.3 - Third-Sub.md']);
+
+      const result = await writer.createSubtask('TASK-2', '/fake/backlog', mockParser);
+
+      // Should be 2.4 (next after max existing = 3), not 2.2 (filling gap)
+      expect(result.id).toBe('TASK-2.4');
+      expect(result.filePath).toContain('task-2.4 - Untitled.md');
+    });
+
+    it('should handle parent IDs with large numbers', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createSubtask('TASK-100', '/fake/backlog', mockParser);
+
+      expect(result.id).toBe('TASK-100.1');
+      expect(result.filePath).toContain('task-100.1 - Untitled.md');
+    });
+
+    it('should create tasks directory if missing', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      mockReaddirSync([]);
+
+      await writer.createSubtask('TASK-1', '/fake/backlog', mockParser);
+
+      expect(fs.mkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining('tasks'),
+        expect.objectContaining({ recursive: true })
+      );
+    });
+
+    it('should throw error if parent ID has no numeric part', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      await expect(writer.createSubtask('INVALID', '/fake/backlog', mockParser)).rejects.toThrow(
+        'Cannot extract numeric ID'
+      );
+    });
+
+    it('should use correct prefix from parent ID', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createSubtask('ISSUE-5', '/fake/backlog', mockParser);
+
+      expect(result.id).toBe('ISSUE-5.1');
     });
   });
 

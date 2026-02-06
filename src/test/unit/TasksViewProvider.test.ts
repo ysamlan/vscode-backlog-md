@@ -173,8 +173,8 @@ describe('TasksViewProvider', () => {
     });
   });
 
-  describe('setDraftsMode', () => {
-    it('should post draftsModeChanged message when enabled', () => {
+  describe('setViewMode with drafts', () => {
+    it('should send draftsModeChanged and viewModeChanged when switching to drafts', () => {
       const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
 
       provider.resolveWebviewView(
@@ -186,15 +186,21 @@ describe('TasksViewProvider', () => {
         } as vscode.CancellationToken
       );
 
-      provider.setDraftsMode(true);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      provider.setViewMode('drafts');
 
       expect(mockWebview.postMessage).toHaveBeenCalledWith({
         type: 'draftsModeChanged',
         enabled: true,
       });
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'viewModeChanged',
+        viewMode: 'list',
+      });
     });
 
-    it('should post draftsModeChanged message when disabled', () => {
+    it('should disable drafts mode when switching from drafts to kanban', () => {
       const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
 
       provider.resolveWebviewView(
@@ -206,12 +212,71 @@ describe('TasksViewProvider', () => {
         } as vscode.CancellationToken
       );
 
-      provider.setDraftsMode(false);
+      // First switch to drafts
+      provider.setViewMode('drafts');
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      // Then switch to kanban
+      provider.setViewMode('kanban');
 
       expect(mockWebview.postMessage).toHaveBeenCalledWith({
         type: 'draftsModeChanged',
         enabled: false,
       });
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'viewModeChanged',
+        viewMode: 'kanban',
+      });
+    });
+
+    it('should disable drafts mode when switching from drafts to list', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+
+      provider.resolveWebviewView(
+        mockWebviewView as vscode.WebviewView,
+        {} as vscode.WebviewViewResolveContext,
+        {
+          isCancellationRequested: false,
+          onCancellationRequested: vi.fn(),
+        } as vscode.CancellationToken
+      );
+
+      // First switch to drafts
+      provider.setViewMode('drafts');
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      // Then switch to list
+      provider.setViewMode('list');
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'draftsModeChanged',
+        enabled: false,
+      });
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'viewModeChanged',
+        viewMode: 'list',
+      });
+    });
+
+    it('should not send messages when setting same mode', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+
+      provider.resolveWebviewView(
+        mockWebviewView as vscode.WebviewView,
+        {} as vscode.WebviewViewResolveContext,
+        {
+          isCancellationRequested: false,
+          onCancellationRequested: vi.fn(),
+        } as vscode.CancellationToken
+      );
+
+      provider.setViewMode('drafts');
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      // Setting drafts again should be a no-op
+      provider.setViewMode('drafts');
+
+      expect(mockWebview.postMessage).not.toHaveBeenCalled();
     });
   });
 

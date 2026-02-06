@@ -5,6 +5,8 @@ priority: high
 milestone: v1.0
 labels: [feature]
 created: 2026-02-01
+updated_date: 2026-02-06
+ordinal: 1000
 ---
 
 # Implement user authentication

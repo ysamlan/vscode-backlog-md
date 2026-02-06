@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { BaseViewProvider } from './BaseViewProvider';
 import { WebviewMessage, DataSourceMode, Task } from '../core/types';
 import { BacklogWriter } from '../core/BacklogWriter';
+import { computeSubtasks } from '../core/BacklogParser';
 
 /**
  * Provides a unified tasks webview with toggle between Kanban and List views
@@ -14,7 +15,7 @@ import { BacklogWriter } from '../core/BacklogWriter';
  * - Persisting view preferences (viewMode, milestoneGrouping, collapsed columns)
  */
 export class TasksViewProvider extends BaseViewProvider {
-  private viewMode: 'kanban' | 'list' = 'kanban';
+  private viewMode: 'kanban' | 'list' | 'drafts' = 'kanban';
   private milestoneGrouping: boolean = false;
   private dataSourceMode: DataSourceMode = 'local-only';
   private dataSourceReason?: string;
@@ -33,7 +34,12 @@ export class TasksViewProvider extends BaseViewProvider {
   ): void | Thenable<void> {
     // Load saved view mode, milestone grouping, and collapsed columns from globalState
     if (this.context) {
-      this.viewMode = this.context.globalState.get('backlog.viewMode', 'kanban');
+      // Derive from saved state: check legacy showingDrafts flag for migration
+      const legacyDrafts = this.context.globalState.get<boolean>('backlog.showingDrafts', false);
+      this.viewMode = legacyDrafts
+        ? 'drafts'
+        : this.context.globalState.get('backlog.viewMode', 'kanban');
+      this.showingDrafts = this.viewMode === 'drafts';
       this.milestoneGrouping = this.context.globalState.get('backlog.milestoneGrouping', false);
       const savedCollapsed = this.context.globalState.get<string[]>('backlog.collapsedColumns', []);
       this.collapsedColumns = new Set(savedCollapsed);
@@ -42,7 +48,6 @@ export class TasksViewProvider extends BaseViewProvider {
         []
       );
       this.collapsedMilestones = new Set(savedCollapsedMilestones);
-      this.showingDrafts = this.context.globalState.get('backlog.showingDrafts', false);
     }
     return super.resolveWebviewView(webviewView, resolveContext, token);
   }
@@ -97,17 +102,37 @@ export class TasksViewProvider extends BaseViewProvider {
         this.parser.getMilestones(),
       ]);
 
-      // Compute reverse dependencies (blocksTaskIds) for each task
+      // Compute subtask relationships from parentTaskId fields
+      computeSubtasks(tasks);
+
+      // Compute reverse dependencies (blocksTaskIds) and subtask progress for each task
       const tasksWithBlocks = await Promise.all(
-        tasks.map(async (task) => ({
-          ...task,
-          blocksTaskIds: await this.parser!.getBlockedByThisTask(task.id),
-        }))
+        tasks.map(async (task) => {
+          const enhanced: Task & {
+            blocksTaskIds?: string[];
+            subtaskProgress?: { total: number; done: number };
+          } = {
+            ...task,
+            blocksTaskIds: await this.parser!.getBlockedByThisTask(task.id),
+          };
+          if (task.subtasks && task.subtasks.length > 0) {
+            const total = task.subtasks.length;
+            const done = task.subtasks.filter((childId) => {
+              const child = tasks.find((t) => t.id === childId);
+              return child?.status === 'Done';
+            }).length;
+            enhanced.subtaskProgress = { total, done };
+          }
+          return enhanced;
+        })
       );
 
-      // Send initial state along with data
+      // Send initial state along with data (drafts uses list layout)
       this.postMessage({ type: 'draftsModeChanged', enabled: this.showingDrafts });
-      this.postMessage({ type: 'viewModeChanged', viewMode: this.viewMode });
+      this.postMessage({
+        type: 'viewModeChanged',
+        viewMode: this.viewMode === 'drafts' ? 'list' : this.viewMode,
+      });
       this.postMessage({
         type: 'columnCollapseChanged',
         collapsedColumns: Array.from(this.collapsedColumns),
@@ -358,15 +383,30 @@ export class TasksViewProvider extends BaseViewProvider {
   }
 
   /**
-   * Set the view mode (kanban or list) from external command
+   * Set the view mode (kanban, list, or drafts) from external command.
+   * Drafts mode is treated as a special list view showing draft tasks.
    */
-  setViewMode(mode: 'kanban' | 'list'): void {
+  setViewMode(mode: 'kanban' | 'list' | 'drafts'): void {
     if (this.viewMode === mode) return;
     this.viewMode = mode;
+
+    const isDrafts = mode === 'drafts';
+    const draftsChanged = this.showingDrafts !== isDrafts;
+    this.showingDrafts = isDrafts;
+
     if (this.context) {
       this.context.globalState.update('backlog.viewMode', mode);
+      this.context.globalState.update('backlog.showingDrafts', isDrafts);
     }
-    this.postMessage({ type: 'viewModeChanged', viewMode: mode });
+
+    // Drafts view uses list layout
+    this.postMessage({ type: 'draftsModeChanged', enabled: isDrafts });
+    this.postMessage({ type: 'viewModeChanged', viewMode: isDrafts ? 'list' : mode });
+
+    // Refresh to load correct task set when switching to/from drafts
+    if (draftsChanged) {
+      this.refresh();
+    }
   }
 
   /**
@@ -374,17 +414,5 @@ export class TasksViewProvider extends BaseViewProvider {
    */
   setFilter(filter: string): void {
     this.postMessage({ type: 'setFilter', filter });
-  }
-
-  /**
-   * Toggle drafts mode: shows draft tasks in list view
-   */
-  setDraftsMode(enabled: boolean): void {
-    this.showingDrafts = enabled;
-    if (this.context) {
-      this.context.globalState.update('backlog.showingDrafts', enabled);
-    }
-    this.postMessage({ type: 'draftsModeChanged', enabled });
-    this.refresh();
   }
 }

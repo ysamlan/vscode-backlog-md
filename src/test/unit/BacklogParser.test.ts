@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { BacklogParser } from '../../core/BacklogParser';
+import { BacklogParser, computeSubtasks } from '../../core/BacklogParser';
+import type { Task } from '../../core/types';
 import * as fs from 'fs';
 
 vi.mock('fs', async () => {
@@ -1346,6 +1347,186 @@ status: To Do
         const task = parser.parseTaskContent(content, '/fake/path/task-42 - Regular.md');
         expect(task?.id).toBe('TASK-42');
       });
+    });
+  });
+
+  describe('Parent-child task parsing', () => {
+    it('should parse parent_task_id from frontmatter', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-2.1
+title: Subtask
+status: To Do
+parent_task_id: TASK-2
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-2.1.md');
+      expect(task?.parentTaskId).toBe('TASK-2');
+    });
+
+    it('should parse parent field as alias for parent_task_id', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-3.1
+title: Subtask with parent alias
+status: To Do
+parent: TASK-3
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-3.1.md');
+      expect(task?.parentTaskId).toBe('TASK-3');
+    });
+
+    it('should parse subtasks array from frontmatter', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-2
+title: Parent Task
+status: In Progress
+subtasks: [TASK-2.1, TASK-2.2]
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-2.md');
+      expect(task?.subtasks).toEqual(['TASK-2.1', 'TASK-2.2']);
+    });
+
+    it('should parse subtasks as multi-line array', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-2
+title: Parent Task
+status: In Progress
+subtasks:
+  - TASK-2.1
+  - TASK-2.2
+  - TASK-2.3
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-2.md');
+      expect(task?.subtasks).toEqual(['TASK-2.1', 'TASK-2.2', 'TASK-2.3']);
+    });
+
+    it('should handle subtasks as single string', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-2
+title: Parent Task
+status: In Progress
+subtasks: TASK-2.1
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-2.md');
+      expect(task?.subtasks).toEqual(['TASK-2.1']);
+    });
+
+    it('should not have subtasks when field is absent', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Regular Task
+status: To Do
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.subtasks).toBeUndefined();
+    });
+  });
+
+  describe('computeSubtasks', () => {
+    function makeTask(overrides: Partial<Task>): Task {
+      return {
+        id: 'TASK-1',
+        title: 'Test',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/fake/path/task.md',
+        ...overrides,
+      };
+    }
+
+    it('should populate subtasks on parent from child parentTaskId', () => {
+      const tasks = [
+        makeTask({ id: 'TASK-2', title: 'Parent' }),
+        makeTask({ id: 'TASK-2.1', title: 'Child 1', parentTaskId: 'TASK-2' }),
+        makeTask({ id: 'TASK-2.2', title: 'Child 2', parentTaskId: 'TASK-2' }),
+      ];
+
+      computeSubtasks(tasks);
+
+      expect(tasks[0].subtasks).toEqual(['TASK-2.1', 'TASK-2.2']);
+    });
+
+    it('should sort subtask IDs', () => {
+      const tasks = [
+        makeTask({ id: 'TASK-1' }),
+        makeTask({ id: 'TASK-1.3', parentTaskId: 'TASK-1' }),
+        makeTask({ id: 'TASK-1.1', parentTaskId: 'TASK-1' }),
+        makeTask({ id: 'TASK-1.2', parentTaskId: 'TASK-1' }),
+      ];
+
+      computeSubtasks(tasks);
+
+      expect(tasks[0].subtasks).toEqual(['TASK-1.1', 'TASK-1.2', 'TASK-1.3']);
+    });
+
+    it('should not add subtasks to tasks with no children', () => {
+      const tasks = [makeTask({ id: 'TASK-1' }), makeTask({ id: 'TASK-2' })];
+
+      computeSubtasks(tasks);
+
+      expect(tasks[0].subtasks).toBeUndefined();
+      expect(tasks[1].subtasks).toBeUndefined();
+    });
+
+    it('should handle orphaned children (parent not in list)', () => {
+      const tasks = [
+        makeTask({ id: 'TASK-5.1', parentTaskId: 'TASK-5' }),
+        makeTask({ id: 'TASK-5.2', parentTaskId: 'TASK-5' }),
+      ];
+
+      computeSubtasks(tasks);
+
+      // No parent in the list, so no subtasks array is set
+      expect(tasks[0].subtasks).toBeUndefined();
+      expect(tasks[1].subtasks).toBeUndefined();
+    });
+
+    it('should overwrite existing subtasks from frontmatter', () => {
+      const tasks = [
+        makeTask({ id: 'TASK-3', subtasks: ['TASK-3.1', 'TASK-3.99'] }),
+        makeTask({ id: 'TASK-3.1', parentTaskId: 'TASK-3' }),
+        makeTask({ id: 'TASK-3.2', parentTaskId: 'TASK-3' }),
+      ];
+
+      computeSubtasks(tasks);
+
+      // Should be computed from parentTaskId, not from the existing array
+      expect(tasks[0].subtasks).toEqual(['TASK-3.1', 'TASK-3.2']);
+    });
+
+    it('should handle multiple parents with different children', () => {
+      const tasks = [
+        makeTask({ id: 'TASK-1' }),
+        makeTask({ id: 'TASK-2' }),
+        makeTask({ id: 'TASK-1.1', parentTaskId: 'TASK-1' }),
+        makeTask({ id: 'TASK-2.1', parentTaskId: 'TASK-2' }),
+        makeTask({ id: 'TASK-2.2', parentTaskId: 'TASK-2' }),
+      ];
+
+      computeSubtasks(tasks);
+
+      expect(tasks[0].subtasks).toEqual(['TASK-1.1']);
+      expect(tasks[1].subtasks).toEqual(['TASK-2.1', 'TASK-2.2']);
+    });
+
+    it('should handle empty task list', () => {
+      const tasks: Task[] = [];
+      computeSubtasks(tasks);
+      expect(tasks).toEqual([]);
     });
   });
 

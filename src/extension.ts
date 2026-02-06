@@ -2,10 +2,10 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { TasksViewProvider } from './providers/TasksViewProvider';
 import { TaskDetailProvider } from './providers/TaskDetailProvider';
-import { TaskCreatePanel } from './providers/TaskCreatePanel';
 import { DashboardViewProvider } from './providers/DashboardViewProvider';
 import { BacklogParser } from './core/BacklogParser';
 import { BacklogWriter } from './core/BacklogWriter';
+import { TaskCreatePanel } from './providers/TaskCreatePanel';
 import { FileWatcher } from './core/FileWatcher';
 import { BacklogCli } from './core/BacklogCli';
 
@@ -87,43 +87,34 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register view mode toggle commands
+  // Register 3-way view mode toggle commands (kanban | list | drafts)
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.showListView', () => {
       tasksProvider.setViewMode('list');
-      vscode.commands.executeCommand('setContext', 'backlog.isListView', true);
+      vscode.commands.executeCommand('setContext', 'backlog.viewMode', 'list');
     })
   );
 
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.showKanbanView', () => {
       tasksProvider.setViewMode('kanban');
-      vscode.commands.executeCommand('setContext', 'backlog.isListView', false);
-    })
-  );
-
-  // Register drafts mode toggle commands
-  context.subscriptions.push(
-    vscode.commands.registerCommand('backlog.showDrafts', () => {
-      tasksProvider.setDraftsMode(true);
-      vscode.commands.executeCommand('setContext', 'backlog.showingDrafts', true);
+      vscode.commands.executeCommand('setContext', 'backlog.viewMode', 'kanban');
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('backlog.hideDrafts', () => {
-      tasksProvider.setDraftsMode(false);
-      vscode.commands.executeCommand('setContext', 'backlog.showingDrafts', false);
+    vscode.commands.registerCommand('backlog.showDraftsView', () => {
+      tasksProvider.setViewMode('drafts');
+      vscode.commands.executeCommand('setContext', 'backlog.viewMode', 'drafts');
     })
   );
 
-  // Initialize context for view mode (default is kanban)
-  const savedViewMode = context.globalState.get<'kanban' | 'list'>('backlog.viewMode', 'kanban');
-  vscode.commands.executeCommand('setContext', 'backlog.isListView', savedViewMode === 'list');
-
-  // Initialize context for drafts mode
+  // Initialize context for view mode: derive from saved state
   const savedDraftsMode = context.globalState.get<boolean>('backlog.showingDrafts', false);
-  vscode.commands.executeCommand('setContext', 'backlog.showingDrafts', savedDraftsMode);
+  const savedViewMode = savedDraftsMode
+    ? 'drafts'
+    : context.globalState.get<'kanban' | 'list' | 'drafts'>('backlog.viewMode', 'kanban');
+  vscode.commands.executeCommand('setContext', 'backlog.viewMode', savedViewMode);
 
   // Register filter by status command (used by dashboard clickable cards)
   context.subscriptions.push(
@@ -138,7 +129,7 @@ export function activate(context: vscode.ExtensionContext) {
 
       // Switch to list view and apply filter
       tasksProvider.setViewMode('list');
-      vscode.commands.executeCommand('setContext', 'backlog.isListView', true);
+      vscode.commands.executeCommand('setContext', 'backlog.viewMode', 'list');
       tasksProvider.setFilter(filter);
     })
   );
@@ -168,10 +159,10 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // Register create task command
+  // Register create task command (opens form to create a draft)
   const writer = new BacklogWriter();
   context.subscriptions.push(
-    vscode.commands.registerCommand('backlog.createTask', async () => {
+    vscode.commands.registerCommand('backlog.createTask', () => {
       if (!backlogFolder || !parser) {
         vscode.window.showErrorMessage('No backlog folder found in workspace');
         return;

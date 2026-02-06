@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { BacklogParser } from '../core/BacklogParser';
+import * as path from 'path';
+import { BacklogParser, computeSubtasks } from '../core/BacklogParser';
 import { BacklogWriter, computeContentHash, FileConflictError } from '../core/BacklogWriter';
 import type { Task } from '../core/types';
 
@@ -29,6 +30,9 @@ interface TaskDetailData {
   blocksTaskIds: string[];
   isBlocked: boolean;
   descriptionHtml: string;
+  isDraft?: boolean;
+  parentTask?: { id: string; title: string };
+  subtaskSummaries?: Array<{ id: string; title: string; status: string }>;
 }
 
 /**
@@ -221,6 +225,32 @@ export class TaskDetailProvider {
       // Parse description markdown
       const descriptionHtml = task.description ? await parseMarkdown(task.description) : '';
 
+      // Compute parent task info
+      let parentTask: { id: string; title: string } | undefined;
+      if (task.parentTaskId) {
+        const parent = await this.parser!.getTask(task.parentTaskId);
+        if (parent) {
+          parentTask = { id: parent.id, title: parent.title };
+        }
+      }
+
+      // Compute subtask summaries
+      computeSubtasks(allTasks);
+      let subtaskSummaries: Array<{ id: string; title: string; status: string }> | undefined;
+      const thisTask = allTasks.find((t) => t.id === task.id);
+      if (thisTask?.subtasks && thisTask.subtasks.length > 0) {
+        const summaries: Array<{ id: string; title: string; status: string }> = [];
+        for (const childId of thisTask.subtasks) {
+          const child = allTasks.find((t) => t.id === childId);
+          if (child) {
+            summaries.push({ id: child.id, title: child.title, status: child.status });
+          }
+        }
+        if (summaries.length > 0) {
+          subtaskSummaries = summaries;
+        }
+      }
+
       const data: TaskDetailData = {
         task,
         statuses,
@@ -231,6 +261,9 @@ export class TaskDetailProvider {
         blocksTaskIds,
         isBlocked,
         descriptionHtml,
+        isDraft: task.folder === 'drafts',
+        parentTask,
+        subtaskSummaries,
       };
 
       webview.postMessage({ type: 'taskData', data });
@@ -246,6 +279,7 @@ export class TaskDetailProvider {
   private async handleMessage(message: {
     type: string;
     taskId?: string;
+    parentTaskId?: string;
     listType?: 'acceptanceCriteria' | 'definitionOfDone';
     itemId?: number;
     field?: string;
@@ -331,6 +365,47 @@ export class TaskDetailProvider {
         }
         break;
 
+      case 'promoteDraft': {
+        if (!TaskDetailProvider.currentTaskId || !this.parser) break;
+
+        try {
+          await this.writer.promoteDraft(TaskDetailProvider.currentTaskId, this.parser);
+          vscode.window.showInformationMessage(
+            `Draft promoted to task: ${TaskDetailProvider.currentTaskId}`
+          );
+          await this.openTask(TaskDetailProvider.currentTaskId);
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to promote draft: ${error}`);
+        }
+        break;
+      }
+
+      case 'discardDraft': {
+        if (!TaskDetailProvider.currentTaskId || !this.parser) break;
+
+        const draftTask = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        if (!draftTask) break;
+
+        const discardConfirmation = await vscode.window.showWarningMessage(
+          `Discard draft "${draftTask.title}"? This will permanently delete the file.`,
+          { modal: true },
+          'Discard'
+        );
+
+        if (discardConfirmation === 'Discard') {
+          try {
+            if (draftTask.filePath && fs.existsSync(draftTask.filePath)) {
+              fs.unlinkSync(draftTask.filePath);
+            }
+            vscode.window.showInformationMessage('Draft discarded');
+            TaskDetailProvider.currentPanel?.dispose();
+          } catch (error) {
+            vscode.window.showErrorMessage(`Failed to discard draft: ${error}`);
+          }
+        }
+        break;
+      }
+
       case 'archiveTask': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
 
@@ -353,6 +428,29 @@ export class TaskDetailProvider {
           } catch (error) {
             vscode.window.showErrorMessage(`Failed to archive task: ${error}`);
           }
+        }
+        break;
+      }
+
+      case 'createSubtask': {
+        if (!message.parentTaskId || !this.parser) break;
+
+        try {
+          const backlogPath = path.dirname(
+            path.dirname((await this.parser.getTask(message.parentTaskId))?.filePath || '')
+          );
+          if (!backlogPath) break;
+
+          const result = await this.writer.createSubtask(
+            message.parentTaskId,
+            backlogPath,
+            this.parser
+          );
+
+          // Open the new subtask in the detail panel
+          await this.openTask(result.id);
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to create subtask: ${error}`);
         }
         break;
       }

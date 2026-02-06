@@ -48,4 +48,7 @@ export interface TaskDetailData {
   blocksTaskIds: string[];
   isBlocked: boolean;
   descriptionHtml: string;
+  isDraft?: boolean;
+  parentTask?: { id: string; title: string };
+  subtaskSummaries?: Array<{ id: string; title: string; status: string }>;
 }

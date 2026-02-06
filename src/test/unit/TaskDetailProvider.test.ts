@@ -10,6 +10,7 @@ import { BacklogParser } from '../../core/BacklogParser';
 vi.mock('fs', () => ({
   existsSync: vi.fn(),
   readFileSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
 
 // Mock marked module
@@ -258,6 +259,232 @@ describe('TaskDetailProvider', () => {
       }
 
       expect(TaskDetailProvider['currentFilePath']).toBeUndefined();
+    });
+  });
+
+  describe('sendTaskData isDraft', () => {
+    it('should set isDraft: true when task folder is drafts', async () => {
+      const filePath = '/test/backlog/drafts/draft-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'DRAFT-1',
+        title: 'Draft Task',
+        description: 'Description',
+        status: 'Draft',
+        priority: undefined,
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: filePath,
+        folder: 'drafts',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+
+      await provider.openTask('DRAFT-1');
+
+      // Wait for setTimeout in openTask
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.isDraft).toBe(true);
+    });
+
+    it('should set isDraft: false when task folder is tasks', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Regular Task',
+        description: 'Description',
+        status: 'To Do',
+        priority: undefined,
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: filePath,
+        folder: 'tasks',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+
+      await provider.openTask('TASK-1');
+
+      // Wait for setTimeout in openTask
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.isDraft).toBe(false);
+    });
+  });
+
+  describe('sendTaskData subtask info', () => {
+    it('should include parentTask when task has parentTaskId', async () => {
+      const filePath = '/test/backlog/tasks/task-2.1.md';
+
+      (mockParser.getTask as Mock).mockImplementation(async (id: string) => {
+        if (id === 'TASK-2.1') {
+          return {
+            id: 'TASK-2.1',
+            title: 'Subtask',
+            status: 'To Do',
+            labels: [],
+            assignee: [],
+            dependencies: [],
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath,
+            parentTaskId: 'TASK-2',
+          };
+        }
+        if (id === 'TASK-2') {
+          return {
+            id: 'TASK-2',
+            title: 'Parent Task',
+            status: 'In Progress',
+            labels: [],
+            assignee: [],
+            dependencies: [],
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath: '/test/backlog/tasks/task-2.md',
+          };
+        }
+        return undefined;
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-2.1');
+
+      // Wait for setTimeout
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.parentTask).toEqual({
+        id: 'TASK-2',
+        title: 'Parent Task',
+      });
+    });
+
+    it('should include subtaskSummaries when task has subtask children', async () => {
+      const filePath = '/test/backlog/tasks/task-3.md';
+
+      (mockParser.getTask as Mock).mockImplementation(async (id: string) => {
+        if (id === 'TASK-3') {
+          return {
+            id: 'TASK-3',
+            title: 'Parent',
+            status: 'In Progress',
+            labels: [],
+            assignee: [],
+            dependencies: [],
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath,
+          };
+        }
+        return undefined;
+      });
+
+      // getTasks returns parent + children
+      (mockParser.getTasks as Mock).mockResolvedValue([
+        {
+          id: 'TASK-3',
+          title: 'Parent',
+          status: 'In Progress',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath,
+        },
+        {
+          id: 'TASK-3.1',
+          title: 'Child 1',
+          status: 'Done',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/test/backlog/tasks/task-3.1.md',
+          parentTaskId: 'TASK-3',
+        },
+        {
+          id: 'TASK-3.2',
+          title: 'Child 2',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/test/backlog/tasks/task-3.2.md',
+          parentTaskId: 'TASK-3',
+        },
+      ]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-3');
+
+      // Wait for setTimeout
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.subtaskSummaries).toEqual([
+        { id: 'TASK-3.1', title: 'Child 1', status: 'Done' },
+        { id: 'TASK-3.2', title: 'Child 2', status: 'To Do' },
+      ]);
+    });
+
+    it('should not include parentTask when task has no parentTaskId', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Regular Task',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath,
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.parentTask).toBeUndefined();
+      expect(taskDataCall![0].data.subtaskSummaries).toBeUndefined();
     });
   });
 

@@ -2,7 +2,7 @@
   import type { Task } from '../../lib/types';
 
   interface Props {
-    task: Task & { blocksTaskIds?: string[] };
+    task: Task & { blocksTaskIds?: string[]; subtaskProgress?: { total: number; done: number } };
     onOpenTask: (taskId: string) => void;
     ondragstart?: (e: DragEvent) => void;
     ondragend?: (e: DragEvent) => void;
@@ -61,6 +61,7 @@
   let hasDependencies = $derived((task.dependencies?.length ?? 0) > 0);
   let hasBlocks = $derived((task.blocksTaskIds?.length ?? 0) > 0);
   let showDepsSection = $derived(hasDependencies || hasBlocks);
+  let hasSubtaskProgress = $derived(task.subtaskProgress !== undefined && task.subtaskProgress.total > 0);
 </script>
 
 <div
@@ -129,6 +130,17 @@
           {/if}
         </span>
       {/if}
+    </div>
+  {/if}
+  {#if hasSubtaskProgress}
+    <div class="task-card-subtasks" data-testid="subtask-progress-{task.id}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m21 12-7 7-7-7"/><path d="M14 5v14"/><path d="M3 5v14"/>
+      </svg>
+      <span class="subtask-count">{task.subtaskProgress!.done}/{task.subtaskProgress!.total}</span>
+      <span class="subtask-bar">
+        <span class="subtask-bar-fill" style="width: {(task.subtaskProgress!.done / task.subtaskProgress!.total) * 100}%"></span>
+      </span>
     </div>
   {/if}
 </div>

@@ -8,6 +8,7 @@
     uniqueLabels: string[];
     uniqueAssignees: string[];
     milestones: string[];
+    parentTask?: { id: string; title: string };
     onUpdateLabels: (labels: string[]) => void;
     onUpdateAssignees: (assignees: string[]) => void;
     onUpdateMilestone: (milestone: string | undefined) => void;
@@ -23,6 +24,7 @@
     uniqueLabels,
     uniqueAssignees,
     milestones,
+    parentTask,
     onUpdateLabels,
     onUpdateAssignees,
     onUpdateMilestone,
@@ -75,6 +77,25 @@
 <div class="section">
   <div class="section-title">Details</div>
   <div class="meta-grid">
+    <!-- Parent Task -->
+    {#if parentTask}
+      <div class="meta-item">
+        <div class="meta-label">Parent Task</div>
+        <div data-testid="parent-task">
+          <button
+            type="button"
+            class="dependency-link"
+            data-task-id={parentTask.id}
+            data-testid="parent-task-link"
+            onclick={() => onOpenTask(parentTask!.id)}
+          >
+            {parentTask.id}
+          </button>
+          <span class="parent-task-title">{parentTask.title}</span>
+        </div>
+      </div>
+    {/if}
+
     <!-- Labels -->
     <div class="meta-item">
       <div class="meta-label">Labels</div>

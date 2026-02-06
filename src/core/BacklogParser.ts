@@ -30,11 +30,41 @@ interface RawFrontmatter {
   documentation?: string[] | string;
   type?: string;
   parent?: string;
+  parent_task_id?: string;
+  subtasks?: string[] | string;
   created_date?: string;
   created?: string;
   updated_date?: string;
   updated?: string;
   ordinal?: number;
+}
+
+/**
+ * Compute subtask relationships from parentTaskId fields.
+ * Populates the `subtasks` array on parent tasks by scanning all tasks
+ * for those with a matching `parentTaskId`.
+ * This overwrites any existing `subtasks` arrays.
+ */
+export function computeSubtasks(tasks: Task[]): void {
+  const parentToChildren = new Map<string, string[]>();
+
+  for (const task of tasks) {
+    if (task.parentTaskId) {
+      const children = parentToChildren.get(task.parentTaskId);
+      if (children) {
+        children.push(task.id);
+      } else {
+        parentToChildren.set(task.parentTaskId, [task.id]);
+      }
+    }
+  }
+
+  for (const task of tasks) {
+    const children = parentToChildren.get(task.id);
+    if (children) {
+      task.subtasks = children.sort();
+    }
+  }
 }
 
 /**
@@ -402,8 +432,11 @@ export class BacklogParser {
     if (fm.updated_date || fm.updated) {
       task.updatedAt = String(fm.updated_date || fm.updated);
     }
-    if (fm.parent) {
-      task.parentTaskId = String(fm.parent);
+    if (fm.parent_task_id || fm.parent) {
+      task.parentTaskId = String(fm.parent_task_id || fm.parent);
+    }
+    if (fm.subtasks) {
+      task.subtasks = this.normalizeStringArray(fm.subtasks);
     }
     if (fm.references) {
       task.references = this.normalizeStringArray(fm.references);

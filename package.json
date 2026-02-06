@@ -77,13 +77,8 @@
         "icon": "$(layout)"
       },
       {
-        "command": "backlog.showDrafts",
-        "title": "Show Drafts",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "backlog.hideDrafts",
-        "title": "Hide Drafts",
+        "command": "backlog.showDraftsView",
+        "title": "Switch to Drafts View",
         "icon": "$(edit)"
       }
     ],
@@ -96,28 +91,23 @@
         },
         {
           "command": "backlog.showListView",
-          "when": "view == backlog.kanban && !backlog.isListView",
+          "when": "view == backlog.kanban && backlog.viewMode != 'list'",
           "group": "navigation@2"
         },
         {
           "command": "backlog.showKanbanView",
-          "when": "view == backlog.kanban && backlog.isListView",
-          "group": "navigation@2"
-        },
-        {
-          "command": "backlog.showDrafts",
-          "when": "view == backlog.kanban && !backlog.showingDrafts",
+          "when": "view == backlog.kanban && backlog.viewMode != 'kanban'",
           "group": "navigation@3"
         },
         {
-          "command": "backlog.hideDrafts",
-          "when": "view == backlog.kanban && backlog.showingDrafts",
-          "group": "navigation@3"
+          "command": "backlog.showDraftsView",
+          "when": "view == backlog.kanban && backlog.viewMode != 'drafts'",
+          "group": "navigation@4"
         },
         {
           "command": "backlog.refresh",
           "when": "view == backlog.kanban",
-          "group": "navigation@4"
+          "group": "navigation@5"
         }
       ]
     },

@@ -3,6 +3,7 @@
   import type { TaskDetailData, Task } from '../../lib/types';
   import TaskHeader from './TaskHeader.svelte';
   import MetaSection from './MetaSection.svelte';
+  import SubtasksSection from './SubtasksSection.svelte';
   import DescriptionSection from './DescriptionSection.svelte';
   import Checklist from './Checklist.svelte';
   import ActionButtons from './ActionButtons.svelte';
@@ -21,6 +22,9 @@
   let blocksTaskIds: string[] = $state([]);
   let isBlocked = $state(false);
   let descriptionHtml = $state('');
+  let isDraft = $state(false);
+  let parentTask: { id: string; title: string } | undefined = $state(undefined);
+  let subtaskSummaries: Array<{ id: string; title: string; status: string }> | undefined = $state(undefined);
 
   // Handle messages from extension
   onMessage((message) => {
@@ -36,6 +40,9 @@
           blocksTaskIds = data.blocksTaskIds;
           isBlocked = data.isBlocked;
           descriptionHtml = data.descriptionHtml;
+          isDraft = data.isDraft ?? false;
+          parentTask = data.parentTask;
+          subtaskSummaries = data.subtaskSummaries;
           viewState = 'ready';
         }
         break;
@@ -98,6 +105,24 @@
       vscode.postMessage({ type: 'archiveTask', taskId: task.id });
     }
   }
+
+  function handlePromoteDraft() {
+    if (task) {
+      vscode.postMessage({ type: 'promoteDraft', taskId: task.id });
+    }
+  }
+
+  function handleDiscardDraft() {
+    if (task) {
+      vscode.postMessage({ type: 'discardDraft', taskId: task.id });
+    }
+  }
+
+  function handleCreateSubtask() {
+    if (task) {
+      vscode.postMessage({ type: 'createSubtask', parentTaskId: task.id });
+    }
+  }
 </script>
 
 {#if viewState === 'loading'}
@@ -121,6 +146,17 @@
     onUpdatePriority={handleUpdatePriority}
   />
 
+  {#if isDraft}
+    <div class="draft-banner">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
+      <span>Draft — changes saved automatically</span>
+      <div class="draft-banner-actions">
+        <button class="draft-promote-btn" data-testid="promote-draft-btn" onclick={handlePromoteDraft}>Save as Task</button>
+        <button class="draft-discard-btn" data-testid="discard-draft-btn" onclick={handleDiscardDraft}>Discard</button>
+      </div>
+    </div>
+  {/if}
+
   <MetaSection
     labels={task.labels}
     assignees={task.assignee}
@@ -130,11 +166,20 @@
     {uniqueLabels}
     {uniqueAssignees}
     {milestones}
+    {parentTask}
     onUpdateLabels={handleUpdateLabels}
     onUpdateAssignees={handleUpdateAssignees}
     onUpdateMilestone={handleUpdateMilestone}
     onOpenTask={handleOpenTask}
   />
+
+  {#if subtaskSummaries && subtaskSummaries.length > 0}
+    <SubtasksSection
+      subtasks={subtaskSummaries}
+      onOpenTask={handleOpenTask}
+      onCreateSubtask={handleCreateSubtask}
+    />
+  {/if}
 
   <DescriptionSection
     description={task.description || ''}
@@ -156,5 +201,5 @@
     onToggle={handleToggleChecklist}
   />
 
-  <ActionButtons onOpenFile={handleOpenFile} onArchive={handleArchive} />
+  <ActionButtons onOpenFile={handleOpenFile} onArchive={handleArchive} {isDraft} />
 {/if}

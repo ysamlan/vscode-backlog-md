@@ -259,7 +259,7 @@ export class BacklogWriter {
       const config = await parser.getConfig();
       taskPrefix = config.task_prefix || 'TASK';
     }
-    const taskId = `${taskPrefix}-${nextId}`;
+    const taskId = `${taskPrefix}-${nextId}`.toUpperCase();
 
     // Sanitize title for filename
     const sanitizedTitle = options.title
@@ -300,6 +300,139 @@ export class BacklogWriter {
     body += '\n## Acceptance Criteria\n<!-- AC:BEGIN -->\n<!-- AC:END -->\n';
 
     // Build content
+    const content = this.reconstructFile(frontmatter, body);
+    fs.writeFileSync(filePath, content, 'utf-8');
+
+    return { id: taskId, filePath };
+  }
+
+  /**
+   * Create a new draft file in the drafts/ directory
+   * @param backlogPath - Path to the backlog directory
+   * @param parser - Optional parser to read config
+   */
+  async createDraft(
+    backlogPath: string,
+    _parser?: BacklogParser
+  ): Promise<{ id: string; filePath: string }> {
+    const draftsDir = path.join(backlogPath, 'drafts');
+
+    // Ensure drafts directory exists
+    if (!fs.existsSync(draftsDir)) {
+      fs.mkdirSync(draftsDir, { recursive: true });
+    }
+
+    // Generate next draft ID
+    const nextId = this.getNextDraftId(draftsDir);
+    const draftId = `DRAFT-${nextId}`;
+
+    const fileName = `draft-${nextId} - Untitled.md`;
+    const filePath = path.join(draftsDir, fileName);
+
+    // Build frontmatter
+    const today = new Date().toISOString().split('T')[0];
+    const frontmatter: FrontmatterData = {
+      id: draftId,
+      title: 'Untitled',
+      status: 'Draft',
+      labels: [],
+      assignee: [],
+      dependencies: [],
+      created_date: today,
+      updated_date: today,
+    };
+
+    // Build body
+    const body =
+      '\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\n<!-- SECTION:DESCRIPTION:END -->\n\n## Acceptance Criteria\n<!-- AC:BEGIN -->\n<!-- AC:END -->\n';
+
+    // Build content
+    const content = this.reconstructFile(frontmatter, body);
+    fs.writeFileSync(filePath, content, 'utf-8');
+
+    return { id: draftId, filePath };
+  }
+
+  /**
+   * Get the next available draft ID number
+   */
+  private getNextDraftId(draftsDir: string): number {
+    const files = fs.existsSync(draftsDir) ? fs.readdirSync(draftsDir) : [];
+    let maxId = 0;
+
+    for (const file of files) {
+      const match = file.match(/^draft-(\d+)/i);
+      if (match) {
+        const id = parseInt(match[1], 10);
+        if (id > maxId) {
+          maxId = id;
+        }
+      }
+    }
+
+    return maxId + 1;
+  }
+
+  /**
+   * Create a subtask under a parent task.
+   * Uses dot-notation IDs (e.g., TASK-2.1, TASK-2.2).
+   * Scans existing tasks to find the next sub-number, handling gaps.
+   */
+  async createSubtask(
+    parentTaskId: string,
+    backlogPath: string,
+    _parser?: BacklogParser
+  ): Promise<{ id: string; filePath: string }> {
+    const tasksDir = path.join(backlogPath, 'tasks');
+
+    if (!fs.existsSync(tasksDir)) {
+      fs.mkdirSync(tasksDir, { recursive: true });
+    }
+
+    // Extract the numeric part from parent ID (e.g., "TASK-2" -> "2", "TASK-10" -> "10")
+    const parentNumMatch = parentTaskId.match(/(\d+)$/);
+    if (!parentNumMatch) {
+      throw new Error(`Cannot extract numeric ID from parent: ${parentTaskId}`);
+    }
+    const parentNum = parentNumMatch[1];
+
+    // Get task prefix from parent ID (e.g., "TASK-2" -> "TASK")
+    const prefixMatch = parentTaskId.match(/^(.+)-\d+$/);
+    const taskPrefix = prefixMatch ? prefixMatch[1] : 'TASK';
+
+    // Scan existing files for subtask numbering (task-N.M pattern)
+    const files = fs.existsSync(tasksDir) ? fs.readdirSync(tasksDir) : [];
+    let maxSubId = 0;
+    const subPattern = new RegExp(`^task-${parentNum}\\.(\\d+)`, 'i');
+    for (const file of files) {
+      const match = file.match(subPattern);
+      if (match) {
+        const subId = parseInt(match[1], 10);
+        if (subId > maxSubId) maxSubId = subId;
+      }
+    }
+    const nextSubId = maxSubId + 1;
+
+    const taskId = `${taskPrefix}-${parentNum}.${nextSubId}`.toUpperCase();
+    const fileName = `task-${parentNum}.${nextSubId} - Untitled.md`;
+    const filePath = path.join(tasksDir, fileName);
+
+    const today = new Date().toISOString().split('T')[0];
+    const frontmatter: FrontmatterData = {
+      id: taskId,
+      title: 'Untitled',
+      status: 'To Do',
+      labels: [],
+      assignee: [],
+      dependencies: [],
+      parent_task_id: parentTaskId,
+      created_date: today,
+      updated_date: today,
+    };
+
+    const body =
+      '\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\n<!-- SECTION:DESCRIPTION:END -->\n\n## Acceptance Criteria\n<!-- AC:BEGIN -->\n<!-- AC:END -->\n';
+
     const content = this.reconstructFile(frontmatter, body);
     fs.writeFileSync(filePath, content, 'utf-8');
 

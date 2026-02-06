@@ -1602,6 +1602,225 @@ body {
   color: var(--vscode-descriptionForeground, #858585);
 }
 
+/* Draft banner in task detail */
+.draft-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: var(--vscode-inputValidation-infoBackground, rgba(59, 130, 246, 0.1));
+  border: 1px solid var(--vscode-inputValidation-infoBorder, rgba(59, 130, 246, 0.4));
+  color: var(--vscode-foreground, #cccccc);
+}
+
+.draft-banner svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.draft-banner-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.draft-promote-btn {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+}
+
+.draft-promote-btn:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.draft-discard-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--vscode-button-secondaryBackground, #3a3d41);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  background: var(--vscode-button-secondaryBackground, #313131);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+}
+
+.draft-discard-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, #3c3c3c);
+}
+
+/* Subtask progress indicator on kanban cards */
+.task-card-subtasks {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #858585);
+}
+
+.task-card-subtasks svg {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.subtask-count {
+  white-space: nowrap;
+}
+
+.subtask-bar {
+  flex: 1;
+  max-width: 60px;
+  height: 3px;
+  background: var(--vscode-widget-border, #303031);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.subtask-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--vscode-progressBar-background, #3b82f6);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* List view: subtask row indentation */
+.subtask-row td:first-child,
+.subtask-row td:nth-child(2) {
+  padding-left: 4px;
+}
+
+.subtask-connector {
+  color: var(--vscode-descriptionForeground, #858585);
+  margin-right: 4px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.subtask-row {
+  opacity: 0.85;
+}
+
+.drag-handle-blank {
+  width: 24px;
+}
+
+/* Task detail: parent task title */
+.parent-task-title {
+  margin-left: 6px;
+  color: var(--vscode-descriptionForeground, #858585);
+  font-size: 12px;
+}
+
+/* Task detail: subtasks section */
+.subtasks-progress-label {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #858585);
+  margin-left: 6px;
+}
+
+.subtasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.subtask-item:hover {
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04));
+}
+
+.subtask-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot-to-do {
+  background: var(--vscode-descriptionForeground, #858585);
+}
+
+.status-dot-in-progress {
+  background: var(--vscode-progressBar-background, #3b82f6);
+}
+
+.status-dot-done {
+  background: var(--vscode-testing-iconPassed, #4ec94e);
+}
+
+.status-dot-draft {
+  background: var(--vscode-descriptionForeground, #858585);
+  opacity: 0.5;
+}
+
+.subtask-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--vscode-textLink-foreground, #3b82f6);
+  white-space: nowrap;
+}
+
+.subtask-link:hover {
+  text-decoration: underline;
+}
+
+.subtask-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-foreground, #cccccc);
+}
+
+.subtask-status-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.add-subtask-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px dashed var(--vscode-widget-border, #303031);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #858585);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.add-subtask-btn:hover {
+  border-color: var(--vscode-focusBorder, #007fd4);
+  color: var(--vscode-foreground, #cccccc);
+}
+
 /* Utility classes */
 .hidden {
   display: none !important;

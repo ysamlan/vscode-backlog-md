@@ -139,6 +139,54 @@
     });
   });
 
+  // Build hierarchical display list: insert subtasks directly after their parent
+  type DisplayEntry = { task: TaskWithBlocks; isSubtask: boolean };
+  let displayTasks = $derived.by((): DisplayEntry[] => {
+    // Build a lookup of parentTaskId -> children present in sortedTasks
+    const childrenByParent = new Map<string, TaskWithBlocks[]>();
+    const subtaskIds = new Set<string>();
+
+    for (const task of sortedTasks) {
+      if (task.parentTaskId) {
+        subtaskIds.add(task.id);
+        const siblings = childrenByParent.get(task.parentTaskId) ?? [];
+        siblings.push(task);
+        childrenByParent.set(task.parentTaskId, siblings);
+      }
+    }
+
+    // If there are no subtasks at all, skip the extra work
+    if (subtaskIds.size === 0) {
+      return sortedTasks.map((task) => ({ task, isSubtask: false }));
+    }
+
+    const result: DisplayEntry[] = [];
+    for (const task of sortedTasks) {
+      // Skip subtasks in their original sorted position; they will be
+      // inserted after their parent instead.
+      if (subtaskIds.has(task.id)) continue;
+
+      result.push({ task, isSubtask: false });
+
+      // Append any children of this task immediately after it
+      const children = childrenByParent.get(task.id);
+      if (children) {
+        for (const child of children) {
+          result.push({ task: child, isSubtask: true });
+        }
+      }
+    }
+
+    // Append orphaned subtasks whose parent is not in the current list
+    for (const task of sortedTasks) {
+      if (subtaskIds.has(task.id) && !result.some((e) => e.task.id === task.id)) {
+        result.push({ task, isSubtask: true });
+      }
+    }
+
+    return result;
+  });
+
   function getSortIndicator(field: string): string {
     if (currentSort.field !== field) return '';
     return currentSort.direction === 'asc' ? '↑' : '↓';
@@ -381,7 +429,7 @@
   {/if}
 
   <div id="taskListContent">
-    {#if sortedTasks.length === 0}
+    {#if displayTasks.length === 0}
       <div class="empty-state">No tasks found</div>
     {:else}
       <table class="task-table">
@@ -427,19 +475,20 @@
           ondragleave={handleDragLeave}
           ondrop={handleDrop}
         >
-          {#each sortedTasks as task (task.id)}
+          {#each displayTasks as { task, isSubtask } (task.id)}
             {@const depsCount = task.dependencies?.length ?? 0}
             {@const blocksCount = task.blocksTaskIds?.length ?? 0}
             <tr
               data-task-id={task.id}
               data-testid="task-row-{task.id}"
               tabindex="0"
-              draggable={isDragEnabled && !isDraftsView && !showingCompleted ? 'true' : undefined}
+              draggable={isDragEnabled && !isDraftsView && !showingCompleted && !isSubtask ? 'true' : undefined}
               class:dragging={draggedTaskId === task.id}
               class:drop-before={dropTargetTaskId === task.id && dropPosition === 'before'}
               class:drop-after={dropTargetTaskId === task.id && dropPosition === 'after'}
               class:completed-row={showingCompleted || task.source === 'completed'}
               class:draft-row={isDraftsView}
+              class:subtask-row={isSubtask}
               onclick={() => handleRowClickGuarded(task.id)}
               onkeydown={(e) => handleRowKeydown(e, task.id)}
               ondragstart={(e) => handleDragStart(e, task.id)}
@@ -447,17 +496,24 @@
               ondragover={(e) => handleDragOver(e, task.id)}
             >
               {#if isDragEnabled && !isDraftsView && !showingCompleted}
-                <td
-                  class="drag-handle"
-                  data-testid="drag-handle-{task.id}"
-                  onclick={(e) => e.stopPropagation()}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>
-                  </svg>
-                </td>
+                {#if isSubtask}
+                  <td class="drag-handle drag-handle-blank"></td>
+                {:else}
+                  <td
+                    class="drag-handle"
+                    data-testid="drag-handle-{task.id}"
+                    onclick={(e) => e.stopPropagation()}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/>
+                    </svg>
+                  </td>
+                {/if}
               {/if}
               <td>
+                {#if isSubtask}
+                  <span class="subtask-connector" aria-hidden="true">└</span>
+                {/if}
                 {#if isDraftsView}
                   <span class="draft-badge">DRAFT</span>
                 {/if}

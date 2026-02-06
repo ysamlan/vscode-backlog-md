@@ -44,12 +44,15 @@
     onUpdateTaskStatus,
   }: Props = $props();
 
+  // Filter out subtasks (they are represented by progress on parent cards)
+  let topLevelTasks = $derived(tasks.filter((t) => !t.parentTaskId));
+
   // Group tasks by milestone
   let milestoneGroups = $derived.by(() => {
     const milestoneMap = new Map<string | null, TaskWithBlocks[]>();
     const uncategorized: TaskWithBlocks[] = [];
 
-    for (const task of tasks) {
+    for (const task of topLevelTasks) {
       if (task.milestone) {
         if (!milestoneMap.has(task.milestone)) {
           milestoneMap.set(task.milestone, []);
@@ -125,7 +128,7 @@
   }
 </script>
 
-{#if tasks.length === 0}
+{#if topLevelTasks.length === 0}
   <div class="empty-state">No tasks found. Create tasks in your backlog/ folder.</div>
 {:else if milestoneGrouping}
   <div class="kanban-board milestone-grouped">
@@ -144,7 +147,7 @@
 {:else}
   <div class="kanban-board">
     {#each columns as col (col.status)}
-      {@const columnTasks = tasks.filter((t) => t.status === col.status)}
+      {@const columnTasks = topLevelTasks.filter((t) => t.status === col.status)}
       <KanbanColumn
         status={col.status}
         label={col.label}

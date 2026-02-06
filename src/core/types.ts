@@ -133,7 +133,9 @@ export type WebviewMessage =
   | { type: 'filterByStatus'; status: string }
   | { type: 'completeTask'; taskId: string }
   | { type: 'promoteDraft'; taskId: string }
-  | { type: 'requestCompletedTasks' };
+  | { type: 'discardDraft'; taskId: string }
+  | { type: 'requestCompletedTasks' }
+  | { type: 'createSubtask'; parentTaskId: string };
 
 /**
  * Data source mode for task viewing
