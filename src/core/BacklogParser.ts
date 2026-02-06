@@ -132,10 +132,19 @@ export class BacklogParser {
   }
 
   /**
-   * Get a single task by ID, searching tasks/, then drafts/, then completed/
+   * Get archived tasks from the archive/tasks/ folder.
+   * Sets folder: 'archive' on all returned tasks.
+   */
+  async getArchivedTasks(): Promise<Task[]> {
+    const tasks = await this.getTasksFromFolder('archive/tasks');
+    return tasks.map((t) => ({ ...t, folder: 'archive' as TaskFolder }));
+  }
+
+  /**
+   * Get a single task by ID, searching tasks/, then drafts/, then completed/, then archive/tasks/
    */
   async getTask(taskId: string): Promise<Task | undefined> {
-    for (const folder of ['tasks', 'drafts', 'completed'] as const) {
+    for (const folder of ['tasks', 'drafts', 'completed', 'archive/tasks']) {
       const tasks = await this.getTasksFromFolder(folder);
       const found = tasks.find((t) => t.id === taskId);
       if (found) return found;

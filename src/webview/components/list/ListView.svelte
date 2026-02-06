@@ -11,6 +11,7 @@
     currentMilestone: string;
     searchQuery: string;
     isDraftsView?: boolean;
+    isArchivedView?: boolean;
     completedTasks?: TaskWithBlocks[];
     onOpenTask: (taskId: string) => void;
     onFilterChange: (filter: string) => void;
@@ -19,6 +20,8 @@
     onReorderTasks?: (updates: Array<{ taskId: string; ordinal: number }>) => void;
     onCompleteTask?: (taskId: string) => void;
     onPromoteDraft?: (taskId: string) => void;
+    onRestoreTask?: (taskId: string) => void;
+    onDeleteTask?: (taskId: string) => void;
     onRequestCompletedTasks?: () => void;
   }
 
@@ -29,6 +32,7 @@
     currentMilestone,
     searchQuery,
     isDraftsView = false,
+    isArchivedView = false,
     completedTasks = [],
     onOpenTask,
     onFilterChange,
@@ -37,6 +41,8 @@
     onReorderTasks,
     onCompleteTask,
     onPromoteDraft,
+    onRestoreTask,
+    onDeleteTask,
     onRequestCompletedTasks,
   }: Props = $props();
 
@@ -73,8 +79,8 @@
 
     let filtered = tasks;
 
-    // In drafts view, show all drafts (no status filtering)
-    if (!isDraftsView) {
+    // In drafts/archived view, show all tasks (no status filtering)
+    if (!isDraftsView && !isArchivedView) {
       switch (currentFilter) {
         case 'todo':
           filtered = filtered.filter((t) => t.status === 'To Do');
@@ -340,6 +346,16 @@
     e.stopPropagation();
     onPromoteDraft?.(taskId);
   }
+
+  function handleRestoreClick(e: Event, taskId: string) {
+    e.stopPropagation();
+    onRestoreTask?.(taskId);
+  }
+
+  function handleDeleteClick(e: Event, taskId: string) {
+    e.stopPropagation();
+    onDeleteTask?.(taskId);
+  }
 </script>
 
 <div class="task-list-container">
@@ -354,7 +370,16 @@
     />
   </div>
 
-  {#if isDraftsView}
+  {#if isArchivedView}
+    <div class="filter-buttons">
+      <span class="drafts-label" data-testid="archived-label">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>
+        </svg>
+        Archived
+      </span>
+    </div>
+  {:else if isDraftsView}
     <div class="filter-buttons">
       <span class="drafts-label" data-testid="drafts-label">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -430,7 +455,13 @@
 
   <div id="taskListContent">
     {#if displayTasks.length === 0}
-      <div class="empty-state">No tasks found</div>
+      <div class="empty-state" data-testid="empty-state">
+        {#if isArchivedView}
+          No archived tasks. Tasks you archive will appear here.
+        {:else}
+          No tasks found
+        {/if}
+      </div>
     {:else}
       <table class="task-table">
         <thead>
@@ -465,7 +496,7 @@
             >
               Priority {getSortIndicator('priority')}
             </th>
-            {#if isDraftsView || !showingCompleted}
+            {#if isDraftsView || isArchivedView || !showingCompleted}
               <th class="actions-header">Actions</th>
             {/if}
           </tr>
@@ -482,12 +513,13 @@
               data-task-id={task.id}
               data-testid="task-row-{task.id}"
               tabindex="0"
-              draggable={isDragEnabled && !isDraftsView && !showingCompleted && !isSubtask ? 'true' : undefined}
+              draggable={isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted && !isSubtask ? 'true' : undefined}
               class:dragging={draggedTaskId === task.id}
               class:drop-before={dropTargetTaskId === task.id && dropPosition === 'before'}
               class:drop-after={dropTargetTaskId === task.id && dropPosition === 'after'}
               class:completed-row={showingCompleted || task.source === 'completed'}
               class:draft-row={isDraftsView}
+              class:archived-row={isArchivedView}
               class:subtask-row={isSubtask}
               onclick={() => handleRowClickGuarded(task.id)}
               onkeydown={(e) => handleRowKeydown(e, task.id)}
@@ -495,7 +527,7 @@
               ondragend={handleDragEnd}
               ondragover={(e) => handleDragOver(e, task.id)}
             >
-              {#if isDragEnabled && !isDraftsView && !showingCompleted}
+              {#if isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted}
                 {#if isSubtask}
                   <td class="drag-handle drag-handle-blank"></td>
                 {:else}
@@ -546,7 +578,32 @@
                   -
                 {/if}
               </td>
-              {#if isDraftsView}
+              {#if isArchivedView}
+                <td class="actions-cell archived-actions">
+                  <button
+                    class="action-btn restore-btn"
+                    data-testid="restore-btn-{task.id}"
+                    title="Restore to Tasks"
+                    onclick={(e) => handleRestoreClick(e, task.id)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                    </svg>
+                    Restore
+                  </button>
+                  <button
+                    class="action-btn delete-btn"
+                    data-testid="delete-btn-{task.id}"
+                    title="Delete Permanently"
+                    onclick={(e) => handleDeleteClick(e, task.id)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                    </svg>
+                    Delete
+                  </button>
+                </td>
+              {:else if isDraftsView}
                 <td class="actions-cell">
                   <button
                     class="action-btn promote-btn"

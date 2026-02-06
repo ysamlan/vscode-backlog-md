@@ -79,6 +79,24 @@ export class BacklogWriter {
   }
 
   /**
+   * Restore an archived task: moves from archive/tasks/ back to tasks/
+   */
+  async restoreArchivedTask(taskId: string, parser: BacklogParser): Promise<string> {
+    return this.moveTaskToFolder(taskId, 'tasks', parser);
+  }
+
+  /**
+   * Permanently delete a task file from disk
+   */
+  async deleteTask(taskId: string, parser: BacklogParser): Promise<void> {
+    const task = await parser.getTask(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+    fs.unlinkSync(task.filePath);
+  }
+
+  /**
    * Promote a draft to a regular task: moves from drafts/ to tasks/, updates status to 'To Do'
    */
   async promoteDraft(taskId: string, parser: BacklogParser): Promise<string> {
@@ -123,8 +141,12 @@ export class BacklogWriter {
       throw new Error(`Task ${taskId} not found`);
     }
 
-    // Calculate destination path
-    const backlogPath = path.dirname(path.dirname(task.filePath)); // backlog/
+    // Calculate destination path - go up from file to backlog root
+    // Files in archive/tasks/ are 3 levels deep, others are 2 levels deep
+    const isArchived = task.filePath.includes(path.join('archive', 'tasks'));
+    const backlogPath = isArchived
+      ? path.dirname(path.dirname(path.dirname(task.filePath))) // backlog/archive/tasks/file -> backlog/
+      : path.dirname(path.dirname(task.filePath)); // backlog/tasks/file -> backlog/
     const destDir = path.join(backlogPath, destFolder);
     const fileName = path.basename(task.filePath);
     const destPath = path.join(destDir, fileName);

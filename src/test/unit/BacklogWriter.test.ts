@@ -14,6 +14,7 @@ vi.mock('fs', async () => {
     readdirSync: vi.fn(() => []),
     mkdirSync: vi.fn(),
     renameSync: vi.fn(),
+    unlinkSync: vi.fn(),
   };
 });
 
@@ -1514,6 +1515,70 @@ status: To Do
           writer.updateTask('TASK-1', { status: 'Done' }, mockParser, originalHash)
         ).rejects.toThrow(FileConflictError);
       });
+    });
+  });
+
+  describe('restoreArchivedTask', () => {
+    it('should move task from archive/tasks/ to tasks/', async () => {
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-5',
+        title: 'Archived Task',
+        status: 'Done' as const,
+        folder: 'archive' as const,
+        filePath: '/fake/backlog/archive/tasks/task-5 - Archived-Task.md',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      const result = await writer.restoreArchivedTask('TASK-5', mockParser);
+
+      expect(fs.renameSync).toHaveBeenCalledWith(
+        '/fake/backlog/archive/tasks/task-5 - Archived-Task.md',
+        '/fake/backlog/tasks/task-5 - Archived-Task.md'
+      );
+      expect(result).toBe('/fake/backlog/tasks/task-5 - Archived-Task.md');
+    });
+
+    it('should throw when task is not found', async () => {
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue(undefined);
+
+      await expect(writer.restoreArchivedTask('TASK-999', mockParser)).rejects.toThrow(
+        'Task TASK-999 not found'
+      );
+    });
+  });
+
+  describe('deleteTask', () => {
+    it('should permanently delete the task file', async () => {
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-5',
+        title: 'Task to Delete',
+        status: 'Done' as const,
+        folder: 'archive' as const,
+        filePath: '/fake/backlog/archive/tasks/task-5 - Task-to-Delete.md',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      await writer.deleteTask('TASK-5', mockParser);
+
+      expect(fs.unlinkSync).toHaveBeenCalledWith(
+        '/fake/backlog/archive/tasks/task-5 - Task-to-Delete.md'
+      );
+    });
+
+    it('should throw when task is not found', async () => {
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue(undefined);
+
+      await expect(writer.deleteTask('TASK-999', mockParser)).rejects.toThrow(
+        'Task TASK-999 not found'
+      );
     });
   });
 });

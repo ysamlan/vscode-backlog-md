@@ -1530,6 +1530,161 @@ status: To Do
     });
   });
 
+  describe('getArchivedTasks', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should return tasks from archive/tasks/ folder with folder set to archive', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue(['task-1 - Archived-Task.md']);
+      vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: TASK-1
+title: Archived Task
+status: Done
+---
+`);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const archived = await parser.getArchivedTasks();
+
+      expect(archived).toHaveLength(1);
+      expect(archived[0].folder).toBe('archive');
+      expect(archived[0].id).toBe('TASK-1');
+      expect(archived[0].title).toBe('Archived Task');
+    });
+
+    it('should return empty array when no archive/tasks/ folder exists', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const archived = await parser.getArchivedTasks();
+
+      expect(archived).toEqual([]);
+    });
+
+    it('should parse multiple archived tasks', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue([
+        'task-1 - First.md',
+        'task-2 - Second.md',
+      ]);
+
+      const parser = new BacklogParser('/fake/backlog');
+      vi.spyOn(parser, 'parseTaskFile').mockImplementation(async (filePath: string) => {
+        if (filePath.includes('task-1')) {
+          return {
+            id: 'TASK-1',
+            title: 'First Archived',
+            status: 'Done' as const,
+            labels: [],
+            assignee: [],
+            dependencies: [],
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath,
+          };
+        }
+        return {
+          id: 'TASK-2',
+          title: 'Second Archived',
+          status: 'To Do' as const,
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath,
+        };
+      });
+
+      const archived = await parser.getArchivedTasks();
+
+      expect(archived).toHaveLength(2);
+      expect(archived[0].folder).toBe('archive');
+      expect(archived[1].folder).toBe('archive');
+    });
+  });
+
+  describe('getTask searches archive folder', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should find task in archive/tasks/ folder when not in other folders', async () => {
+      const parser = new BacklogParser('/fake/backlog');
+
+      vi.spyOn(parser, 'getTasksFromFolder').mockImplementation(async (folder: string) => {
+        if (folder === 'archive/tasks') {
+          return [
+            {
+              id: 'TASK-10',
+              title: 'Archived Task',
+              status: 'Done' as const,
+              folder: 'archive' as const,
+              filePath: '/fake/backlog/archive/tasks/task-10.md',
+              labels: [],
+              assignee: [],
+              dependencies: [],
+              acceptanceCriteria: [],
+              definitionOfDone: [],
+            },
+          ];
+        }
+        return [];
+      });
+
+      const task = await parser.getTask('TASK-10');
+      expect(task).toBeDefined();
+      expect(task?.id).toBe('TASK-10');
+      expect(task?.folder).toBe('archive');
+    });
+
+    it('should prefer tasks/ over archive/tasks/ when task exists in both', async () => {
+      const parser = new BacklogParser('/fake/backlog');
+
+      vi.spyOn(parser, 'getTasksFromFolder').mockImplementation(async (folder: string) => {
+        if (folder === 'tasks') {
+          return [
+            {
+              id: 'TASK-1',
+              title: 'Active Task',
+              status: 'To Do' as const,
+              folder: 'tasks' as const,
+              filePath: '/fake/backlog/tasks/task-1.md',
+              labels: [],
+              assignee: [],
+              dependencies: [],
+              acceptanceCriteria: [],
+              definitionOfDone: [],
+            },
+          ];
+        }
+        if (folder === 'archive/tasks') {
+          return [
+            {
+              id: 'TASK-1',
+              title: 'Archived Task',
+              status: 'Done' as const,
+              folder: 'archive' as const,
+              filePath: '/fake/backlog/archive/tasks/task-1.md',
+              labels: [],
+              assignee: [],
+              dependencies: [],
+              acceptanceCriteria: [],
+              definitionOfDone: [],
+            },
+          ];
+        }
+        return [];
+      });
+
+      const task = await parser.getTask('TASK-1');
+      expect(task?.folder).toBe('tasks');
+      expect(task?.title).toBe('Active Task');
+    });
+  });
+
   describe('Edge Cases: Section Parsing', () => {
     it('should handle description without markers', () => {
       const parser = new BacklogParser('/fake/path');
