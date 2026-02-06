@@ -23,6 +23,7 @@
   let isBlocked = $state(false);
   let descriptionHtml = $state('');
   let isDraft = $state(false);
+  let isArchived = $state(false);
   let parentTask: { id: string; title: string } | undefined = $state(undefined);
   let subtaskSummaries: Array<{ id: string; title: string; status: string }> | undefined = $state(undefined);
 
@@ -41,6 +42,7 @@
           isBlocked = data.isBlocked;
           descriptionHtml = data.descriptionHtml;
           isDraft = data.isDraft ?? false;
+          isArchived = data.isArchived ?? false;
           parentTask = data.parentTask;
           subtaskSummaries = data.subtaskSummaries;
           viewState = 'ready';
@@ -123,6 +125,18 @@
       vscode.postMessage({ type: 'createSubtask', parentTaskId: task.id });
     }
   }
+
+  function handleRestore() {
+    if (task) {
+      vscode.postMessage({ type: 'restoreTask', taskId: task.id });
+    }
+  }
+
+  function handleDelete() {
+    if (task) {
+      vscode.postMessage({ type: 'deleteTask', taskId: task.id });
+    }
+  }
 </script>
 
 {#if viewState === 'loading'}
@@ -146,7 +160,15 @@
     onUpdatePriority={handleUpdatePriority}
   />
 
-  {#if isDraft}
+  {#if isArchived}
+    <div class="draft-banner archived-banner">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+      <span>Archived — this task has been archived</span>
+      <div class="draft-banner-actions">
+        <button class="draft-promote-btn" data-testid="restore-archived-btn" onclick={handleRestore}>Restore</button>
+      </div>
+    </div>
+  {:else if isDraft}
     <div class="draft-banner">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>
       <span>Draft — changes saved automatically</span>
@@ -201,5 +223,12 @@
     onToggle={handleToggleChecklist}
   />
 
-  <ActionButtons onOpenFile={handleOpenFile} onArchive={handleArchive} {isDraft} />
+  <ActionButtons
+    onOpenFile={handleOpenFile}
+    onArchive={handleArchive}
+    onRestore={handleRestore}
+    onDelete={handleDelete}
+    {isDraft}
+    {isArchived}
+  />
 {/if}

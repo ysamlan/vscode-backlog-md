@@ -49,6 +49,7 @@ export interface TaskDetailData {
   isBlocked: boolean;
   descriptionHtml: string;
   isDraft?: boolean;
+  isArchived?: boolean;
   parentTask?: { id: string; title: string };
   subtaskSummaries?: Array<{ id: string; title: string; status: string }>;
 }

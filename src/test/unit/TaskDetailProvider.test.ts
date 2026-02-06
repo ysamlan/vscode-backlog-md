@@ -21,6 +21,26 @@ vi.mock('marked', () => ({
   },
 }));
 
+// Mock BacklogWriter
+const mockWriter = {
+  updateTask: vi.fn().mockResolvedValue(undefined),
+  toggleChecklistItem: vi.fn().mockResolvedValue(undefined),
+  promoteDraft: vi.fn().mockResolvedValue(undefined),
+  archiveTask: vi.fn().mockResolvedValue(undefined),
+  restoreArchivedTask: vi.fn().mockResolvedValue('/fake/backlog/tasks/task-5.md'),
+  deleteTask: vi.fn().mockResolvedValue(undefined),
+  createSubtask: vi
+    .fn()
+    .mockResolvedValue({ id: 'TASK-99', filePath: '/fake/backlog/tasks/task-99.md' }),
+};
+vi.mock('../../core/BacklogWriter', () => ({
+  BacklogWriter: vi.fn(function () {
+    return mockWriter;
+  }),
+  computeContentHash: vi.fn(() => 'mock-hash'),
+  FileConflictError: class FileConflictError extends Error {},
+}));
+
 describe('TaskDetailProvider', () => {
   let extensionUri: vscode.Uri;
   let mockParser: BacklogParser;
@@ -65,6 +85,18 @@ describe('TaskDetailProvider', () => {
     // Reset fs mocks
     (fs.existsSync as Mock).mockReturnValue(true);
     (fs.readFileSync as Mock).mockReturnValue('# Test Task\nContent');
+
+    // Reset writer mocks
+    mockWriter.updateTask.mockResolvedValue(undefined);
+    mockWriter.toggleChecklistItem.mockResolvedValue(undefined);
+    mockWriter.promoteDraft.mockResolvedValue(undefined);
+    mockWriter.archiveTask.mockResolvedValue(undefined);
+    mockWriter.restoreArchivedTask.mockResolvedValue('/fake/backlog/tasks/task-5.md');
+    mockWriter.deleteTask.mockResolvedValue(undefined);
+    mockWriter.createSubtask.mockResolvedValue({
+      id: 'TASK-99',
+      filePath: '/fake/backlog/tasks/task-99.md',
+    });
 
     // Clear static state between tests
     TaskDetailProvider['currentPanel'] = undefined;
@@ -485,6 +517,139 @@ describe('TaskDetailProvider', () => {
       expect(taskDataCall).toBeTruthy();
       expect(taskDataCall![0].data.parentTask).toBeUndefined();
       expect(taskDataCall![0].data.subtaskSummaries).toBeUndefined();
+    });
+  });
+
+  describe('sendTaskData isArchived', () => {
+    it('should set isArchived: true when task folder is archive', async () => {
+      const filePath = '/test/backlog/archive/tasks/task-5.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-5',
+        title: 'Archived Task',
+        description: 'Description',
+        status: 'Done',
+        priority: undefined,
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: filePath,
+        folder: 'archive',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+
+      await provider.openTask('TASK-5');
+
+      // Wait for setTimeout in openTask
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.isArchived).toBe(true);
+      expect(taskDataCall![0].data.isDraft).toBe(false);
+    });
+
+    it('should set isArchived: false when task folder is tasks', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Regular Task',
+        description: 'Description',
+        status: 'To Do',
+        priority: undefined,
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: filePath,
+        folder: 'tasks',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+
+      await provider.openTask('TASK-1');
+
+      // Wait for setTimeout in openTask
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.isArchived).toBe(false);
+    });
+  });
+
+  describe('handleMessage restoreTask', () => {
+    it('should call restoreArchivedTask and close panel', async () => {
+      const filePath = '/test/backlog/archive/tasks/task-5.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-5',
+        title: 'Archived Task',
+        status: 'Done',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath,
+        folder: 'archive',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-5');
+
+      // Get message handler
+      const messageHandler = (mockWebview.onDidReceiveMessage as Mock).mock.calls[0][0];
+
+      await messageHandler({ type: 'restoreTask', taskId: 'TASK-5' });
+
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        expect.stringContaining('restored')
+      );
+      expect(mockPanel.dispose).toHaveBeenCalled();
+    });
+  });
+
+  describe('handleMessage deleteTask', () => {
+    it('should show confirmation dialog before deleting', async () => {
+      const filePath = '/test/backlog/archive/tasks/task-5.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-5',
+        title: 'Task to Delete',
+        status: 'Done',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath,
+        folder: 'archive',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-5');
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as Mock).mock.calls[0][0];
+
+      await messageHandler({ type: 'deleteTask', taskId: 'TASK-5' });
+
+      expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+        expect.stringContaining('Task to Delete'),
+        expect.objectContaining({ modal: true }),
+        'Delete'
+      );
     });
   });
 

@@ -31,6 +31,7 @@ interface TaskDetailData {
   isBlocked: boolean;
   descriptionHtml: string;
   isDraft?: boolean;
+  isArchived?: boolean;
   parentTask?: { id: string; title: string };
   subtaskSummaries?: Array<{ id: string; title: string; status: string }>;
 }
@@ -262,6 +263,7 @@ export class TaskDetailProvider {
         isBlocked,
         descriptionHtml,
         isDraft: task.folder === 'drafts',
+        isArchived: task.folder === 'archive',
         parentTask,
         subtaskSummaries,
       };
@@ -409,24 +411,52 @@ export class TaskDetailProvider {
       case 'archiveTask': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
 
-        const archiveTask = await this.parser.getTask(TaskDetailProvider.currentTaskId);
-        if (!archiveTask) break;
+        try {
+          await this.writer.archiveTask(TaskDetailProvider.currentTaskId, this.parser);
+          vscode.window.showInformationMessage(`Task ${TaskDetailProvider.currentTaskId} archived`);
+          TaskDetailProvider.currentPanel?.dispose();
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to archive task: ${error}`);
+        }
+        break;
+      }
 
-        const confirmation = await vscode.window.showWarningMessage(
-          `Archive task "${archiveTask.title}"? It will be moved to backlog/archive/tasks/`,
+      case 'restoreTask': {
+        if (!TaskDetailProvider.currentTaskId || !this.parser) break;
+
+        try {
+          await this.writer.restoreArchivedTask(TaskDetailProvider.currentTaskId, this.parser);
+          vscode.window.showInformationMessage(
+            `Task ${TaskDetailProvider.currentTaskId} restored to tasks`
+          );
+          TaskDetailProvider.currentPanel?.dispose();
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to restore task: ${error}`);
+        }
+        break;
+      }
+
+      case 'deleteTask': {
+        if (!TaskDetailProvider.currentTaskId || !this.parser) break;
+
+        const deleteTarget = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        if (!deleteTarget) break;
+
+        const deleteConfirmation = await vscode.window.showWarningMessage(
+          `Permanently delete task "${deleteTarget.title}"? This cannot be undone.`,
           { modal: true },
-          'Archive'
+          'Delete'
         );
 
-        if (confirmation === 'Archive') {
+        if (deleteConfirmation === 'Delete') {
           try {
-            await this.writer.archiveTask(TaskDetailProvider.currentTaskId, this.parser);
+            await this.writer.deleteTask(TaskDetailProvider.currentTaskId, this.parser);
             vscode.window.showInformationMessage(
-              `Task ${TaskDetailProvider.currentTaskId} archived`
+              `Task ${TaskDetailProvider.currentTaskId} deleted`
             );
             TaskDetailProvider.currentPanel?.dispose();
           } catch (error) {
-            vscode.window.showErrorMessage(`Failed to archive task: ${error}`);
+            vscode.window.showErrorMessage(`Failed to delete task: ${error}`);
           }
         }
         break;
