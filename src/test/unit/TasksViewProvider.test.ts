@@ -836,6 +836,94 @@ describe('TasksViewProvider', () => {
       );
     });
 
+    it('should build byStatus from config statuses', async () => {
+      const baseTask = {
+        title: 'Task',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/t.md',
+      };
+
+      const tasks: Task[] = [
+        { ...baseTask, id: 'T-1', status: 'Backlog' },
+        { ...baseTask, id: 'T-2', status: 'Review' },
+      ];
+
+      // Config returns custom statuses
+      (mockParser.getStatuses as Mock).mockResolvedValue([
+        'Backlog',
+        'In Dev',
+        'Review',
+        'Deployed',
+      ]);
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.setViewMode('dashboard');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'statsUpdated',
+          stats: expect.objectContaining({
+            totalTasks: 2,
+            byStatus: {
+              Backlog: 1,
+              'In Dev': 0,
+              Review: 1,
+              Deployed: 0,
+            },
+          }),
+        })
+      );
+    });
+
+    it('should use last config status as done status for milestones', async () => {
+      const baseTask = {
+        title: 'Task',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/t.md',
+      };
+
+      const tasks: Task[] = [
+        { ...baseTask, id: 'T-1', status: 'Backlog', milestone: 'v1' },
+        { ...baseTask, id: 'T-2', status: 'Deployed', milestone: 'v1' },
+      ];
+
+      // Last status (Deployed) is treated as "done"
+      (mockParser.getStatuses as Mock).mockResolvedValue([
+        'Backlog',
+        'In Dev',
+        'Review',
+        'Deployed',
+      ]);
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.setViewMode('dashboard');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'statsUpdated',
+          stats: expect.objectContaining({
+            milestones: [expect.objectContaining({ name: 'v1', total: 2, done: 1 })],
+          }),
+        })
+      );
+    });
+
     it('should include completedCount from completed folder', async () => {
       const tasks: Task[] = [
         {
@@ -896,6 +984,125 @@ describe('TasksViewProvider', () => {
           }),
         })
       );
+    });
+  });
+
+  describe('draftCountUpdated', () => {
+    it('should send draftCountUpdated with count of draft tasks on refresh', async () => {
+      const draftTasks = [
+        {
+          id: 'TASK-10',
+          title: 'Draft Task 1',
+          status: 'Draft' as const,
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/fake/backlog/drafts/task-10.md',
+        },
+        {
+          id: 'TASK-11',
+          title: 'Draft Task 2',
+          status: 'Draft' as const,
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/fake/backlog/drafts/task-11.md',
+        },
+      ];
+
+      (mockParser as unknown as Record<string, unknown>).getDrafts = vi
+        .fn()
+        .mockResolvedValue(draftTasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'draftCountUpdated',
+        count: 2,
+      });
+    });
+
+    it('should send draftCountUpdated with 0 when no drafts exist', async () => {
+      (mockParser as unknown as Record<string, unknown>).getDrafts = vi.fn().mockResolvedValue([]);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'draftCountUpdated',
+        count: 0,
+      });
+    });
+
+    it('should use tasks.length as draft count when in drafts mode', async () => {
+      const draftTasks = [
+        {
+          id: 'TASK-10',
+          title: 'Draft Task 1',
+          status: 'Draft' as const,
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/fake/backlog/drafts/task-10.md',
+        },
+        {
+          id: 'TASK-11',
+          title: 'Draft Task 2',
+          status: 'Draft' as const,
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/fake/backlog/drafts/task-11.md',
+        },
+        {
+          id: 'TASK-12',
+          title: 'Draft Task 3',
+          status: 'Draft' as const,
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/fake/backlog/drafts/task-12.md',
+        },
+      ];
+
+      (mockParser as unknown as Record<string, unknown>).getDrafts = vi
+        .fn()
+        .mockResolvedValue(draftTasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      // Switch to drafts mode
+      provider.setViewMode('drafts');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      // In drafts mode, count comes from tasks.length (the loaded drafts), not a separate getDrafts call
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'draftCountUpdated',
+        count: 3,
+      });
     });
   });
 

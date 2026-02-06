@@ -60,7 +60,7 @@
           <path d="M3 3v18h18"/><path d="M13 17V9"/><path d="M18 17V5"/><path d="M8 17v-3"/>
         </svg>
       {/if}
-      <span class="tab-label">{tab.label}{#if tab.mode === 'drafts' && draftCount > 0} ({draftCount}){/if}</span>
+      <span class="tab-label">{tab.label}{#if tab.mode === 'drafts' && draftCount > 0}&nbsp;({draftCount}){/if}</span>
     </button>
   {/each}
 
