@@ -1,9 +1,10 @@
 ---
 id: TASK-90
 title: 'Feature gap analysis: upstream Backlog.md TUI/web vs our extension'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 02:48'
+updated_date: '2026-02-06 18:09'
 labels:
   - research
   - compatibility
@@ -53,9 +54,9 @@ Conduct a comprehensive review of the upstream MrLesk/Backlog.md TUI and web int
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All TUI features documented and compared
-- [ ] #2 All web UI features documented and compared
-- [ ] #3 All CLI capabilities documented and compared
-- [ ] #4 Gaps categorized by importance (critical, important, nice-to-have)
-- [ ] #5 Findings documented in a backlog document for reference
+- [x] #1 All TUI features documented and compared
+- [x] #2 All web UI features documented and compared
+- [x] #3 All CLI capabilities documented and compared
+- [x] #4 Gaps categorized by importance (critical, important, nice-to-have)
+- [x] #5 Findings documented in a backlog document for reference
 <!-- AC:END -->

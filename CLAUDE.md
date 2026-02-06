@@ -174,51 +174,192 @@ The extension activates when it detects `backlog/tasks/*.md` files.
 
 ### Upstream Backlog.md Reference
 
-When researching Backlog.md data models, frontmatter fields, or functionality, consult the upstream source at **https://github.com/MrLesk/Backlog.md**.
+Upstream source: **https://github.com/MrLesk/Backlog.md**.
 
-**To fetch raw files from the repo** (for code inspection):
+> **Research workflow**: A local checkout lives at `/workspace/tmp/mrlesk-Backlog.md-src/`. Always use this for researching upstream functionality instead of fetching from GitHub. If the directory is missing, clone it: `git clone https://github.com/MrLesk/Backlog.md.git /workspace/tmp/mrlesk-Backlog.md-src`
 
-```
-https://raw.githubusercontent.com/MrLesk/Backlog.md/main/src/<path>
-```
-
-**Key source files:**
-
-- `src/markdown/parser.ts` - Frontmatter parsing, date formats, array handling
-- `src/markdown/serializer.ts` - Task serialization with `gray-matter` library
-- `src/file-system/operations.ts` - File I/O, config serialization
-- `src/core/backlog.ts` - Core task operations (createTask, updateTask)
-- `src/core/task-loader.ts` - Cross-branch task loading
-
-**Task file format (canonical):**
+#### Task YAML Frontmatter (all fields)
 
 ```yaml
 ---
-id: TASK-1
-title: Example task
-status: To Do
-priority: high
-milestone: v1.0
-labels: [feature, ui]
-assignee: [@user]
-created: 2024-01-15
-updated_date: 2024-01-16
-dependencies: [TASK-2]
+id: TASK-1 # string, auto-generated, uppercase prefix
+title: Example task # string, required
+status: To Do # string, from config statuses
+priority: high # "high" | "medium" | "low" (optional)
+assignee: ['@alice', '@bob'] # string[], @-prefixed values are quoted
+reporter: '@carol' # string (optional)
+created_date: 2024-01-15 # YYYY-MM-DD or YYYY-MM-DD HH:mm
+updated_date: 2024-01-16 14:30 # same format (optional, set on updates)
+labels: [feature, ui] # string[], inline bracket format
+milestone: v1.0 # string (optional)
+dependencies: [TASK-2, TASK-3] # string[], task IDs
+references: [https://example.com] # string[] (optional, if non-empty)
+documentation: [docs/spec.md] # string[] (optional, if non-empty)
+parent_task_id: TASK-5 # string (optional, for subtasks)
+subtasks: [TASK-5.1, TASK-5.2] # string[] (optional, dot notation)
+ordinal: 1500 # number (optional, for ordering)
+onStatusChange: './scripts/notify.sh' # string (optional, per-task callback)
 ---
-
-# Example task
-
-Description content here.
 ```
 
-**Key formatting rules:**
+**Serialization field order**: id, title, status, assignee, reporter, created_date, updated_date, labels, milestone, dependencies, references, documentation, parent_task_id, subtasks, priority, ordinal, onStatusChange. Optional fields are omitted when empty/undefined.
 
-- Arrays use inline bracket format: `labels: [item1, item2]`
-- Dates use `YYYY-MM-DD` format (no timestamps)
-- Assignees with `@` prefix are quoted: `[@user]` or `["@user"]`
-- Field order: id, title, status, priority, milestone, labels, assignee, created, updated_date, dependencies...
+**Formatting rules:**
 
-Always check the upstream repo when:
+- Arrays: inline bracket format `[item1, item2]`
+- Dates: `YYYY-MM-DD` (date-only) or `YYYY-MM-DD HH:mm` (space separator, not T)
+- Legacy date formats auto-converted: `DD-MM-YY`, `DD/MM/YY`, `DD.MM.YY`
+- Assignees with `@` prefix: auto-quoted in arrays `["@alice"]`
+- Priority: always lowercase
+- Subtask IDs: dot notation `TASK-5.1`, `TASK-5.2`
+
+#### Body Sections
+
+Task body uses markdown headers with HTML comment markers for machine-readable boundaries:
+
+```markdown
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+
+Task description content.
+
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+
+<!-- AC:BEGIN -->
+
+- [x] #1 First criterion (checked)
+- [ ] #2 Second criterion (unchecked)
+<!-- AC:END -->
+
+## Definition of Done
+
+<!-- DOD:BEGIN -->
+
+- [ ] #1 Code reviewed
+- [ ] #2 Tests pass
+<!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+
+1. Step one
+2. Step two
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+
+Found that X required Y approach.
+
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+
+Completed with approach Z.
+
+<!-- SECTION:FINAL_SUMMARY:END -->
+```
+
+**Marker formats:**
+
+- Structured sections: `<!-- SECTION:{KEY}:BEGIN -->` / `<!-- SECTION:{KEY}:END -->` where KEY is `DESCRIPTION`, `PLAN`, `NOTES`, `FINAL_SUMMARY`
+- Checklists: `<!-- AC:BEGIN -->` / `<!-- AC:END -->` and `<!-- DOD:BEGIN -->` / `<!-- DOD:END -->`
+- Checklist items: `- [x] #N Text` or `- [ ] #N Text` (1-based index)
+- Legacy checklists without markers are also parsed (backward compat)
+
+#### Folder Structure
+
+```
+backlog/
+├── config.yml                    # Project configuration
+├── .user                         # Local user settings (optional, not committed)
+├── tasks/                        # Active task files
+│   └── TASK-1 - Task-title.md
+├── drafts/                       # Draft task files (pre-promotion)
+│   └── DRAFT-1 - Draft-title.md
+├── completed/                    # Tasks moved here when done
+│   └── TASK-5 - Done-task.md
+├── archive/
+│   ├── tasks/                    # Archived tasks (soft delete)
+│   ├── drafts/                   # Archived drafts
+│   └── milestones/               # Archived milestones
+├── docs/                         # Project documents (supports subdirs)
+│   └── doc-1 - Document-title.md
+├── decisions/                    # Decision records
+│   └── decision-1 - Decision-title.md
+└── milestones/                   # Milestone files
+    └── m-1 - Milestone-name.md
+```
+
+#### Config File (`config.yml`)
+
+Parsed as line-by-line `key: value` (not strict YAML). Comments with `#`.
+
+```yaml
+project_name: 'My Project' # string, required
+statuses: ['To Do', 'In Progress', 'Done'] # string[], valid task statuses
+default_status: 'To Do' # string, default for new tasks (first status if omitted)
+labels: ['bug', 'feature'] # string[], predefined labels
+milestones: ['v1.0', 'v2.0'] # string[], predefined milestones
+definition_of_done: ['Tests pass', 'Code reviewed'] # string[], default DoD for new tasks
+task_prefix: 'task' # string, ID prefix (default "task" → TASK-1)
+zero_padded_ids: 3 # number, pad IDs (→ TASK-001)
+default_assignee: 'alice' # string (optional)
+default_reporter: 'bob' # string (optional)
+auto_commit: false # boolean, auto-commit changes to git
+check_active_branches: true # boolean, include cross-branch tasks
+active_branch_days: 30 # number, days to look back for branch tasks
+remote_operations: true # boolean, enable remote branch operations
+onStatusChange: './scripts/hook.sh' # string, global status change callback
+bypass_git_hooks: false # boolean, skip pre-commit hooks
+default_editor: 'vim' # string, editor for manual editing
+auto_open_browser: true # boolean, auto-open browser on server start
+default_port: 6420 # number, web server port
+max_column_width: 20 # number, TUI column width
+date_format: 'yyyy-mm-dd' # string, display format
+```
+
+#### File Naming Conventions
+
+| Entity    | Prefix       | Pattern                          | Example                        |
+| --------- | ------------ | -------------------------------- | ------------------------------ |
+| Task      | configurable | `{TASK_PREFIX}-{N} - {Title}.md` | `TASK-1 - Add-login.md`        |
+| Draft     | `draft`      | `DRAFT-{N} - {Title}.md`         | `DRAFT-3 - Explore-caching.md` |
+| Document  | `doc`        | `doc-{N} - {Title}.md`           | `doc-1 - API-Reference.md`     |
+| Decision  | `decision`   | `decision-{N} - {Title}.md`      | `decision-1 - Use-React.md`    |
+| Milestone | `m`          | `m-{N} - {Title}.md`             | `m-1 - Launch-prep.md`         |
+
+- Title sanitization: removes `<>:"/\|?*'(),!@#$%^&+=[]{}`, spaces → hyphens, collapse multiple hyphens
+- IDs are uppercase in frontmatter (`TASK-1`) but lowercase in filenames may vary
+- Zero-padding applies per config: `zero_padded_ids: 3` → `TASK-001`
+- Subtask IDs use dot notation: `TASK-5.1`, `TASK-5.2`
+
+#### Other Entity Frontmatter
+
+**Documents** (`docs/`): `id`, `title`, `type` (`readme`|`guide`|`specification`|`other`), `created_date`, `updated_date`, `tags` (string[])
+
+**Decisions** (`decisions/`): `id`, `title`, `date`, `status` (`proposed`|`accepted`|`rejected`|`superseded`). Body sections: `## Context`, `## Decision`, `## Consequences`, `## Alternatives`
+
+**Milestones** (`milestones/`): `id`, `title`. Body: `## Description`
+
+#### Key Operations & Business Rules
+
+- **Draft vs Task**: Status "Draft" → draft workflow; any other status → task workflow
+- **Promote**: draft → task (new TASK-N ID, old draft file deleted)
+- **Demote**: task → draft (new DRAFT-N ID, old task file deleted)
+- **Complete**: moves task file to `completed/`
+- **Archive**: moves to `archive/{tasks,drafts,milestones}/` (soft delete, IDs reusable)
+- **Status callbacks**: per-task `onStatusChange` overrides global config
+- **Timestamps**: `created_date` set once; `updated_date` on every modification
+
+Always check the upstream repo (or the local checkout at `/workspace/tmp/mrlesk-Backlog.md-src/`) when:
 
 - Adding new frontmatter field support
 - Implementing sorting/ordering features
