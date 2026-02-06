@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { statusToClass, customStatusStyle } from '../../lib/statusColors';
+
   interface SubtaskSummary {
     id: string;
     title: string;
@@ -7,17 +9,16 @@
 
   interface Props {
     subtasks: SubtaskSummary[];
+    statuses?: string[];
     onOpenTask: (taskId: string) => void;
     onCreateSubtask: () => void;
   }
 
-  let { subtasks, onOpenTask, onCreateSubtask }: Props = $props();
+  let { subtasks, statuses = [], onOpenTask, onCreateSubtask }: Props = $props();
 
-  let doneCount = $derived(subtasks.filter((s) => s.status === 'Done').length);
-
-  function getStatusDotClass(status: string): string {
-    return status.toLowerCase().replace(' ', '-');
-  }
+  // The last configured status is treated as "done"
+  let doneStatus = $derived(statuses.length > 0 ? statuses[statuses.length - 1] : 'Done');
+  let doneCount = $derived(subtasks.filter((s) => s.status === doneStatus).length);
 </script>
 
 <div class="section" data-testid="subtasks-section">
@@ -28,7 +29,7 @@
   <div class="subtasks-list">
     {#each subtasks as subtask (subtask.id)}
       <div class="subtask-item" data-testid="subtask-item-{subtask.id}">
-        <span class="subtask-status-dot status-dot-{getStatusDotClass(subtask.status)}" title={subtask.status}></span>
+        <span class="subtask-status-dot status-dot-{statusToClass(subtask.status)}" style={customStatusStyle(subtask.status)} title={subtask.status}></span>
         <button
           type="button"
           class="subtask-link"
@@ -38,7 +39,7 @@
           {subtask.id}
         </button>
         <span class="subtask-title">{subtask.title}</span>
-        <span class="subtask-status-badge status-badge status-{getStatusDotClass(subtask.status)}">{subtask.status}</span>
+        <span class="subtask-status-badge status-badge status-{statusToClass(subtask.status)}" style={customStatusStyle(subtask.status)}>{subtask.status}</span>
       </div>
     {/each}
   </div>

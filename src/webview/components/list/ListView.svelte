@@ -1,11 +1,13 @@
 <script lang="ts">
   import type { Task, Milestone } from '../../lib/types';
+  import { statusToClass, customStatusStyle } from '../../lib/statusColors';
   import { compareByOrdinal, calculateOrdinalsForDrop, type CardData } from '../../../core/ordinalUtils';
 
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
 
   interface Props {
     tasks: TaskWithBlocks[];
+    statuses: string[];
     milestones: Milestone[];
     currentFilter: string;
     currentMilestone: string;
@@ -27,6 +29,7 @@
 
   let {
     tasks,
+    statuses = [],
     milestones,
     currentFilter,
     currentMilestone,
@@ -45,6 +48,9 @@
     onDeleteTask,
     onRequestCompletedTasks,
   }: Props = $props();
+
+  // The "done" status is the last one in the configured statuses list
+  let doneStatus = $derived(statuses.length > 0 ? statuses[statuses.length - 1] : 'Done');
 
   let currentSort = $state<{ field: string; direction: 'asc' | 'desc' }>({
     field: 'status',
@@ -230,8 +236,8 @@
     }
   }
 
-  function getStatusClass(status: string): string {
-    return status.toLowerCase().replace(' ', '-');
+  function getStatusBadgeStyle(status: string): string {
+    return customStatusStyle(status);
   }
 
   // Drag-and-drop state
@@ -452,6 +458,19 @@
           <option value={milestone}>{milestone}</option>
         {/each}
       </select>
+      {#if allLabels.length > 0}
+        <select
+          class="label-filter"
+          value={currentLabel}
+          onchange={(e) => { currentLabel = (e.target as HTMLSelectElement).value; }}
+          data-testid="label-filter"
+        >
+          <option value="">All Labels</option>
+          {#each allLabels as label (label)}
+            <option value={label}>{label}</option>
+          {/each}
+        </select>
+      {/if}
     </div>
   {/if}
 
@@ -569,9 +588,16 @@
                     {/if}
                   </span>
                 {/if}
+                {#if task.labels.length > 0}
+                  <span class="row-labels" data-testid="row-labels-{task.id}">
+                    {#each task.labels as label (label)}
+                      <span class="task-label">{label}</span>
+                    {/each}
+                  </span>
+                {/if}
               </td>
               <td>
-                <span class="status-badge status-{getStatusClass(task.status)}">{task.status}</span>
+                <span class="status-badge status-{statusToClass(task.status)}" style={getStatusBadgeStyle(task.status)}>{task.status}</span>
               </td>
               <td>
                 {#if task.priority}
@@ -619,7 +645,7 @@
                     Promote
                   </button>
                 </td>
-              {:else if !showingCompleted && task.status === 'Done'}
+              {:else if !showingCompleted && task.status === doneStatus}
                 <td class="actions-cell">
                   <button
                     class="action-btn complete-btn"

@@ -25,6 +25,7 @@
     { status: 'Done', label: 'Done' },
   ]);
   let configMilestones = $state<Milestone[]>([]);
+  let statuses = $derived(columns.map((c) => c.status));
   let milestoneGrouping = $state(false);
   let collapsedColumns = $state(new Set<string>());
   let collapsedMilestones = $state(new Set<string>());
@@ -394,6 +395,7 @@
   <div id="list-view" class="view-content">
     <ListView
       {tasks}
+      {statuses}
       milestones={configMilestones}
       {currentFilter}
       {currentMilestone}
@@ -414,6 +416,7 @@
   <div id="archived-view" class="view-content">
     <ListView
       {tasks}
+      {statuses}
       milestones={configMilestones}
       {currentFilter}
       {currentMilestone}

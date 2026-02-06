@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { TaskStatus, TaskPriority } from '../../lib/types';
+  import { statusToClass, customStatusStyle } from '../../lib/statusColors';
 
   interface Props {
     taskId: string;
@@ -34,7 +35,8 @@
     originalTitle = title;
   });
 
-  const statusClass = $derived(status.toLowerCase().replace(/\s+/g, '-'));
+  const statusClass = $derived(statusToClass(status));
+  const statusInlineStyle = $derived(customStatusStyle(status));
   const priorityClass = $derived(priority ? `priority-${priority}` : '');
   const priorities = ['high', 'medium', 'low'];
 
@@ -79,6 +81,7 @@
   <div class="task-badges">
     <select
       class="dropdown-select status-select status-{statusClass}"
+      style={statusInlineStyle}
       data-testid="status-select"
       value={status}
       onchange={handleStatusChange}

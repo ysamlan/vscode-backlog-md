@@ -1,6 +1,7 @@
 <script lang="ts">
   import { vscode } from '../../stores/vscode.svelte';
   import type { DashboardStats } from '../../lib/types';
+  import { statusToClass, customStatCardStyle } from '../../lib/statusColors';
 
   interface Props {
     stats: DashboardStats;
@@ -8,8 +9,11 @@
 
   let { stats }: Props = $props();
 
+  // Use the last status as the "done" status for completion percentage
+  let statusNames = $derived(Object.keys(stats.byStatus));
+  let doneStatusName = $derived(statusNames.length > 0 ? statusNames[statusNames.length - 1] : 'Done');
   const completionPct = $derived(
-    stats.totalTasks > 0 ? Math.round((stats.byStatus['Done'] / stats.totalTasks) * 100) : 0
+    stats.totalTasks > 0 ? Math.round(((stats.byStatus[doneStatusName] || 0) / stats.totalTasks) * 100) : 0
   );
 
   function handleStatusClick(status: string) {
@@ -18,32 +22,17 @@
 </script>
 
 <div class="stats-grid">
-  <button
-    class="stat-card stat-todo clickable"
-    onclick={() => handleStatusClick('To Do')}
-    type="button"
-  >
-    <div class="stat-value">{stats.byStatus['To Do'] || 0}</div>
-    <div class="stat-label">To Do</div>
-  </button>
-
-  <button
-    class="stat-card stat-in-progress clickable"
-    onclick={() => handleStatusClick('In Progress')}
-    type="button"
-  >
-    <div class="stat-value">{stats.byStatus['In Progress'] || 0}</div>
-    <div class="stat-label">In Progress</div>
-  </button>
-
-  <button
-    class="stat-card stat-done clickable"
-    onclick={() => handleStatusClick('Done')}
-    type="button"
-  >
-    <div class="stat-value">{stats.byStatus['Done'] || 0}</div>
-    <div class="stat-label">Done</div>
-  </button>
+  {#each Object.entries(stats.byStatus) as [status, count] (status)}
+    <button
+      class="stat-card stat-{statusToClass(status)} clickable"
+      style={customStatCardStyle(status)}
+      onclick={() => handleStatusClick(status)}
+      type="button"
+    >
+      <div class="stat-value">{count}</div>
+      <div class="stat-label">{status}</div>
+    </button>
+  {/each}
 
   <div class="stat-card">
     <div class="stat-value">{stats.totalTasks}</div>

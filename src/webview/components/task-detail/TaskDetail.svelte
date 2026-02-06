@@ -198,6 +198,7 @@
   {#if subtaskSummaries && subtaskSummaries.length > 0}
     <SubtasksSection
       subtasks={subtaskSummaries}
+      {statuses}
       onOpenTask={handleOpenTask}
       onCreateSubtask={handleCreateSubtask}
     />

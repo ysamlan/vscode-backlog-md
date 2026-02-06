@@ -1391,6 +1391,7 @@ body {
   text-align: center;
 }
 
+.stat-card.stat-to-do,
 .stat-card.stat-todo {
   border-left: 3px solid var(--vscode-badge-background, #4d4d4d);
 }
@@ -1845,6 +1846,35 @@ body {
 
 .shortcuts-help-btn:hover {
   opacity: 1;
+}
+
+/* Label filter dropdown (list view) */
+.label-filter {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.label-filter:hover {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.label-filter:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+/* Inline label pills in list view rows */
+.row-labels {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
 }
 
 /* Utility classes */

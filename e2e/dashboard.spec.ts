@@ -83,7 +83,7 @@ test.describe('Dashboard Tab', () => {
     await postMessageToWebview(page, { type: 'statsUpdated', stats: sampleStats });
 
     // Verify stats grid shows correct values
-    await expect(page.locator('.stat-todo .stat-value')).toHaveText('3');
+    await expect(page.locator('.stat-to-do .stat-value')).toHaveText('3');
     await expect(page.locator('.stat-in-progress .stat-value')).toHaveText('4');
     await expect(page.locator('.stat-done .stat-value')).toHaveText('3');
 
@@ -151,7 +151,7 @@ test.describe('Dashboard Tab', () => {
     await clearPostedMessages(page);
 
     // Click the "To Do" stat card
-    await page.click('.stat-todo');
+    await page.click('.stat-to-do');
 
     // Verify the correct message was sent
     const message = await getLastPostedMessage(page);

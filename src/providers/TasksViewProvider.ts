@@ -115,6 +115,9 @@ export class TasksViewProvider extends BaseViewProvider {
       // Compute subtask relationships from parentTaskId fields
       computeSubtasks(tasks);
 
+      // The last configured status is treated as the "done" status
+      const doneStatus = statuses.length > 0 ? statuses[statuses.length - 1] : 'Done';
+
       // Compute reverse dependencies (blocksTaskIds) and subtask progress for each task
       const tasksWithBlocks = await Promise.all(
         tasks.map(async (task) => {
@@ -129,7 +132,7 @@ export class TasksViewProvider extends BaseViewProvider {
             const total = task.subtasks.length;
             const done = task.subtasks.filter((childId) => {
               const child = tasks.find((t) => t.id === childId);
-              return child?.status === 'Done';
+              return child?.status === doneStatus;
             }).length;
             enhanced.subtaskProgress = { total, done };
           }
@@ -512,11 +515,12 @@ export class TasksViewProvider extends BaseViewProvider {
     if (!this._view || !this.parser) return;
 
     try {
-      const [tasks, completedTasks] = await Promise.all([
+      const [tasks, completedTasks, statuses] = await Promise.all([
         this.parser.getTasks(),
         this.parser.getCompletedTasks(),
+        this.parser.getStatuses(),
       ]);
-      const stats = this.computeStatistics(tasks, completedTasks.length);
+      const stats = this.computeStatistics(tasks, completedTasks.length, statuses);
       this.postMessage({ type: 'statsUpdated', stats });
     } catch (error) {
       console.error('[Backlog.md] Error refreshing dashboard stats:', error);
@@ -525,11 +529,14 @@ export class TasksViewProvider extends BaseViewProvider {
   }
 
   /**
-   * Compute statistics from tasks
+   * Compute statistics from tasks.
+   * The statuses array comes from the backlog config. The last status in the list
+   * is treated as the "done" status for milestone completion tracking.
    */
   private computeStatistics(
     tasks: Task[],
-    completedCount: number = 0
+    completedCount: number = 0,
+    statuses: string[] = ['To Do', 'In Progress', 'Done']
   ): {
     totalTasks: number;
     completedCount: number;
@@ -537,11 +544,11 @@ export class TasksViewProvider extends BaseViewProvider {
     byPriority: Record<string, number>;
     milestones: Array<{ name: string; total: number; done: number }>;
   } {
-    const byStatus: Record<string, number> = {
-      'To Do': 0,
-      'In Progress': 0,
-      Done: 0,
-    };
+    // Build byStatus dynamically: start with all config statuses (preserving order)
+    const byStatus: Record<string, number> = {};
+    for (const status of statuses) {
+      byStatus[status] = 0;
+    }
 
     const byPriority: Record<string, number> = {
       high: 0,
@@ -549,6 +556,9 @@ export class TasksViewProvider extends BaseViewProvider {
       low: 0,
       none: 0,
     };
+
+    // The last configured status is treated as the "done" status
+    const doneStatus = statuses.length > 0 ? statuses[statuses.length - 1] : 'Done';
 
     const milestoneMap = new Map<string, { total: number; done: number }>();
 
@@ -564,7 +574,7 @@ export class TasksViewProvider extends BaseViewProvider {
         }
         const m = milestoneMap.get(task.milestone)!;
         m.total++;
-        if (task.status === 'Done') {
+        if (task.status === doneStatus) {
           m.done++;
         }
       }
