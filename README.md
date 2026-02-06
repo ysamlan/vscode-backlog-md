@@ -86,6 +86,25 @@ Add JWT-based authentication to the API endpoints.
 | `assignee` | List of usernames                       |
 | `labels`   | List of tags                            |
 
+## Keyboard Shortcuts
+
+Press `?` in the tasks view to see all shortcuts, or use the `?` button in the bottom-right corner.
+
+| Key       | Action                          |
+| --------- | ------------------------------- |
+| `?`       | Show keyboard shortcuts         |
+| `z`       | Kanban view                     |
+| `x`       | List view                       |
+| `c`       | Drafts view                     |
+| `v`       | Archived view                   |
+| `j` / `k` | Next / previous task            |
+| `h` / `l` | Previous / next column (kanban) |
+| `Enter`   | Open focused task               |
+| `/`       | Focus search                    |
+| `n`       | Create new task                 |
+| `r`       | Refresh views                   |
+| `Esc`     | Close popup                     |
+
 ## Commands
 
 Open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P) and type "Backlog":

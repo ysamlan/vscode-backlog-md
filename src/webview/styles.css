@@ -1821,6 +1821,32 @@ body {
   color: var(--vscode-foreground, #cccccc);
 }
 
+/* Keyboard shortcuts help button */
+.shortcuts-help-btn {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.2));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground, #cccccc));
+  border: 1px solid var(--vscode-widget-border, #303031);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.shortcuts-help-btn:hover {
+  opacity: 1;
+}
+
 /* Utility classes */
 .hidden {
   display: none !important;
