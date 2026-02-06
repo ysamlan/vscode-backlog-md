@@ -50,10 +50,13 @@ interface FrontmatterData {
   milestone?: string;
   labels?: string[];
   assignee?: string[];
+  reporter?: string;
   dependencies?: string[];
   references?: string[];
   documentation?: string[];
   type?: string;
+  parent_task_id?: string;
+  subtasks?: string[];
   created_date?: string;
   updated_date?: string;
   ordinal?: number;
@@ -235,6 +238,9 @@ export class BacklogWriter {
     }
     if (updates.type !== undefined) {
       frontmatter.type = updates.type;
+    }
+    if (updates.reporter !== undefined) {
+      frontmatter.reporter = updates.reporter;
     }
     if (updates.ordinal !== undefined) {
       frontmatter.ordinal = updates.ordinal;
