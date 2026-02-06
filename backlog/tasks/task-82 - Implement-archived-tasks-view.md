@@ -1,10 +1,10 @@
 ---
 id: TASK-82
 title: Implement archived tasks view
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 02:12'
-updated_date: '2026-02-06 02:12'
+updated_date: '2026-02-06 17:57'
 labels:
   - ui
   - archive

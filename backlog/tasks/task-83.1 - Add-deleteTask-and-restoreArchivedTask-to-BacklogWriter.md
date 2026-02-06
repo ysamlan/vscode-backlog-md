@@ -1,9 +1,10 @@
 ---
 id: TASK-83.1
 title: Add deleteTask and restoreArchivedTask to BacklogWriter
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 02:26'
+updated_date: '2026-02-06 17:57'
 labels:
   - backend
 dependencies: []

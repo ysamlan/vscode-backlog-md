@@ -1,9 +1,10 @@
 ---
 id: TASK-81
 title: Replace native view toggle icons with in-webview tab control
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 02:12'
+updated_date: '2026-02-06 17:57'
 labels:
   - ui
   - navigation

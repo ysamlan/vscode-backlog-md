@@ -1,9 +1,10 @@
 ---
 id: TASK-84
 title: 'Add keyboard shortcuts help popup (? key, Gmail-style)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 02:12'
+updated_date: '2026-02-06 17:57'
 labels:
   - ui
   - ux

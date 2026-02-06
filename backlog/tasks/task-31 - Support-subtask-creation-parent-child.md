@@ -1,9 +1,10 @@
 ---
 id: TASK-31
 title: Support subtask creation (parent-child)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-02 23:22'
+updated_date: '2026-02-06 17:57'
 labels:
   - 'epic:task-crud'
   - 'phase:7'
