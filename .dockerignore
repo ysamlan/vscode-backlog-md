@@ -1,0 +1,24 @@
+# Dependencies (arch-specific binaries, reinstalled in container)
+node_modules/
+.bun/
+
+# Build outputs (rebuilt in container)
+dist/
+out/
+*.vsix
+
+# VS Code test binaries (arch-specific)
+.vscode-test/
+
+# Test artifacts
+test-results/
+playwright-report/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python virtual environments
+.venv/
+.venv_devcontainer/
+
