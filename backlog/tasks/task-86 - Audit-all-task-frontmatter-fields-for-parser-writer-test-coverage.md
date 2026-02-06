@@ -1,9 +1,10 @@
 ---
 id: TASK-86
 title: Audit all task frontmatter fields for parser/writer/test coverage
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 02:36'
+updated_date: '2026-02-06 16:08'
 labels:
   - testing
   - compatibility
@@ -58,11 +59,11 @@ Comprehensively review ALL fields that can appear in Backlog.md task YAML frontm
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every upstream frontmatter field has a corresponding TypeScript type
-- [ ] #2 BacklogParser correctly parses every field (including alternate names like created vs created_date)
-- [ ] #3 BacklogWriter preserves every field on round-trip without data loss
-- [ ] #4 Unit tests exist for parsing each field
-- [ ] #5 Unit tests exist for writing each field
-- [ ] #6 Sample workspace tasks collectively cover all field variants
-- [ ] #7 Fields with special formatting (arrays, dates, @-prefixed assignees) have edge case tests
+- [x] #1 Every upstream frontmatter field has a corresponding TypeScript type
+- [x] #2 BacklogParser correctly parses every field (including alternate names like created vs created_date)
+- [x] #3 BacklogWriter preserves every field on round-trip without data loss
+- [x] #4 Unit tests exist for parsing each field
+- [x] #5 Unit tests exist for writing each field
+- [x] #6 Sample workspace tasks collectively cover all field variants
+- [x] #7 Fields with special formatting (arrays, dates, @-prefixed assignees) have edge case tests
 <!-- AC:END -->

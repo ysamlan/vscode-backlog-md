@@ -1,9 +1,10 @@
 ---
 id: TASK-89
 title: Add label filtering to list view and label display on list rows
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 02:48'
+updated_date: '2026-02-06 17:51'
 labels:
   - ui
   - feature

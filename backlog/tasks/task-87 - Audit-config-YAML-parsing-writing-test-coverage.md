@@ -1,9 +1,10 @@
 ---
 id: TASK-87
 title: Audit config YAML parsing/writing test coverage
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 02:37'
+updated_date: '2026-02-06 15:53'
 labels:
   - testing
   - compatibility
@@ -49,10 +50,10 @@ Ensure our config YAML parser and writer have comprehensive test coverage for al
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every upstream config field has a corresponding TypeScript type
-- [ ] #2 Config parser handles both snake_case and camelCase field names
-- [ ] #3 Unit tests exist for parsing each config field
-- [ ] #4 Unit tests cover edge cases (missing/empty/partial config)
-- [ ] #5 Sample workspace config.yml includes all supported fields
-- [ ] #6 Config types are verified against upstream BacklogConfig type
+- [x] #1 Every upstream config field has a corresponding TypeScript type
+- [x] #2 Config parser handles both snake_case and camelCase field names
+- [x] #3 Unit tests exist for parsing each config field
+- [x] #4 Unit tests cover edge cases (missing/empty/partial config)
+- [x] #5 Sample workspace config.yml includes all supported fields
+- [x] #6 Config types are verified against upstream BacklogConfig type
 <!-- AC:END -->

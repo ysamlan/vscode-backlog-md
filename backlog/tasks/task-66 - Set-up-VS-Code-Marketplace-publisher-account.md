@@ -4,11 +4,16 @@ title: Set up VS Code Marketplace publisher account
 status: To Do
 assignee: []
 created_date: '2026-02-04 01:40'
+updated_date: '2026-02-06 16:00'
 labels:
   - 'epic:polish'
   - 'phase:9'
 milestone: MVP Release
 dependencies: []
+references:
+  - 'https://github.com/marketplace/actions/publish-vs-code-extension'
+  - >-
+    https://onlyutkarsh.medium.com/shipping-vs-code-extensions-with-confidence-automating-releases-with-github-actions-a3c87b866355
 priority: low
 ---
 

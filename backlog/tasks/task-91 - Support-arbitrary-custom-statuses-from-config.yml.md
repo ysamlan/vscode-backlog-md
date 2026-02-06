@@ -1,9 +1,10 @@
 ---
 id: TASK-91
 title: Support arbitrary custom statuses from config.yml
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 03:18'
+updated_date: '2026-02-06 17:48'
 labels:
   - upstream-compat
   - bug

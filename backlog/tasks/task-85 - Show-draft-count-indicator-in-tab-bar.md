@@ -1,9 +1,10 @@
 ---
 id: TASK-85
 title: Show draft count indicator in tab bar
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-06 02:22'
+updated_date: '2026-02-06 17:50'
 labels:
   - ui
   - ux
