@@ -74,6 +74,45 @@ export interface Milestone {
 }
 
 /**
+ * Document type for backlog docs
+ */
+export type DocumentType = 'readme' | 'guide' | 'specification' | 'other';
+
+/**
+ * Decision status for ADR-style decisions
+ */
+export type DecisionStatus = 'proposed' | 'accepted' | 'rejected' | 'superseded';
+
+/**
+ * Represents a Backlog.md document (from backlog/docs/)
+ */
+export interface BacklogDocument {
+  id: string;
+  title: string;
+  type?: DocumentType;
+  tags: string[];
+  createdAt?: string;
+  updatedAt?: string;
+  content: string;
+  filePath: string;
+}
+
+/**
+ * Represents a Backlog.md decision (from backlog/decisions/)
+ */
+export interface BacklogDecision {
+  id: string;
+  title: string;
+  date?: string;
+  status?: DecisionStatus;
+  context?: string;
+  decision?: string;
+  consequences?: string;
+  alternatives?: string;
+  filePath: string;
+}
+
+/**
  * Task resolution strategy for cross-branch conflicts
  */
 export type TaskResolutionStrategy = 'most_recent' | 'most_progressed';
@@ -151,8 +190,13 @@ export type WebviewMessage =
   | { type: 'createSubtask'; parentTaskId: string }
   | { type: 'restoreTask'; taskId: string }
   | { type: 'deleteTask'; taskId: string }
-  | { type: 'setViewMode'; mode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' }
-  | { type: 'requestCreateTask' };
+  | {
+      type: 'setViewMode';
+      mode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' | 'docs' | 'decisions';
+    }
+  | { type: 'requestCreateTask' }
+  | { type: 'openDocument'; documentId: string }
+  | { type: 'openDecision'; decisionId: string };
 
 /**
  * Data source mode for task viewing
@@ -179,7 +223,10 @@ export type ExtensionMessage =
   | { type: 'setFilter'; filter: string }
   | { type: 'draftsModeChanged'; enabled: boolean }
   | { type: 'completedTasksUpdated'; tasks: Task[] }
-  | { type: 'activeTabChanged'; tab: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' }
+  | {
+      type: 'activeTabChanged';
+      tab: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' | 'docs' | 'decisions';
+    }
   | { type: 'draftCountUpdated'; count: number }
   | {
       type: 'statsUpdated';
@@ -190,4 +237,8 @@ export type ExtensionMessage =
         byPriority: Record<string, number>;
         milestones: Array<{ name: string; total: number; done: number }>;
       };
-    };
+    }
+  | { type: 'documentsUpdated'; documents: BacklogDocument[] }
+  | { type: 'decisionsUpdated'; decisions: BacklogDecision[] }
+  | { type: 'documentData'; document: BacklogDocument; contentHtml: string }
+  | { type: 'decisionData'; decision: BacklogDecision; sections: Record<string, string> };

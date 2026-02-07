@@ -9,6 +9,10 @@ import {
   ChecklistItem,
   Milestone,
   BacklogConfig,
+  BacklogDocument,
+  BacklogDecision,
+  DocumentType,
+  DecisionStatus,
 } from './types';
 import { GitBranchService } from './GitBranchService';
 import { CrossBranchTaskLoader } from './CrossBranchTaskLoader';
@@ -547,5 +551,274 @@ export class BacklogParser {
       checked: match[1].toLowerCase() === 'x',
       text: match[3].trim(),
     };
+  }
+
+  /**
+   * Get all documents from backlog/docs/ (supports subdirectories)
+   */
+  async getDocuments(): Promise<BacklogDocument[]> {
+    const docsPath = path.join(this.backlogPath, 'docs');
+    if (!fs.existsSync(docsPath)) return [];
+
+    const files = this.getMarkdownFilesRecursive(docsPath);
+    const documents: BacklogDocument[] = [];
+
+    for (const filePath of files) {
+      try {
+        const doc = this.parseDocumentFile(filePath);
+        if (doc) documents.push(doc);
+      } catch (error) {
+        console.error(`[Backlog.md Parser] Error parsing document file ${filePath}:`, error);
+      }
+    }
+
+    return documents.sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  /**
+   * Get a single document by ID
+   */
+  async getDocument(docId: string): Promise<BacklogDocument | undefined> {
+    const docs = await this.getDocuments();
+    return docs.find((d) => d.id === docId);
+  }
+
+  /**
+   * Get all decisions from backlog/decisions/
+   */
+  async getDecisions(): Promise<BacklogDecision[]> {
+    const decisionsPath = path.join(this.backlogPath, 'decisions');
+    if (!fs.existsSync(decisionsPath)) return [];
+
+    const files = fs.readdirSync(decisionsPath).filter((f) => f.endsWith('.md'));
+    const decisions: BacklogDecision[] = [];
+
+    for (const file of files) {
+      try {
+        const filePath = path.join(decisionsPath, file);
+        const decision = this.parseDecisionFile(filePath);
+        if (decision) decisions.push(decision);
+      } catch (error) {
+        console.error(`[Backlog.md Parser] Error parsing decision file ${file}:`, error);
+      }
+    }
+
+    return decisions.sort((a, b) => {
+      const aNum = parseInt(a.id.replace(/\D/g, ''), 10) || 0;
+      const bNum = parseInt(b.id.replace(/\D/g, ''), 10) || 0;
+      return aNum - bNum;
+    });
+  }
+
+  /**
+   * Get a single decision by ID
+   */
+  async getDecision(decisionId: string): Promise<BacklogDecision | undefined> {
+    const decisions = await this.getDecisions();
+    return decisions.find((d) => d.id === decisionId);
+  }
+
+  /**
+   * Recursively get all .md files from a directory
+   */
+  private getMarkdownFilesRecursive(dirPath: string): string[] {
+    const results: string[] = [];
+    if (!fs.existsSync(dirPath)) return results;
+
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...this.getMarkdownFilesRecursive(fullPath));
+      } else if (entry.name.endsWith('.md')) {
+        results.push(fullPath);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Parse a document file from backlog/docs/
+   */
+  parseDocumentFile(filePath: string): BacklogDocument | undefined {
+    if (!fs.existsSync(filePath)) return undefined;
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return this.parseDocumentContent(content, filePath);
+  }
+
+  /**
+   * Parse document content from markdown with YAML frontmatter
+   */
+  parseDocumentContent(content: string, filePath: string): BacklogDocument | undefined {
+    const lines = content.split('\n');
+
+    // Extract ID from filename (doc-N pattern)
+    const filename = path.basename(filePath, '.md');
+    const idMatch = filename.match(/^(doc-\d+)/i);
+    const id = idMatch ? idMatch[1].toUpperCase() : filename;
+
+    const doc: BacklogDocument = {
+      id,
+      title: '',
+      tags: [],
+      content: '',
+      filePath,
+    };
+
+    // Parse YAML frontmatter
+    let lineIndex = 0;
+    if (lines[0]?.trim() === '---') {
+      lineIndex = 1;
+      const frontmatterLines: string[] = [];
+      while (lineIndex < lines.length && lines[lineIndex]?.trim() !== '---') {
+        frontmatterLines.push(lines[lineIndex]);
+        lineIndex++;
+      }
+      lineIndex++; // Skip closing ---
+
+      try {
+        const fm = yaml.load(frontmatterLines.join('\n')) as Record<string, unknown> | null;
+        if (fm) {
+          if (fm.id) doc.id = String(fm.id).toUpperCase();
+          if (fm.title) doc.title = String(fm.title);
+          if (fm.type) doc.type = String(fm.type) as DocumentType;
+          if (fm.tags) doc.tags = this.normalizeStringArray(fm.tags as string | string[]);
+          if (fm.created_date || fm.created)
+            doc.createdAt = this.normalizeDateValue(fm.created_date || fm.created);
+          if (fm.updated_date || fm.updated)
+            doc.updatedAt = this.normalizeDateValue(fm.updated_date || fm.updated);
+        }
+      } catch (error) {
+        console.error(
+          `[Backlog.md Parser] Error parsing document frontmatter in ${filePath}:`,
+          error
+        );
+      }
+    }
+
+    // Body is everything after frontmatter
+    const bodyLines = lines.slice(lineIndex);
+    doc.content = bodyLines.join('\n').trim();
+
+    // Extract title from first heading if not in frontmatter
+    if (!doc.title) {
+      const titleLine = bodyLines.find((l) => l.trim().startsWith('# '));
+      if (titleLine) {
+        doc.title = titleLine.trim().replace(/^#\s+/, '');
+      }
+    }
+
+    // Fall back to filename-based title
+    if (!doc.title) {
+      doc.title = filename.replace(/^doc-\d+\s*-\s*/i, '').replace(/-/g, ' ');
+    }
+
+    return doc.title ? doc : undefined;
+  }
+
+  /**
+   * Parse a decision file from backlog/decisions/
+   */
+  parseDecisionFile(filePath: string): BacklogDecision | undefined {
+    if (!fs.existsSync(filePath)) return undefined;
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return this.parseDecisionContent(content, filePath);
+  }
+
+  /**
+   * Parse decision content from markdown with YAML frontmatter
+   */
+  parseDecisionContent(content: string, filePath: string): BacklogDecision | undefined {
+    const lines = content.split('\n');
+
+    // Extract ID from filename (decision-N pattern)
+    const filename = path.basename(filePath, '.md');
+    const idMatch = filename.match(/^(decision-\d+)/i);
+    const id = idMatch ? idMatch[1].toUpperCase() : filename;
+
+    const decision: BacklogDecision = {
+      id,
+      title: '',
+      filePath,
+    };
+
+    // Parse YAML frontmatter
+    let lineIndex = 0;
+    if (lines[0]?.trim() === '---') {
+      lineIndex = 1;
+      const frontmatterLines: string[] = [];
+      while (lineIndex < lines.length && lines[lineIndex]?.trim() !== '---') {
+        frontmatterLines.push(lines[lineIndex]);
+        lineIndex++;
+      }
+      lineIndex++; // Skip closing ---
+
+      try {
+        const fm = yaml.load(frontmatterLines.join('\n')) as Record<string, unknown> | null;
+        if (fm) {
+          if (fm.id) decision.id = String(fm.id).toUpperCase();
+          if (fm.title) decision.title = String(fm.title);
+          if (fm.date) decision.date = this.normalizeDateValue(fm.date);
+          if (fm.status) decision.status = String(fm.status).toLowerCase() as DecisionStatus;
+        }
+      } catch (error) {
+        console.error(
+          `[Backlog.md Parser] Error parsing decision frontmatter in ${filePath}:`,
+          error
+        );
+      }
+    }
+
+    // Parse body sections (Context, Decision, Consequences, Alternatives)
+    let currentSection = '';
+    const sections: Record<string, string[]> = {
+      context: [],
+      decision: [],
+      consequences: [],
+      alternatives: [],
+    };
+
+    for (let i = lineIndex; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmedLine = line.trim();
+
+      // Extract title from first heading if not in frontmatter
+      if (trimmedLine.startsWith('# ') && !decision.title) {
+        decision.title = trimmedLine.replace(/^#\s+/, '');
+        continue;
+      }
+
+      if (trimmedLine.startsWith('## ')) {
+        const sectionName = trimmedLine.substring(3).toLowerCase();
+        if (sectionName.includes('context')) {
+          currentSection = 'context';
+        } else if (sectionName.includes('decision')) {
+          currentSection = 'decision';
+        } else if (sectionName.includes('consequences')) {
+          currentSection = 'consequences';
+        } else if (sectionName.includes('alternatives')) {
+          currentSection = 'alternatives';
+        } else {
+          currentSection = '';
+        }
+        continue;
+      }
+
+      if (currentSection && sections[currentSection]) {
+        sections[currentSection].push(line);
+      }
+    }
+
+    decision.context = sections.context.join('\n').trim() || undefined;
+    decision.decision = sections.decision.join('\n').trim() || undefined;
+    decision.consequences = sections.consequences.join('\n').trim() || undefined;
+    decision.alternatives = sections.alternatives.join('\n').trim() || undefined;
+
+    // Fall back to filename-based title
+    if (!decision.title) {
+      decision.title = filename.replace(/^decision-\d+\s*-\s*/i, '').replace(/-/g, ' ');
+    }
+
+    return decision.title ? decision : undefined;
   }
 }

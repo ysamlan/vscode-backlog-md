@@ -12,6 +12,8 @@
     { mode: 'drafts', label: 'Drafts' },
     { mode: 'archived', label: 'Archived' },
     { mode: 'dashboard', label: 'Dashboard' },
+    { mode: 'docs', label: 'Docs' },
+    { mode: 'decisions', label: 'Decisions' },
   ];
 
   let {
@@ -58,6 +60,14 @@
       {:else if tab.mode === 'dashboard'}
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 3v18h18"/><path d="M13 17V9"/><path d="M18 17V5"/><path d="M8 17v-3"/>
+        </svg>
+      {:else if tab.mode === 'docs'}
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>
+        </svg>
+      {:else if tab.mode === 'decisions'}
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m20 16-4-4 4-4"/><path d="M4 20V4"/><path d="m20 16H8a4 4 0 0 1 0-8h12"/>
         </svg>
       {/if}
       <span class="tab-label">{tab.label}{#if tab.mode === 'drafts' && draftCount > 0}&nbsp;({draftCount}){/if}</span>

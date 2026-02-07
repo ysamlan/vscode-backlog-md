@@ -1,7 +1,14 @@
 /**
  * Tab modes for the unified Tasks view
  */
-export type TabMode = 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard';
+export type TabMode =
+  | 'kanban'
+  | 'list'
+  | 'drafts'
+  | 'archived'
+  | 'dashboard'
+  | 'docs'
+  | 'decisions';
 
 /**
  * Re-export core types for use in webview components
@@ -18,6 +25,10 @@ export type {
   ChecklistItem,
   Milestone,
   BacklogConfig,
+  BacklogDocument,
+  BacklogDecision,
+  DecisionStatus,
+  DocumentType,
   WebviewMessage,
   ExtensionMessage,
   DataSourceMode,

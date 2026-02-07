@@ -85,6 +85,22 @@
         "command": "backlog.showArchivedView",
         "title": "Switch to Archived View",
         "icon": "$(archive)"
+      },
+      {
+        "command": "backlog.showDocsView",
+        "title": "Backlog: Show Documents"
+      },
+      {
+        "command": "backlog.showDecisionsView",
+        "title": "Backlog: Show Decisions"
+      },
+      {
+        "command": "backlog.openDocumentDetail",
+        "title": "Backlog: Open Document Detail"
+      },
+      {
+        "command": "backlog.openDecisionDetail",
+        "title": "Backlog: Open Decision Detail"
       }
     ],
     "menus": {},

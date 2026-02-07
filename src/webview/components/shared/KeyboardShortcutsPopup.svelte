@@ -62,6 +62,14 @@
               <kbd>d</kbd>
               <span>Dashboard view</span>
             </div>
+            <div class="shortcut-row">
+              <kbd>b</kbd>
+              <span>Documents view</span>
+            </div>
+            <div class="shortcut-row">
+              <kbd>m</kbd>
+              <span>Decisions view</span>
+            </div>
           </div>
         </div>
 

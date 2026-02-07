@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { TasksViewProvider } from './providers/TasksViewProvider';
 import { TaskDetailProvider } from './providers/TaskDetailProvider';
+import { ContentDetailProvider } from './providers/ContentDetailProvider';
 import { BacklogParser } from './core/BacklogParser';
 import { BacklogWriter } from './core/BacklogWriter';
 import { TaskCreatePanel } from './providers/TaskCreatePanel';
@@ -52,6 +53,10 @@ export function activate(context: vscode.ExtensionContext) {
   // Create Task Detail provider for opening task details in editor
   const taskDetailProvider = new TaskDetailProvider(context.extensionUri, parser);
   console.log('[Backlog.md] Task detail provider created');
+
+  // Create Content Detail provider for opening docs/decisions in editor
+  const contentDetailProvider = new ContentDetailProvider(context.extensionUri, parser);
+  console.log('[Backlog.md] Content detail provider created');
 
   // Register commands
   context.subscriptions.push(
@@ -108,14 +113,39 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.showDocsView', () => {
+      tasksProvider.setViewMode('docs');
+      vscode.commands.executeCommand('setContext', 'backlog.viewMode', 'docs');
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.showDecisionsView', () => {
+      tasksProvider.setViewMode('decisions');
+      vscode.commands.executeCommand('setContext', 'backlog.viewMode', 'decisions');
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.openDocumentDetail', (docId: string) => {
+      contentDetailProvider.openDocument(docId);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.openDecisionDetail', (decisionId: string) => {
+      contentDetailProvider.openDecision(decisionId);
+    })
+  );
+
   // Initialize context for view mode: derive from saved state
   const savedDraftsMode = context.globalState.get<boolean>('backlog.showingDrafts', false);
   const savedViewMode = savedDraftsMode
     ? 'drafts'
-    : context.globalState.get<'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard'>(
-        'backlog.viewMode',
-        'kanban'
-      );
+    : context.globalState.get<
+        'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' | 'docs' | 'decisions'
+      >('backlog.viewMode', 'kanban');
   vscode.commands.executeCommand('setContext', 'backlog.viewMode', savedViewMode);
 
   // Register filter by status command (used by dashboard clickable cards)

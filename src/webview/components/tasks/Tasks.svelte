@@ -1,9 +1,11 @@
 <script lang="ts">
-  import type { Task, Milestone, TaskStatus, DashboardStats, TabMode } from '../../lib/types';
+  import type { Task, Milestone, TaskStatus, DashboardStats, TabMode, BacklogDocument, BacklogDecision } from '../../lib/types';
   import { vscode, onMessage } from '../../stores/vscode.svelte';
   import KanbanBoard from '../kanban/KanbanBoard.svelte';
   import ListView from '../list/ListView.svelte';
   import Dashboard from '../dashboard/Dashboard.svelte';
+  import DocumentsList from '../docs/DocumentsList.svelte';
+  import DecisionsList from '../decisions/DecisionsList.svelte';
   import TabBar from '../shared/TabBar.svelte';
   import Toast from '../shared/Toast.svelte';
   import KeyboardShortcutsPopup from '../shared/KeyboardShortcutsPopup.svelte';
@@ -33,6 +35,10 @@
 
   // Dashboard state
   let dashboardStats = $state<DashboardStats | null>(null);
+
+  // Documents & Decisions state
+  let documents = $state<BacklogDocument[]>([]);
+  let decisions = $state<BacklogDecision[]>([]);
 
   // List view state
   let currentFilter = $state('all');
@@ -143,6 +149,14 @@
         dashboardStats = message.stats;
         break;
 
+      case 'documentsUpdated':
+        documents = message.documents as BacklogDocument[];
+        break;
+
+      case 'decisionsUpdated':
+        decisions = message.decisions as BacklogDecision[];
+        break;
+
       case 'error':
         console.error('[Tasks]', message.message);
         break;
@@ -199,6 +213,8 @@
         case 'c': handleTabChange('drafts'); break;
         case 'v': handleTabChange('archived'); break;
         case 'd': handleTabChange('dashboard'); break;
+        case 'b': handleTabChange('docs'); break;
+        case 'm': handleTabChange('decisions'); break;
         case 'j': focusSibling('[data-task-id]', 1); break;
         case 'k': focusSibling('[data-task-id]', -1); break;
         case 'h': focusAdjacentColumn(-1); break;
@@ -433,6 +449,14 @@
 {:else if activeTab === 'dashboard'}
   <div id="dashboard-view" class="view-content">
     <Dashboard stats={dashboardStats} {noBacklog} />
+  </div>
+{:else if activeTab === 'docs'}
+  <div id="docs-view" class="view-content">
+    <DocumentsList {documents} />
+  </div>
+{:else if activeTab === 'decisions'}
+  <div id="decisions-view" class="view-content">
+    <DecisionsList {decisions} />
   </div>
 {/if}
 

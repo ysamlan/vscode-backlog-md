@@ -15,7 +15,8 @@ import { computeSubtasks } from '../core/BacklogParser';
  * - Persisting view preferences (viewMode, milestoneGrouping, collapsed columns)
  */
 export class TasksViewProvider extends BaseViewProvider {
-  private viewMode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' = 'kanban';
+  private viewMode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' | 'docs' | 'decisions' =
+    'kanban';
   private milestoneGrouping: boolean = false;
   private dataSourceMode: DataSourceMode = 'local-only';
   private dataSourceReason?: string;
@@ -37,10 +38,9 @@ export class TasksViewProvider extends BaseViewProvider {
       const legacyDrafts = this.context.globalState.get<boolean>('backlog.showingDrafts', false);
       this.viewMode = legacyDrafts
         ? 'drafts'
-        : this.context.globalState.get<'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard'>(
-            'backlog.viewMode',
-            'kanban'
-          );
+        : this.context.globalState.get<
+            'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' | 'docs' | 'decisions'
+          >('backlog.viewMode', 'kanban');
       this.milestoneGrouping = this.context.globalState.get('backlog.milestoneGrouping', false);
       const savedCollapsed = this.context.globalState.get<string[]>('backlog.collapsedColumns', []);
       this.collapsedColumns = new Set(savedCollapsed);
@@ -92,6 +92,16 @@ export class TasksViewProvider extends BaseViewProvider {
       // Determine which tasks to load based on mode
       if (this.viewMode === 'dashboard') {
         await this.refreshDashboard();
+        return;
+      }
+
+      if (this.viewMode === 'docs') {
+        await this.refreshDocuments();
+        return;
+      }
+
+      if (this.viewMode === 'decisions') {
+        await this.refreshDecisions();
         return;
       }
 
@@ -365,6 +375,16 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
       }
 
+      case 'openDocument': {
+        vscode.commands.executeCommand('backlog.openDocumentDetail', message.documentId);
+        break;
+      }
+
+      case 'openDecision': {
+        vscode.commands.executeCommand('backlog.openDecisionDetail', message.decisionId);
+        break;
+      }
+
       case 'filterByStatus': {
         vscode.commands.executeCommand('backlog.filterByStatus', message.status);
         break;
@@ -458,7 +478,9 @@ export class TasksViewProvider extends BaseViewProvider {
    * Set the view mode (kanban, list, or drafts) from external command.
    * Drafts mode is treated as a special list view showing draft tasks.
    */
-  setViewMode(mode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard'): void {
+  setViewMode(
+    mode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' | 'docs' | 'decisions'
+  ): void {
     if (this.viewMode === mode) return;
     const previousMode = this.viewMode;
     this.viewMode = mode;
@@ -466,6 +488,8 @@ export class TasksViewProvider extends BaseViewProvider {
     const isDrafts = mode === 'drafts';
     const isArchived = mode === 'archived';
     const isDashboard = mode === 'dashboard';
+    const isDocs = mode === 'docs';
+    const isDecisions = mode === 'decisions';
 
     if (this.context) {
       this.context.globalState.update('backlog.viewMode', mode);
@@ -476,7 +500,7 @@ export class TasksViewProvider extends BaseViewProvider {
     this.postMessage({ type: 'activeTabChanged', tab: mode });
     // Backward compatibility: also send legacy messages
     this.postMessage({ type: 'draftsModeChanged', enabled: isDrafts });
-    if (!isDashboard) {
+    if (!isDashboard && !isDocs && !isDecisions) {
       this.postMessage({
         type: 'viewModeChanged',
         viewMode: isDrafts || isArchived ? 'list' : mode,
@@ -489,13 +513,19 @@ export class TasksViewProvider extends BaseViewProvider {
       return;
     }
 
-    // Refresh to load correct task set when switching to/from drafts, archived, or dashboard
-    const needsRefresh =
-      isDrafts ||
-      isArchived ||
-      previousMode === 'drafts' ||
-      previousMode === 'archived' ||
-      previousMode === 'dashboard';
+    // Refresh docs/decisions when switching to those tabs
+    if (isDocs) {
+      this.refreshDocuments();
+      return;
+    }
+    if (isDecisions) {
+      this.refreshDecisions();
+      return;
+    }
+
+    // Refresh to load correct task set when switching to/from special modes
+    const specialModes = ['drafts', 'archived', 'dashboard', 'docs', 'decisions'];
+    const needsRefresh = specialModes.includes(mode) || specialModes.includes(previousMode);
     if (needsRefresh) {
       this.refresh();
     }
@@ -506,6 +536,38 @@ export class TasksViewProvider extends BaseViewProvider {
    */
   setFilter(filter: string): void {
     this.postMessage({ type: 'setFilter', filter });
+  }
+
+  /**
+   * Refresh documents list and send to webview
+   */
+  async refreshDocuments(): Promise<void> {
+    if (!this._view || !this.parser) return;
+
+    try {
+      const documents = await this.parser.getDocuments();
+      this.postMessage({ type: 'activeTabChanged', tab: 'docs' });
+      this.postMessage({ type: 'documentsUpdated', documents });
+    } catch (error) {
+      console.error('[Backlog.md] Error refreshing documents:', error);
+      this.postMessage({ type: 'error', message: 'Failed to load documents' });
+    }
+  }
+
+  /**
+   * Refresh decisions list and send to webview
+   */
+  async refreshDecisions(): Promise<void> {
+    if (!this._view || !this.parser) return;
+
+    try {
+      const decisions = await this.parser.getDecisions();
+      this.postMessage({ type: 'activeTabChanged', tab: 'decisions' });
+      this.postMessage({ type: 'decisionsUpdated', decisions });
+    } catch (error) {
+      console.error('[Backlog.md] Error refreshing decisions:', error);
+      this.postMessage({ type: 'error', message: 'Failed to load decisions' });
+    }
   }
 
   /**

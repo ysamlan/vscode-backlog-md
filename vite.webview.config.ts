@@ -34,6 +34,7 @@ export default defineConfig({
       input: {
         tasks: resolve(__dirname, 'src/webview/entries/tasks.ts'),
         'task-detail': resolve(__dirname, 'src/webview/entries/task-detail.ts'),
+        'content-detail': resolve(__dirname, 'src/webview/entries/content-detail.ts'),
       },
       output: {
         // Output as [name].js (e.g., tasks.js, dashboard.js)
