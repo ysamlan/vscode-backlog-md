@@ -270,7 +270,7 @@ body {
 
 .kanban-column {
   flex: 1 1 0%;
-  min-width: 0;
+  min-width: 140px;
   background: var(--vscode-sideBar-background, #252526);
   border-radius: 8px;
   padding: 10px;

@@ -140,7 +140,7 @@ test.describe('Tasks View', () => {
       await expect(doneCards).toHaveCount(2);
     });
 
-    test('kanban board does not overflow at sidebar width', async ({ page }) => {
+    test('kanban columns have a minimum width and scroll at narrow sidebar', async ({ page }) => {
       // Set viewport to typical narrow sidebar width
       await page.setViewportSize({ width: 350, height: 600 });
 
@@ -148,8 +148,16 @@ test.describe('Tasks View', () => {
       const scrollWidth = await board.evaluate((el) => el.scrollWidth);
       const clientWidth = await board.evaluate((el) => el.clientWidth);
 
-      // No horizontal scroll: scrollWidth should equal clientWidth
-      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+      // Board should scroll horizontally rather than crushing columns
+      expect(scrollWidth).toBeGreaterThan(clientWidth);
+
+      // Each column should maintain a readable minimum width
+      const columns = page.locator('.kanban-column');
+      const count = await columns.count();
+      for (let i = 0; i < count; i++) {
+        const width = await columns.nth(i).evaluate((el) => el.getBoundingClientRect().width);
+        expect(width).toBeGreaterThanOrEqual(140);
+      }
     });
 
     test('displays correct ordinal data attributes', async ({ page }) => {
