@@ -39,6 +39,7 @@ describe('TasksViewProvider', () => {
       getStatuses: vi.fn().mockResolvedValue(['To Do', 'In Progress', 'Done']),
       getMilestones: vi.fn().mockResolvedValue([]),
       getBlockedByThisTask: vi.fn().mockResolvedValue([]),
+      getDrafts: vi.fn().mockResolvedValue([]),
       getCompletedTasks: vi.fn().mockResolvedValue([]),
     } as unknown as BacklogParser;
   });
@@ -1213,6 +1214,125 @@ describe('TasksViewProvider', () => {
 
       expect(mockParser.getTasks).toHaveBeenCalled();
       expect(mockParser.getTasksWithCrossBranch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reverse dependencies and subtask progress', () => {
+    const baseTask = {
+      title: 'Task',
+      labels: [],
+      assignee: [],
+      acceptanceCriteria: [],
+      definitionOfDone: [],
+      filePath: '/t.md',
+    };
+
+    it('should compute blocksTaskIds from reverse dependency map', async () => {
+      const tasks: Task[] = [
+        { ...baseTask, id: 'T-1', status: 'To Do', dependencies: [] },
+        { ...baseTask, id: 'T-2', status: 'To Do', dependencies: ['T-1'] },
+        { ...baseTask, id: 'T-3', status: 'To Do', dependencies: ['T-1'] },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'tasksUpdated',
+          tasks: expect.arrayContaining([
+            expect.objectContaining({ id: 'T-1', blocksTaskIds: ['T-2', 'T-3'] }),
+            expect.objectContaining({ id: 'T-2', blocksTaskIds: [] }),
+            expect.objectContaining({ id: 'T-3', blocksTaskIds: [] }),
+          ]),
+        })
+      );
+    });
+
+    it('should not call getBlockedByThisTask during refresh', async () => {
+      const tasks: Task[] = [
+        { ...baseTask, id: 'T-1', status: 'To Do', dependencies: [] },
+        { ...baseTask, id: 'T-2', status: 'To Do', dependencies: ['T-1'] },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      await provider.refresh();
+
+      expect(mockParser.getBlockedByThisTask).not.toHaveBeenCalled();
+    });
+
+    it('should compute subtaskProgress via map lookup', async () => {
+      const tasks: Task[] = [
+        {
+          ...baseTask,
+          id: 'T-1',
+          status: 'To Do',
+          dependencies: [],
+          subtasks: ['T-2', 'T-3'],
+          parentTaskId: undefined,
+        },
+        {
+          ...baseTask,
+          id: 'T-2',
+          status: 'Done',
+          dependencies: [],
+          parentTaskId: 'T-1',
+        },
+        {
+          ...baseTask,
+          id: 'T-3',
+          status: 'To Do',
+          dependencies: [],
+          parentTaskId: 'T-1',
+        },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'tasksUpdated',
+          tasks: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'T-1',
+              subtaskProgress: { total: 2, done: 1 },
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('should not include subtaskProgress when task has no subtasks', async () => {
+      const tasks: Task[] = [{ ...baseTask, id: 'T-1', status: 'To Do', dependencies: [] }];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      const tasksUpdatedCall = (
+        mockWebview.postMessage as ReturnType<typeof vi.fn>
+      ).mock.calls.find((call: unknown[]) => (call[0] as { type: string }).type === 'tasksUpdated');
+      const sentTasks = (tasksUpdatedCall![0] as { tasks: Task[] }).tasks;
+      expect(sentTasks[0]).not.toHaveProperty('subtaskProgress');
     });
   });
 });

@@ -10,6 +10,7 @@ vi.mock('fs', async () => {
     existsSync: vi.fn(),
     readFileSync: vi.fn(),
     readdirSync: vi.fn(),
+    statSync: vi.fn().mockReturnValue({ mtimeMs: 1000 }),
   };
 });
 
@@ -256,6 +257,56 @@ labels: ["bug", "feature"]
       const config = await parser.getConfig();
 
       expect(config).toEqual({});
+    });
+
+    it('should cache config and return cached value on second call', async () => {
+      const configContent = `project_name: "Cached Project"`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+      vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: 1000 } as fs.Stats);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config1 = await parser.getConfig();
+      const config2 = await parser.getConfig();
+
+      expect(config1.project_name).toBe('Cached Project');
+      expect(config2.project_name).toBe('Cached Project');
+      // readFileSync should only be called once (cached on second call)
+      expect(fs.readFileSync).toHaveBeenCalledTimes(1);
+    });
+
+    it('should re-read config when mtime changes', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(`project_name: "V1"`);
+      vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: 1000 } as fs.Stats);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config1 = await parser.getConfig();
+      expect(config1.project_name).toBe('V1');
+
+      // Simulate file modification
+      vi.mocked(fs.readFileSync).mockReturnValue(`project_name: "V2"`);
+      vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: 2000 } as fs.Stats);
+
+      const config2 = await parser.getConfig();
+      expect(config2.project_name).toBe('V2');
+      expect(fs.readFileSync).toHaveBeenCalledTimes(2);
+    });
+
+    it('should re-read config after invalidateConfigCache()', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(`project_name: "Original"`);
+      vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: 1000 } as fs.Stats);
+
+      const parser = new BacklogParser('/fake/backlog');
+      await parser.getConfig();
+
+      parser.invalidateConfigCache();
+
+      vi.mocked(fs.readFileSync).mockReturnValue(`project_name: "Updated"`);
+      const config = await parser.getConfig();
+      expect(config.project_name).toBe('Updated');
+      expect(fs.readFileSync).toHaveBeenCalledTimes(2);
     });
   });
 

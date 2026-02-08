@@ -8,6 +8,7 @@ import { BacklogWriter } from './core/BacklogWriter';
 import { TaskCreatePanel } from './providers/TaskCreatePanel';
 import { FileWatcher } from './core/FileWatcher';
 import { BacklogCli } from './core/BacklogCli';
+import { createDebouncedHandler } from './core/debounce';
 
 let fileWatcher: FileWatcher | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
@@ -219,10 +220,14 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Listen for file changes (only if we have a file watcher)
   if (fileWatcher) {
-    fileWatcher.onDidChange((uri) => {
-      console.log('[Backlog.md] File change detected, refreshing views');
+    const debouncedRefresh = createDebouncedHandler((uri: vscode.Uri) => {
+      console.log('[Backlog.md] Debounced refresh triggered');
       tasksProvider.refresh();
       TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
+    }, 300);
+    fileWatcher.onDidChange((uri) => {
+      console.log('[Backlog.md] File change detected, scheduling refresh');
+      debouncedRefresh(uri);
     });
   }
 

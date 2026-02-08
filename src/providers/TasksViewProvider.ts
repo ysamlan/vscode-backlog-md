@@ -128,10 +128,13 @@ export class TasksViewProvider extends BaseViewProvider {
         taskLoader = this.parser.getTasks();
       }
 
-      const [tasks, statuses, milestones] = await Promise.all([
+      const [tasks, statuses, milestones, draftCountFromFolder] = await Promise.all([
         taskLoader,
         this.parser.getStatuses(),
         this.parser.getMilestones(),
+        this.viewMode !== 'drafts'
+          ? this.parser.getDrafts().then((d) => d.length)
+          : Promise.resolve(0),
       ]);
 
       // Compute subtask relationships from parentTaskId fields
@@ -140,27 +143,39 @@ export class TasksViewProvider extends BaseViewProvider {
       // The last configured status is treated as the "done" status
       const doneStatus = statuses.length > 0 ? statuses[statuses.length - 1] : 'Done';
 
-      // Compute reverse dependencies (blocksTaskIds) and subtask progress for each task
-      const tasksWithBlocks = await Promise.all(
-        tasks.map(async (task) => {
-          const enhanced: Task & {
-            blocksTaskIds?: string[];
-            subtaskProgress?: { total: number; done: number };
-          } = {
-            ...task,
-            blocksTaskIds: await this.parser!.getBlockedByThisTask(task.id),
-          };
-          if (task.subtasks && task.subtasks.length > 0) {
-            const total = task.subtasks.length;
-            const done = task.subtasks.filter((childId) => {
-              const child = tasks.find((t) => t.id === childId);
-              return child?.status === doneStatus;
-            }).length;
-            enhanced.subtaskProgress = { total, done };
+      // Build reverse dependency map and task-by-id lookup once — O(n)
+      const taskById = new Map<string, Task>();
+      const reverseDeps = new Map<string, string[]>();
+      for (const task of tasks) {
+        taskById.set(task.id, task);
+        for (const depId of task.dependencies) {
+          let blocked = reverseDeps.get(depId);
+          if (!blocked) {
+            blocked = [];
+            reverseDeps.set(depId, blocked);
           }
-          return enhanced;
-        })
-      );
+          blocked.push(task.id);
+        }
+      }
+
+      const tasksWithBlocks = tasks.map((task) => {
+        const enhanced: Task & {
+          blocksTaskIds?: string[];
+          subtaskProgress?: { total: number; done: number };
+        } = {
+          ...task,
+          blocksTaskIds: reverseDeps.get(task.id) || [],
+        };
+        if (task.subtasks && task.subtasks.length > 0) {
+          const total = task.subtasks.length;
+          const done = task.subtasks.filter((childId) => {
+            const child = taskById.get(childId);
+            return child?.status === doneStatus;
+          }).length;
+          enhanced.subtaskProgress = { total, done };
+        }
+        return enhanced;
+      });
 
       // Send initial state along with data
       this.postMessage({ type: 'activeTabChanged', tab: this.viewMode });
@@ -188,8 +203,7 @@ export class TasksViewProvider extends BaseViewProvider {
       this.postMessage({ type: 'tasksUpdated', tasks: tasksWithBlocks });
 
       // Send draft count for tab badge
-      const draftCount =
-        this.viewMode === 'drafts' ? tasks.length : (await this.parser.getDrafts()).length;
+      const draftCount = this.viewMode === 'drafts' ? tasks.length : draftCountFromFolder;
       this.postMessage({ type: 'draftCountUpdated', count: draftCount });
     } catch (error) {
       console.error('[Backlog.md] Error refreshing Tasks view:', error);

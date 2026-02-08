@@ -76,7 +76,18 @@ export function computeSubtasks(tasks: Task[]): void {
  * Parses Backlog.md task files from the filesystem
  */
 export class BacklogParser {
+  private cachedConfig: BacklogConfig | undefined;
+  private cachedConfigMtime: number | undefined;
+
   constructor(private backlogPath: string) {}
+
+  /**
+   * Invalidate the config cache, forcing the next getConfig() call to re-read from disk.
+   */
+  invalidateConfigCache(): void {
+    this.cachedConfig = undefined;
+    this.cachedConfigMtime = undefined;
+  }
 
   /**
    * Get all tasks from the backlog folder
@@ -209,10 +220,19 @@ export class BacklogParser {
     }
 
     try {
+      // Check mtime for cache invalidation
+      const mtime = fs.statSync(configPath).mtimeMs;
+      if (this.cachedConfig && this.cachedConfigMtime === mtime) {
+        return this.cachedConfig;
+      }
+
       const content = fs.readFileSync(configPath, 'utf-8');
       const raw = yaml.load(content) as Record<string, unknown> | null;
       if (!raw) return {};
-      return this.normalizeConfigKeys(raw);
+      const config = this.normalizeConfigKeys(raw);
+      this.cachedConfig = config;
+      this.cachedConfigMtime = mtime;
+      return config;
     } catch (error) {
       console.error(`[Backlog.md Parser] Error parsing config file:`, error);
       return {};
