@@ -238,8 +238,8 @@ body {
 /* Kanban Board */
 .kanban-board {
   display: flex;
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px;
   min-height: calc(100vh - 85px);
   overflow-x: auto;
 }
@@ -264,25 +264,26 @@ body {
 .kanban-board.milestone-grouped .milestone-content .kanban-board.nested {
   display: flex;
   flex-direction: row;
-  gap: 12px;
+  gap: 8px;
   overflow-x: auto;
 }
 
 .kanban-column {
-  flex: 1;
-  min-width: 200px;
-  max-width: 300px;
+  flex: 1 1 0%;
+  min-width: 0;
   background: var(--vscode-sideBar-background, #252526);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   transition:
+    flex-basis 0.2s ease,
     min-width 0.2s ease,
     max-width 0.2s ease;
 }
 
 .kanban-column.collapsed {
+  flex: 0 0 48px;
   min-width: 48px;
   max-width: 48px;
   padding: 12px 8px;
@@ -525,8 +526,7 @@ body {
 
 /* Nested kanban columns are smaller */
 .kanban-board.nested .kanban-column {
-  min-width: 150px;
-  max-width: 250px;
+  min-width: 0;
   padding: 8px;
 }
 

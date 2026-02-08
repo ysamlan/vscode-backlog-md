@@ -140,6 +140,18 @@ test.describe('Tasks View', () => {
       await expect(doneCards).toHaveCount(2);
     });
 
+    test('kanban board does not overflow at sidebar width', async ({ page }) => {
+      // Set viewport to typical narrow sidebar width
+      await page.setViewportSize({ width: 350, height: 600 });
+
+      const board = page.locator('.kanban-board');
+      const scrollWidth = await board.evaluate((el) => el.scrollWidth);
+      const clientWidth = await board.evaluate((el) => el.clientWidth);
+
+      // No horizontal scroll: scrollWidth should equal clientWidth
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    });
+
     test('displays correct ordinal data attributes', async ({ page }) => {
       await expect(page.locator('[data-testid="task-TASK-1"]')).toHaveAttribute(
         'data-ordinal',
