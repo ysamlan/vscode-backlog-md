@@ -105,6 +105,18 @@ export class TasksViewProvider extends BaseViewProvider {
         return;
       }
 
+      // Read config for project name and cross-branch mode
+      const config = await this.parser.getConfig();
+      this.postMessage({
+        type: 'configUpdated',
+        config: { projectName: config.project_name },
+      });
+
+      // Activate cross-branch mode from config
+      if (config.check_active_branches) {
+        this.dataSourceMode = 'cross-branch';
+      }
+
       let taskLoader: Promise<Task[]>;
       if (this.viewMode === 'archived') {
         taskLoader = this.parser.getArchivedTasks();

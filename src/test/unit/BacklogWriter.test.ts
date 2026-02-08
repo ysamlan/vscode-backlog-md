@@ -430,6 +430,7 @@ Old description
       );
 
       expect(result.id).toBe('ISSUE-1');
+      expect(result.filePath).toContain('issue-1 - Test-Issue.md');
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
       expect(writtenContent).toContain('id: ISSUE-1');
     });
@@ -449,6 +450,7 @@ Old description
       );
 
       expect(result.id).toBe('TASK-1');
+      expect(result.filePath).toContain('task-1 - Test-Task.md');
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
       expect(writtenContent).toContain('id: TASK-1');
     });
@@ -471,6 +473,282 @@ Old description
       expect(result.id).toBe('TASK-1');
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
       expect(writtenContent).toContain('id: TASK-1');
+    });
+  });
+
+  describe('createTask with zero_padded_ids', () => {
+    it('should zero-pad task ID when zero_padded_ids is 3', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ zero_padded_ids: 3 }),
+      } as unknown as BacklogParser;
+
+      const result = await writer.createTask(
+        '/fake/backlog',
+        { title: 'Padded Task' },
+        mockParserWithConfig
+      );
+
+      expect(result.id).toBe('TASK-001');
+      expect(result.filePath).toContain('task-001 - Padded-Task.md');
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('id: TASK-001');
+    });
+
+    it('should not pad when zero_padded_ids is undefined', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({}),
+      } as unknown as BacklogParser;
+
+      const result = await writer.createTask(
+        '/fake/backlog',
+        { title: 'Unpadded Task' },
+        mockParserWithConfig
+      );
+
+      expect(result.id).toBe('TASK-1');
+      expect(result.filePath).toContain('task-1 - Unpadded-Task.md');
+    });
+
+    it('should pad with custom width (4)', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['task-0009 - Existing.md']);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ zero_padded_ids: 4 }),
+      } as unknown as BacklogParser;
+
+      const result = await writer.createTask(
+        '/fake/backlog',
+        { title: 'Wide Pad' },
+        mockParserWithConfig
+      );
+
+      expect(result.id).toBe('TASK-0010');
+      expect(result.filePath).toContain('task-0010 - Wide-Pad.md');
+    });
+
+    it('should combine zero_padded_ids and custom task_prefix', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ task_prefix: 'PROJ', zero_padded_ids: 3 }),
+      } as unknown as BacklogParser;
+
+      const result = await writer.createTask(
+        '/fake/backlog',
+        { title: 'Project Task' },
+        mockParserWithConfig
+      );
+
+      expect(result.id).toBe('PROJ-001');
+      expect(result.filePath).toContain('proj-001 - Project-Task.md');
+    });
+  });
+
+  describe('createTask with custom prefix file scanning', () => {
+    it('should scan files with custom prefix for next ID', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['proj-1 - First.md', 'proj-3 - Third.md']);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ task_prefix: 'PROJ' }),
+      } as unknown as BacklogParser;
+
+      const result = await writer.createTask(
+        '/fake/backlog',
+        { title: 'Next Project' },
+        mockParserWithConfig
+      );
+
+      expect(result.id).toBe('PROJ-4');
+    });
+  });
+
+  describe('createSubtask with custom prefix', () => {
+    it('should use prefix from parent ID in filename', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const result = await writer.createSubtask('ISSUE-5', '/fake/backlog', mockParser);
+
+      expect(result.id).toBe('ISSUE-5.1');
+      expect(result.filePath).toContain('issue-5.1 - Untitled.md');
+    });
+
+    it('should scan with correct prefix pattern for existing subtasks', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync(['proj-3 - Parent.md', 'proj-3.1 - Sub-A.md', 'proj-3.2 - Sub-B.md']);
+
+      const result = await writer.createSubtask('PROJ-3', '/fake/backlog', mockParser);
+
+      expect(result.id).toBe('PROJ-3.3');
+      expect(result.filePath).toContain('proj-3.3 - Untitled.md');
+    });
+  });
+
+  describe('createTask with config defaults', () => {
+    it('should use default_status from config when no explicit status', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ default_status: 'Backlog' }),
+      } as unknown as BacklogParser;
+
+      await writer.createTask('/fake/backlog', { title: 'Default Status' }, mockParserWithConfig);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.status).toBe('Backlog');
+    });
+
+    it('should use explicit status over config default_status', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ default_status: 'Backlog' }),
+      } as unknown as BacklogParser;
+
+      await writer.createTask(
+        '/fake/backlog',
+        { title: 'Explicit Status', status: 'In Progress' },
+        mockParserWithConfig
+      );
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.status).toBe('In Progress');
+    });
+
+    it('should apply default_assignee from config', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ default_assignee: '@dev' }),
+      } as unknown as BacklogParser;
+
+      await writer.createTask('/fake/backlog', { title: 'With Assignee' }, mockParserWithConfig);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.assignee).toEqual(['@dev']);
+    });
+
+    it('should use explicit assignee over config default_assignee', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ default_assignee: '@dev' }),
+      } as unknown as BacklogParser;
+
+      await writer.createTask(
+        '/fake/backlog',
+        { title: 'Custom Assignee', assignee: ['@alice'] },
+        mockParserWithConfig
+      );
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.assignee).toEqual(['@alice']);
+    });
+
+    it('should apply default_reporter from config', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({ default_reporter: '@pm' }),
+      } as unknown as BacklogParser;
+
+      await writer.createTask('/fake/backlog', { title: 'With Reporter' }, mockParserWithConfig);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.reporter).toBe('@pm');
+    });
+
+    it('should include DoD section when definition_of_done configured', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({
+          definition_of_done: ['Tests pass', 'Code reviewed'],
+        }),
+      } as unknown as BacklogParser;
+
+      await writer.createTask('/fake/backlog', { title: 'With DoD' }, mockParserWithConfig);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('## Definition of Done');
+      expect(writtenContent).toContain('- [ ] #1 Tests pass');
+      expect(writtenContent).toContain('- [ ] #2 Code reviewed');
+    });
+
+    it('should not include DoD section when definition_of_done not configured', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
+
+      const mockParserWithConfig = {
+        getConfig: vi.fn().mockResolvedValue({}),
+      } as unknown as BacklogParser;
+
+      await writer.createTask('/fake/backlog', { title: 'Without DoD' }, mockParserWithConfig);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).not.toContain('## Definition of Done');
+    });
+  });
+
+  describe('promoteDraft with config defaults', () => {
+    it('should use default_status from config when promoting', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      const mockParserWithConfig = {
+        getTask: vi.fn().mockResolvedValue({
+          id: 'DRAFT-1',
+          title: 'My Draft',
+          status: 'Draft',
+          folder: 'drafts',
+          filePath: '/fake/backlog/drafts/draft-1 - My-Draft.md',
+          description: '',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+        }),
+        getConfig: vi.fn().mockResolvedValue({ default_status: 'Backlog' }),
+      } as unknown as BacklogParser;
+
+      vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: DRAFT-1
+title: My Draft
+status: Draft
+---
+`);
+
+      await writer.promoteDraft('DRAFT-1', mockParserWithConfig);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.status).toBe('Backlog');
     });
   });
 

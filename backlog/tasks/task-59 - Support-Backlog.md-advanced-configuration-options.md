@@ -1,9 +1,10 @@
 ---
 id: TASK-59
 title: Support Backlog.md advanced configuration options
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-03 14:53'
+updated_date: '2026-02-07 14:49'
 labels:
   - 'epic:foundation'
   - research
@@ -49,3 +50,21 @@ Need to determine:
 - [ ] #4 Display config-aware behavior (e.g., respect zeroPaddedIds)
 - [ ] #5 Implement at least one cross-branch feature OR document why not feasible
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented full config-awareness for the extension. All parsed config fields now influence behavior:
+
+**Step 1: zero_padded_ids** - Changed type from `boolean` to `number`. Added backward-compat normalization (`true` → `3`, `false` → `undefined`). Task IDs and filenames are now zero-padded (e.g., `TASK-001`).
+
+**Step 2: task_prefix** - Fully respected in filenames (`proj-1 - Title.md`), ID scanning (`new RegExp(prefix-\\d+)`), and parser filename extraction (generic `[a-zA-Z]+-\\d+` pattern).
+
+**Step 3: Config defaults** - `default_status`, `default_assignee`, `default_reporter` applied to new tasks and subtasks. `definition_of_done` items generate a DoD section in new task bodies. `promoteDraft()` uses `default_status` instead of hardcoded `'To Do'`.
+
+**Step 4: project_name display** - Added `configUpdated` message type. Provider sends project name on refresh. Dashboard shows it as a header.
+
+**Step 5: Cross-branch activation** - `dataSourceMode` is set to `'cross-branch'` when `check_active_branches: true` in config, activating the already-implemented cross-branch code path.
+
+All 463 unit tests pass. No lint errors, no type errors. Extension builds successfully.
+<!-- SECTION:FINAL_SUMMARY:END -->

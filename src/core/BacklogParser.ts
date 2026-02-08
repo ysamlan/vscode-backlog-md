@@ -181,6 +181,16 @@ export class BacklogParser {
         normalized[key] = value;
       }
     }
+    // Normalize zero_padded_ids: boolean→number for backward compat
+    if ('zero_padded_ids' in normalized) {
+      const val = normalized.zero_padded_ids;
+      if (val === true) {
+        normalized.zero_padded_ids = 3;
+      } else if (val === false || val === 0) {
+        delete normalized.zero_padded_ids;
+      }
+    }
+
     return normalized as BacklogConfig;
   }
 
@@ -313,7 +323,7 @@ export class BacklogParser {
 
     // Extract ID from filename
     const filename = path.basename(filePath, '.md');
-    const idMatch = filename.match(/^((?:task|draft)-\d+)/i);
+    const idMatch = filename.match(/^([a-zA-Z]+-\d+(?:\.\d+)*)/i);
     const id = idMatch ? idMatch[1].toUpperCase() : filename;
 
     // Initialize task with defaults

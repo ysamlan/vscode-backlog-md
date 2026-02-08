@@ -120,10 +120,11 @@ export class BacklogWriter {
 
     fs.renameSync(task.filePath, destPath);
 
-    // Update status from Draft to To Do
+    // Update status from Draft to config default or 'To Do'
+    const config = await parser.getConfig();
     const content = fs.readFileSync(destPath, 'utf-8');
     const { frontmatter, body } = this.extractFrontmatter(content);
-    frontmatter.status = 'To Do';
+    frontmatter.status = config.default_status || 'To Do';
     frontmatter.updated_date = new Date().toISOString().split('T')[0];
     const updatedContent = this.reconstructFile(frontmatter, body);
     fs.writeFileSync(destPath, updatedContent, 'utf-8');
@@ -278,34 +279,35 @@ export class BacklogWriter {
       fs.mkdirSync(tasksDir, { recursive: true });
     }
 
-    // Generate next task ID
-    const nextId = this.getNextTaskId(tasksDir);
+    // Get config for prefix, padding, and defaults
+    const config = parser ? await parser.getConfig() : {};
+    const taskPrefix = config.task_prefix || 'TASK';
+    const zeroPadding = config.zero_padded_ids || 0;
 
-    // Get task prefix from config, default to "TASK"
-    let taskPrefix = 'TASK';
-    if (parser) {
-      const config = await parser.getConfig();
-      taskPrefix = config.task_prefix || 'TASK';
-    }
-    const taskId = `${taskPrefix}-${nextId}`.toUpperCase();
+    // Generate next task ID
+    const nextId = this.getNextTaskId(tasksDir, taskPrefix);
+    const paddedId = zeroPadding > 0 ? String(nextId).padStart(zeroPadding, '0') : String(nextId);
+    const taskId = `${taskPrefix}-${paddedId}`.toUpperCase();
+    const lowerPrefix = taskPrefix.toLowerCase();
 
     // Sanitize title for filename
     const sanitizedTitle = options.title
       .replace(/[^a-zA-Z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .substring(0, 50);
-    const fileName = `task-${nextId} - ${sanitizedTitle}.md`;
+    const fileName = `${lowerPrefix}-${paddedId} - ${sanitizedTitle}.md`;
     const filePath = path.join(tasksDir, fileName);
 
-    // Build frontmatter
+    // Build frontmatter with config defaults
     const frontmatter: FrontmatterData = {
       id: taskId,
       title: options.title,
-      status: options.status || 'To Do',
+      status: options.status || config.default_status || 'To Do',
       priority: options.priority,
       labels: options.labels || [],
       milestone: options.milestone,
-      assignee: options.assignee || [],
+      assignee: options.assignee || (config.default_assignee ? [config.default_assignee] : []),
+      reporter: config.default_reporter,
       dependencies: [],
       created_date: new Date().toISOString().split('T')[0],
       updated_date: new Date().toISOString().split('T')[0],
@@ -326,6 +328,15 @@ export class BacklogWriter {
       body += '<!-- SECTION:DESCRIPTION:BEGIN -->\n<!-- SECTION:DESCRIPTION:END -->\n';
     }
     body += '\n## Acceptance Criteria\n<!-- AC:BEGIN -->\n<!-- AC:END -->\n';
+
+    // Add Definition of Done from config defaults
+    if (config.definition_of_done && config.definition_of_done.length > 0) {
+      body += '\n## Definition of Done\n<!-- DOD:BEGIN -->\n';
+      config.definition_of_done.forEach((item, index) => {
+        body += `- [ ] #${index + 1} ${item}\n`;
+      });
+      body += '<!-- DOD:END -->\n';
+    }
 
     // Build content
     const content = this.reconstructFile(frontmatter, body);
@@ -409,7 +420,7 @@ export class BacklogWriter {
   async createSubtask(
     parentTaskId: string,
     backlogPath: string,
-    _parser?: BacklogParser
+    parser?: BacklogParser
   ): Promise<{ id: string; filePath: string }> {
     const tasksDir = path.join(backlogPath, 'tasks');
 
@@ -427,11 +438,12 @@ export class BacklogWriter {
     // Get task prefix from parent ID (e.g., "TASK-2" -> "TASK")
     const prefixMatch = parentTaskId.match(/^(.+)-\d+$/);
     const taskPrefix = prefixMatch ? prefixMatch[1] : 'TASK';
+    const lowerPrefix = taskPrefix.toLowerCase();
 
-    // Scan existing files for subtask numbering (task-N.M pattern)
+    // Scan existing files for subtask numbering (prefix-N.M pattern)
     const files = fs.existsSync(tasksDir) ? fs.readdirSync(tasksDir) : [];
     let maxSubId = 0;
-    const subPattern = new RegExp(`^task-${parentNum}\\.(\\d+)`, 'i');
+    const subPattern = new RegExp(`^${lowerPrefix}-${parentNum}\\.(\\d+)`, 'i');
     for (const file of files) {
       const match = file.match(subPattern);
       if (match) {
@@ -442,24 +454,44 @@ export class BacklogWriter {
     const nextSubId = maxSubId + 1;
 
     const taskId = `${taskPrefix}-${parentNum}.${nextSubId}`.toUpperCase();
-    const fileName = `task-${parentNum}.${nextSubId} - Untitled.md`;
+    const fileName = `${lowerPrefix}-${parentNum}.${nextSubId} - Untitled.md`;
     const filePath = path.join(tasksDir, fileName);
+
+    // Get config defaults
+    const config = parser ? await parser.getConfig() : {};
 
     const today = new Date().toISOString().split('T')[0];
     const frontmatter: FrontmatterData = {
       id: taskId,
       title: 'Untitled',
-      status: 'To Do',
+      status: config.default_status || 'To Do',
       labels: [],
-      assignee: [],
+      assignee: config.default_assignee ? [config.default_assignee] : [],
+      reporter: config.default_reporter,
       dependencies: [],
       parent_task_id: parentTaskId,
       created_date: today,
       updated_date: today,
     };
 
-    const body =
+    // Remove undefined values
+    Object.keys(frontmatter).forEach((key) => {
+      if (frontmatter[key] === undefined) {
+        delete frontmatter[key];
+      }
+    });
+
+    let body =
       '\n## Description\n\n<!-- SECTION:DESCRIPTION:BEGIN -->\n<!-- SECTION:DESCRIPTION:END -->\n\n## Acceptance Criteria\n<!-- AC:BEGIN -->\n<!-- AC:END -->\n';
+
+    // Add Definition of Done from config defaults
+    if (config.definition_of_done && config.definition_of_done.length > 0) {
+      body += '\n## Definition of Done\n<!-- DOD:BEGIN -->\n';
+      config.definition_of_done.forEach((item, index) => {
+        body += `- [ ] #${index + 1} ${item}\n`;
+      });
+      body += '<!-- DOD:END -->\n';
+    }
 
     const content = this.reconstructFile(frontmatter, body);
     fs.writeFileSync(filePath, content, 'utf-8');
@@ -470,12 +502,13 @@ export class BacklogWriter {
   /**
    * Get the next available task ID number
    */
-  private getNextTaskId(tasksDir: string): number {
+  private getNextTaskId(tasksDir: string, prefix: string = 'task'): number {
     const files = fs.existsSync(tasksDir) ? fs.readdirSync(tasksDir) : [];
     let maxId = 0;
 
+    const pattern = new RegExp(`^${prefix}-(\\d+)`, 'i');
     for (const file of files) {
-      const match = file.match(/^task-(\d+)/i);
+      const match = file.match(pattern);
       if (match) {
         const id = parseInt(match[1], 10);
         if (id > maxId) {

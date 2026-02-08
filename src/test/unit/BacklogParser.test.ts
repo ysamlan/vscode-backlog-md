@@ -191,6 +191,30 @@ status: To Do
       const task = parser.parseTaskContent(content, '/fake/path/task-42 - Some-Task-Name.md');
       expect(task?.id).toBe('TASK-42');
     });
+
+    it('should extract custom-prefix ID from filename', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+title: Custom Prefix Task
+status: To Do
+---
+`;
+
+      const task = parser.parseTaskContent(content, '/fake/path/proj-7 - Custom-Prefix-Task.md');
+      expect(task?.id).toBe('PROJ-7');
+    });
+
+    it('should extract subtask ID with dot notation from filename', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+title: Subtask
+status: To Do
+---
+`;
+
+      const task = parser.parseTaskContent(content, '/fake/path/issue-3.2 - Subtask.md');
+      expect(task?.id).toBe('ISSUE-3.2');
+    });
   });
 
   describe('getConfig', () => {
@@ -309,7 +333,7 @@ task_resolution_strategy: most_progressed
       expect(config.task_resolution_strategy).toBe('most_progressed');
     });
 
-    it('should parse zero_padded_ids option from config', async () => {
+    it('should normalize zero_padded_ids: true to 3', async () => {
       const configContent = `
 zero_padded_ids: true
 `;
@@ -319,7 +343,20 @@ zero_padded_ids: true
       const parser = new BacklogParser('/fake/backlog');
       const config = await parser.getConfig();
 
-      expect(config.zero_padded_ids).toBe(true);
+      expect(config.zero_padded_ids).toBe(3);
+    });
+
+    it('should parse zero_padded_ids as a number', async () => {
+      const configContent = `
+zero_padded_ids: 4
+`;
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue(configContent);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const config = await parser.getConfig();
+
+      expect(config.zero_padded_ids).toBe(4);
     });
 
     it('should handle config with all cross-branch options', async () => {
@@ -342,7 +379,7 @@ zero_padded_ids: false
       expect(config.remote_operations).toBe(true);
       expect(config.active_branch_days).toBe(14);
       expect(config.task_resolution_strategy).toBe('most_recent');
-      expect(config.zero_padded_ids).toBe(false);
+      expect(config.zero_padded_ids).toBeUndefined();
     });
 
     it('should return undefined for missing cross-branch config options', async () => {
@@ -642,7 +679,7 @@ on_status_change: "auto_commit"
       expect(config.active_branch_days).toBe(14);
       expect(config.task_prefix).toBe('PROJ');
       expect(config.task_resolution_strategy).toBe('most_recent');
-      expect(config.zero_padded_ids).toBe(true);
+      expect(config.zero_padded_ids).toBe(3); // true normalized to 3
       expect(config.timezone_preference).toBe('UTC');
       expect(config.include_date_time_in_dates).toBe(false);
       expect(config.on_status_change).toBe('auto_commit');
@@ -752,7 +789,7 @@ on_status_change: "auto_commit"
       const parser = new BacklogParser('/fake/backlog');
       const config = await parser.getConfig();
 
-      expect(config.zero_padded_ids).toBe(true);
+      expect(config.zero_padded_ids).toBe(3); // true normalized to 3
     });
 
     it('should normalize autoOpenBrowser to auto_open_browser', async () => {

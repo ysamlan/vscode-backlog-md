@@ -9,9 +9,11 @@
   let {
     stats = null,
     noBacklog = false,
+    projectName = undefined,
   }: {
     stats: DashboardStats | null;
     noBacklog?: boolean;
+    projectName?: string;
   } = $props();
 
   const viewState = $derived(
@@ -26,6 +28,9 @@
 </script>
 
 <div id="dashboard-content">
+  {#if projectName}
+    <h2 class="project-name">{projectName}</h2>
+  {/if}
   {#if viewState === 'loading'}
     <div class="empty-state">Loading statistics...</div>
   {:else if viewState === 'no-tasks'}

@@ -151,7 +151,7 @@ export interface BacklogConfig {
 
   // Cross-branch config options (upstream compatibility)
   task_resolution_strategy?: TaskResolutionStrategy;
-  zero_padded_ids?: boolean; // Use zero-padded IDs (e.g., TASK-001)
+  zero_padded_ids?: number; // Zero-pad IDs to this width (e.g., 3 → TASK-001)
 }
 
 /**
@@ -238,6 +238,7 @@ export type ExtensionMessage =
         milestones: Array<{ name: string; total: number; done: number }>;
       };
     }
+  | { type: 'configUpdated'; config: { projectName?: string } }
   | { type: 'documentsUpdated'; documents: BacklogDocument[] }
   | { type: 'decisionsUpdated'; decisions: BacklogDecision[] }
   | { type: 'documentData'; document: BacklogDocument; contentHtml: string }

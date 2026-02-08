@@ -35,6 +35,7 @@ describe('TasksViewProvider', () => {
       getTasks: vi.fn().mockResolvedValue([]),
       getTasksWithCrossBranch: vi.fn().mockResolvedValue([]),
       getTask: vi.fn(),
+      getConfig: vi.fn().mockResolvedValue({}),
       getStatuses: vi.fn().mockResolvedValue(['To Do', 'In Progress', 'Done']),
       getMilestones: vi.fn().mockResolvedValue([]),
       getBlockedByThisTask: vi.fn().mockResolvedValue([]),
@@ -1133,6 +1134,85 @@ describe('TasksViewProvider', () => {
         'backlog.filterByStatus',
         'In Progress'
       );
+    });
+  });
+
+  describe('configUpdated message', () => {
+    it('should send configUpdated with project_name on refresh', async () => {
+      (mockParser.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+        project_name: 'My Project',
+      });
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'configUpdated',
+        config: { projectName: 'My Project' },
+      });
+    });
+
+    it('should send configUpdated with undefined projectName when not configured', async () => {
+      (mockParser.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'configUpdated',
+        config: { projectName: undefined },
+      });
+    });
+  });
+
+  describe('cross-branch mode from config', () => {
+    it('should use cross-branch loader when check_active_branches is true', async () => {
+      (mockParser.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+        check_active_branches: true,
+      });
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockParser.getTasksWithCrossBranch).toHaveBeenCalled();
+      expect(mockParser.getTasks).not.toHaveBeenCalled();
+    });
+
+    it('should stay in local-only mode when check_active_branches is false', async () => {
+      (mockParser.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+        check_active_branches: false,
+      });
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockParser.getTasks).toHaveBeenCalled();
+      expect(mockParser.getTasksWithCrossBranch).not.toHaveBeenCalled();
+    });
+
+    it('should stay in local-only mode when check_active_branches is undefined', async () => {
+      (mockParser.getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockParser.getTasks).toHaveBeenCalled();
+      expect(mockParser.getTasksWithCrossBranch).not.toHaveBeenCalled();
     });
   });
 });

@@ -36,6 +36,9 @@
   // Dashboard state
   let dashboardStats = $state<DashboardStats | null>(null);
 
+  // Config state
+  let projectName = $state<string | undefined>(undefined);
+
   // Documents & Decisions state
   let documents = $state<BacklogDocument[]>([]);
   let decisions = $state<BacklogDecision[]>([]);
@@ -155,6 +158,10 @@
 
       case 'decisionsUpdated':
         decisions = message.decisions as BacklogDecision[];
+        break;
+
+      case 'configUpdated':
+        projectName = message.config?.projectName;
         break;
 
       case 'error':
@@ -448,7 +455,7 @@
   </div>
 {:else if activeTab === 'dashboard'}
   <div id="dashboard-view" class="view-content">
-    <Dashboard stats={dashboardStats} {noBacklog} />
+    <Dashboard stats={dashboardStats} {noBacklog} {projectName} />
   </div>
 {:else if activeTab === 'docs'}
   <div id="docs-view" class="view-content">
