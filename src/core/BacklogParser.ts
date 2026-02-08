@@ -285,7 +285,7 @@ export class BacklogParser {
 
     // Check if this is a git repository
     const gitService = new GitBranchService(workspaceRoot);
-    if (!gitService.isGitRepository()) {
+    if (!(await gitService.isGitRepository())) {
       console.log('[Backlog.md Parser] Not a git repository, falling back to local-only');
       return this.getTasks();
     }

@@ -14,6 +14,16 @@ const DEFAULT_ACTIVE_BRANCH_DAYS = 30;
 const DEFAULT_RESOLUTION_STRATEGY: TaskResolutionStrategy = 'most_recent';
 
 /**
+ * Max branches to index concurrently
+ */
+const BRANCH_BATCH_SIZE = 5;
+
+/**
+ * Max task files to hydrate concurrently
+ */
+const HYDRATE_BATCH_SIZE = 8;
+
+/**
  * Status progression order (higher = more progressed)
  */
 const STATUS_ORDER: Record<string, number> = {
@@ -24,9 +34,19 @@ const STATUS_ORDER: Record<string, number> = {
 };
 
 /**
+ * Lightweight index entry for a task file on a branch (no content read required)
+ */
+interface TaskFileIndexEntry {
+  filename: string;
+  taskId: string;
+  lastModified: Date;
+  branch: string;
+}
+
+/**
  * Loads and merges tasks from multiple git branches.
- * Handles task deduplication and conflict resolution when the same task
- * exists on multiple branches with different states.
+ * Uses an index-first strategy: builds a cheap file index per branch,
+ * then only reads full content for tasks that need hydrating.
  */
 export class CrossBranchTaskLoader {
   private gitService: GitBranchService;
@@ -50,26 +70,84 @@ export class CrossBranchTaskLoader {
    */
   async loadTasksAcrossBranches(): Promise<Task[]> {
     try {
-      // Get branches to scan
-      const branches = this.getBranchesToScan();
+      const branches = await this.getBranchesToScan();
+      const currentBranch = await this.gitService.getCurrentBranch();
+
       console.log(
         `[CrossBranchTaskLoader] Scanning ${branches.length} branches:`,
         branches.map((b) => b.name)
       );
 
-      // Load tasks from all branches
-      const taskGroups = new Map<string, Task[]>();
+      // Phase 0: Load current branch tasks from disk + get their git timestamps
+      const [localTasks, localModifiedMap] = await Promise.all([
+        this.parser.getTasks(),
+        this.gitService.getFileModifiedMap(currentBranch, 'backlog/tasks'),
+      ]);
+      const localTaskMap = new Map<string, Task>();
+      for (const task of localTasks) {
+        task.source = 'local';
+        task.branch = currentBranch;
+        // Set lastModified from git timestamps for conflict resolution
+        const filename = path.basename(task.filePath);
+        const modified = localModifiedMap.get(filename);
+        if (modified) {
+          task.lastModified = modified;
+        }
+        localTaskMap.set(task.id, task);
+      }
 
-      for (const branch of branches) {
-        const tasks = await this.loadTasksFromBranch(branch);
-        for (const task of tasks) {
-          const existing = taskGroups.get(task.id) || [];
-          existing.push(task);
-          taskGroups.set(task.id, existing);
+      // Filter out current branch from git scanning
+      const otherBranches = branches.filter((b) => b.name !== currentBranch);
+
+      if (otherBranches.length === 0) {
+        return localTasks;
+      }
+
+      // Phase 1: Build cheap index for all other branches (parallel batches)
+      const allIndexEntries: TaskFileIndexEntry[] = [];
+      for (let i = 0; i < otherBranches.length; i += BRANCH_BATCH_SIZE) {
+        const batch = otherBranches.slice(i, i + BRANCH_BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map((branch) => this.buildBranchIndex(branch.name))
+        );
+        for (const entries of results) {
+          allIndexEntries.push(...entries);
         }
       }
 
-      // Merge and resolve conflicts
+      // Phase 2: Filter — decide which entries need full content
+      const strategy = this.config.task_resolution_strategy ?? DEFAULT_RESOLUTION_STRATEGY;
+      const entriesToHydrate = allIndexEntries.filter((entry) =>
+        this.shouldHydrate(entry, localTaskMap, strategy)
+      );
+
+      console.log(
+        `[CrossBranchTaskLoader] Index: ${allIndexEntries.length} entries, hydrating ${entriesToHydrate.length}`
+      );
+
+      // Phase 3: Hydrate — read full content only for needed entries (parallel batches)
+      const hydratedTasks: Task[] = [];
+      for (let i = 0; i < entriesToHydrate.length; i += HYDRATE_BATCH_SIZE) {
+        const batch = entriesToHydrate.slice(i, i + HYDRATE_BATCH_SIZE);
+        const results = await Promise.all(batch.map((entry) => this.hydrateTask(entry)));
+        for (const task of results) {
+          if (task) {
+            hydratedTasks.push(task);
+          }
+        }
+      }
+
+      // Phase 4: Merge — combine local + hydrated, resolve conflicts
+      const taskGroups = new Map<string, Task[]>();
+      for (const task of localTasks) {
+        taskGroups.set(task.id, [task]);
+      }
+      for (const task of hydratedTasks) {
+        const existing = taskGroups.get(task.id) || [];
+        existing.push(task);
+        taskGroups.set(task.id, existing);
+      }
+
       const mergedTasks = this.mergeTasksByResolutionStrategy(taskGroups);
 
       console.log(
@@ -85,36 +163,29 @@ export class CrossBranchTaskLoader {
   /**
    * Get the list of branches to scan based on configuration
    */
-  private getBranchesToScan(): BranchInfo[] {
-    const currentBranch = this.gitService.getCurrentBranch();
+  private async getBranchesToScan(): Promise<BranchInfo[]> {
+    const currentBranch = await this.gitService.getCurrentBranch();
     const activeDays = this.config.active_branch_days ?? DEFAULT_ACTIVE_BRANCH_DAYS;
 
-    // Get recent branches
-    const branches = this.gitService.listRecentBranches(activeDays);
+    const branches = await this.gitService.listRecentBranches(activeDays);
 
-    // Always include current branch even if it's older than the cutoff
+    // Always include current branch even if older than cutoff
     const hasCurrentBranch = branches.some((b) => b.name === currentBranch);
     if (!hasCurrentBranch) {
-      const allBranches = this.gitService.listLocalBranches();
+      const allBranches = await this.gitService.listLocalBranches();
       const current = allBranches.find((b) => b.name === currentBranch);
       if (current) {
         branches.push(current);
       }
     }
 
-    // Prioritize: current branch first, then main/master, then others by date
-    const mainBranch = this.gitService.getMainBranch();
+    const mainBranch = await this.gitService.getMainBranch();
 
     branches.sort((a, b) => {
-      // Current branch always first
       if (a.name === currentBranch) return -1;
       if (b.name === currentBranch) return 1;
-
-      // Main branch second
       if (a.name === mainBranch) return -1;
       if (b.name === mainBranch) return 1;
-
-      // Then by commit date (most recent first)
       return b.lastCommitDate.getTime() - a.lastCommitDate.getTime();
     });
 
@@ -122,76 +193,88 @@ export class CrossBranchTaskLoader {
   }
 
   /**
-   * Load all tasks from a specific branch
+   * Build a cheap index of task files on a branch (no content reads).
+   * Uses batch timestamp collection for efficiency.
    */
-  private async loadTasksFromBranch(branch: BranchInfo): Promise<Task[]> {
-    const tasks: Task[] = [];
-    const currentBranch = this.gitService.getCurrentBranch();
-    const isCurrentBranch = branch.name === currentBranch;
-
-    // Calculate relative path from workspace root to tasks directory
-    // backlogPath is absolute, we need just "backlog/tasks"
-    const workspaceRoot = path.dirname(this.backlogPath);
+  private async buildBranchIndex(branch: string): Promise<TaskFileIndexEntry[]> {
     const tasksRelativePath = 'backlog/tasks';
 
-    // Check if tasks directory exists on this branch
-    const backlogExists = this.gitService.pathExistsOnBranch(branch.name, 'backlog');
+    const backlogExists = await this.gitService.pathExistsOnBranch(branch, 'backlog');
     if (!backlogExists) {
-      console.log(`[CrossBranchTaskLoader] No backlog folder on branch ${branch.name}`);
       return [];
     }
 
-    // List task files on this branch
-    const taskFiles = this.gitService.listFilesInPath(branch.name, tasksRelativePath);
-    const mdFiles = taskFiles.filter((f) => f.endsWith('.md'));
+    // Get file list and modification timestamps in parallel
+    const [taskFiles, modifiedMap] = await Promise.all([
+      this.gitService.listFilesInPath(branch, tasksRelativePath),
+      this.gitService.getFileModifiedMap(branch, tasksRelativePath),
+    ]);
 
-    console.log(
-      `[CrossBranchTaskLoader] Found ${mdFiles.length} task files on branch ${branch.name}`
-    );
+    const entries: TaskFileIndexEntry[] = [];
+    for (const filename of taskFiles) {
+      if (!filename.endsWith('.md')) continue;
 
-    for (const filename of mdFiles) {
-      try {
-        const filePath = `${tasksRelativePath}/${filename}`;
-        const content = this.gitService.readFileFromBranch(branch.name, filePath);
+      // Extract task ID from filename (e.g., "task-1 - Test-task.md" → "TASK-1")
+      const idMatch = filename.match(/^([a-zA-Z]+-\d+(?:\.\d+)*)/i);
+      if (!idMatch) continue;
 
-        if (!content) continue;
+      const taskId = idMatch[1].toUpperCase();
+      const lastModified = modifiedMap.get(filename) || new Date(0);
 
-        // Parse the task content
-        const absolutePath = path.join(workspaceRoot, filePath);
-        const task = this.parser.parseTaskContent(content, absolutePath);
-
-        if (task) {
-          // Add cross-branch metadata
-          task.source = this.determineTaskSource(branch.name, isCurrentBranch);
-          task.branch = branch.name;
-
-          // Get last modified time for the task file
-          const lastModified = this.gitService.getFileLastModified(branch.name, filePath);
-          if (lastModified) {
-            task.lastModified = lastModified;
-          }
-
-          tasks.push(task);
-        }
-      } catch (error) {
-        console.error(
-          `[CrossBranchTaskLoader] Error parsing task ${filename} on ${branch.name}:`,
-          error
-        );
-      }
+      entries.push({ filename, taskId, lastModified, branch });
     }
 
-    return tasks;
+    return entries;
   }
 
   /**
-   * Determine the source type for a task based on its branch
+   * Decide if an index entry needs full content hydration.
    */
-  private determineTaskSource(branchName: string, isCurrentBranch: boolean): TaskSource {
-    if (isCurrentBranch) {
-      return 'local';
+  private shouldHydrate(
+    entry: TaskFileIndexEntry,
+    localTasks: Map<string, Task>,
+    strategy: TaskResolutionStrategy
+  ): boolean {
+    const localTask = localTasks.get(entry.taskId);
+
+    // Task doesn't exist locally — always hydrate
+    if (!localTask) return true;
+
+    // most_progressed needs status from content — always hydrate
+    if (strategy === 'most_progressed') return true;
+
+    // most_recent: only hydrate if remote is newer
+    const localTime = localTask.lastModified?.getTime() ?? 0;
+    return entry.lastModified.getTime() > localTime;
+  }
+
+  /**
+   * Read full task content from a branch and parse it.
+   */
+  private async hydrateTask(entry: TaskFileIndexEntry): Promise<Task | null> {
+    const filePath = `backlog/tasks/${entry.filename}`;
+    const workspaceRoot = path.dirname(this.backlogPath);
+
+    try {
+      const content = await this.gitService.readFileFromBranch(entry.branch, filePath);
+      if (!content) return null;
+
+      const absolutePath = path.join(workspaceRoot, filePath);
+      const task = this.parser.parseTaskContent(content, absolutePath);
+      if (!task) return null;
+
+      task.source = 'local-branch' as TaskSource;
+      task.branch = entry.branch;
+      task.lastModified = entry.lastModified;
+
+      return task;
+    } catch (error) {
+      console.error(
+        `[CrossBranchTaskLoader] Error hydrating ${entry.filename} on ${entry.branch}:`,
+        error
+      );
+      return null;
     }
-    return 'local-branch';
   }
 
   /**
@@ -226,7 +309,6 @@ export class CrossBranchTaskLoader {
     }
 
     if (strategy === 'most_recent') {
-      // Pick the task with the most recent lastModified date
       return tasks.reduce((latest, task) => {
         const latestTime = latest.lastModified?.getTime() ?? 0;
         const taskTime = task.lastModified?.getTime() ?? 0;
@@ -235,7 +317,6 @@ export class CrossBranchTaskLoader {
     }
 
     // strategy === 'most_progressed'
-    // Pick the task with the highest status progression
     return tasks.reduce((mostProgressed, task) => {
       const currentProgress = STATUS_ORDER[task.status] ?? 0;
       const bestProgress = STATUS_ORDER[mostProgressed.status] ?? 0;

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -128,35 +128,35 @@ status: Draft
   });
 
   describe('isGitRepository', () => {
-    it('should return true for a git repository', () => {
-      expect(gitService.isGitRepository()).toBe(true);
+    it('should return true for a git repository', async () => {
+      expect(await gitService.isGitRepository()).toBe(true);
     });
 
-    it('should return false for a non-git directory', () => {
+    it('should return false for a non-git directory', async () => {
       const nonGitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'non-git-'));
       const nonGitService = new GitBranchService(nonGitDir);
-      expect(nonGitService.isGitRepository()).toBe(false);
+      expect(await nonGitService.isGitRepository()).toBe(false);
       fs.rmSync(nonGitDir, { recursive: true, force: true });
     });
   });
 
   describe('getCurrentBranch', () => {
-    it('should return the current branch name', () => {
-      const branch = gitService.getCurrentBranch();
+    it('should return the current branch name', async () => {
+      const branch = await gitService.getCurrentBranch();
       expect(branch).toBe('main');
     });
   });
 
   describe('getMainBranch', () => {
-    it('should return "main" when main branch exists', () => {
-      const mainBranch = gitService.getMainBranch();
+    it('should return "main" when main branch exists', async () => {
+      const mainBranch = await gitService.getMainBranch();
       expect(mainBranch).toBe('main');
     });
   });
 
   describe('listLocalBranches', () => {
-    it('should list all local branches', () => {
-      const branches = gitService.listLocalBranches();
+    it('should list all local branches', async () => {
+      const branches = await gitService.listLocalBranches();
       const branchNames = branches.map((b) => b.name);
 
       expect(branchNames).toContain('main');
@@ -164,16 +164,16 @@ status: Draft
       expect(branchNames).toContain('old-branch');
     });
 
-    it('should include lastCommitDate for each branch', () => {
-      const branches = gitService.listLocalBranches();
+    it('should include lastCommitDate for each branch', async () => {
+      const branches = await gitService.listLocalBranches();
       for (const branch of branches) {
         expect(branch.lastCommitDate).toBeInstanceOf(Date);
         expect(branch.lastCommitDate.getTime()).toBeLessThanOrEqual(Date.now());
       }
     });
 
-    it('should mark all branches as non-remote', () => {
-      const branches = gitService.listLocalBranches();
+    it('should mark all branches as non-remote', async () => {
+      const branches = await gitService.listLocalBranches();
       for (const branch of branches) {
         expect(branch.isRemote).toBe(false);
       }
@@ -181,8 +181,8 @@ status: Draft
   });
 
   describe('listRecentBranches', () => {
-    it('should filter out old branches', () => {
-      const recentBranches = gitService.listRecentBranches(30);
+    it('should filter out old branches', async () => {
+      const recentBranches = await gitService.listRecentBranches(30);
       const branchNames = recentBranches.map((b) => b.name);
 
       expect(branchNames).toContain('main');
@@ -190,8 +190,8 @@ status: Draft
       expect(branchNames).not.toContain('old-branch');
     });
 
-    it('should include all branches with large enough window', () => {
-      const allBranches = gitService.listRecentBranches(90);
+    it('should include all branches with large enough window', async () => {
+      const allBranches = await gitService.listRecentBranches(90);
       const branchNames = allBranches.map((b) => b.name);
 
       expect(branchNames).toContain('main');
@@ -201,13 +201,13 @@ status: Draft
   });
 
   describe('readFileFromBranch', () => {
-    it('should read file content from current branch', () => {
-      const content = gitService.readFileFromBranch('main', 'README.md');
+    it('should read file content from current branch', async () => {
+      const content = await gitService.readFileFromBranch('main', 'README.md');
       expect(content).toBe('# Test Repo');
     });
 
-    it('should read task file from another branch', () => {
-      const content = gitService.readFileFromBranch(
+    it('should read task file from another branch', async () => {
+      const content = await gitService.readFileFromBranch(
         'feature/test-feature',
         'backlog/tasks/task-2 - Feature-task.md'
       );
@@ -216,59 +216,59 @@ status: Draft
       expect(content).toContain('In Progress');
     });
 
-    it('should return null for non-existent file', () => {
-      const content = gitService.readFileFromBranch('main', 'nonexistent.txt');
+    it('should return null for non-existent file', async () => {
+      const content = await gitService.readFileFromBranch('main', 'nonexistent.txt');
       expect(content).toBeNull();
     });
 
-    it('should return null for non-existent branch', () => {
-      const content = gitService.readFileFromBranch('nonexistent-branch', 'README.md');
+    it('should return null for non-existent branch', async () => {
+      const content = await gitService.readFileFromBranch('nonexistent-branch', 'README.md');
       expect(content).toBeNull();
     });
   });
 
   describe('listFilesInPath', () => {
-    it('should list files in backlog/tasks on main branch', () => {
-      const files = gitService.listFilesInPath('main', 'backlog/tasks');
+    it('should list files in backlog/tasks on main branch', async () => {
+      const files = await gitService.listFilesInPath('main', 'backlog/tasks');
       expect(files.some((f) => f.includes('task-1'))).toBe(true);
     });
 
-    it('should list files in backlog/tasks on feature branch', () => {
-      const files = gitService.listFilesInPath('feature/test-feature', 'backlog/tasks');
+    it('should list files in backlog/tasks on feature branch', async () => {
+      const files = await gitService.listFilesInPath('feature/test-feature', 'backlog/tasks');
       expect(files.some((f) => f.includes('task-1'))).toBe(true);
       expect(files.some((f) => f.includes('task-2'))).toBe(true);
     });
 
-    it('should return empty array for non-existent path', () => {
-      const files = gitService.listFilesInPath('main', 'nonexistent/path');
+    it('should return empty array for non-existent path', async () => {
+      const files = await gitService.listFilesInPath('main', 'nonexistent/path');
       expect(files).toEqual([]);
     });
   });
 
   describe('pathExistsOnBranch', () => {
-    it('should return true for existing file', () => {
-      expect(gitService.pathExistsOnBranch('main', 'README.md')).toBe(true);
+    it('should return true for existing file', async () => {
+      expect(await gitService.pathExistsOnBranch('main', 'README.md')).toBe(true);
     });
 
-    it('should return true for existing directory', () => {
-      expect(gitService.pathExistsOnBranch('main', 'backlog')).toBe(true);
+    it('should return true for existing directory', async () => {
+      expect(await gitService.pathExistsOnBranch('main', 'backlog')).toBe(true);
     });
 
-    it('should return false for non-existent path', () => {
-      expect(gitService.pathExistsOnBranch('main', 'nonexistent.txt')).toBe(false);
+    it('should return false for non-existent path', async () => {
+      expect(await gitService.pathExistsOnBranch('main', 'nonexistent.txt')).toBe(false);
     });
   });
 
   describe('getBranchLastCommitDate', () => {
-    it('should return last commit date for a branch', () => {
-      const date = gitService.getBranchLastCommitDate('main');
+    it('should return last commit date for a branch', async () => {
+      const date = await gitService.getBranchLastCommitDate('main');
       expect(date).toBeInstanceOf(Date);
       expect(date.getTime()).toBeLessThanOrEqual(Date.now());
     });
 
-    it('should return older date for old-branch', () => {
-      const mainDate = gitService.getBranchLastCommitDate('main');
-      const oldDate = gitService.getBranchLastCommitDate('old-branch');
+    it('should return older date for old-branch', async () => {
+      const mainDate = await gitService.getBranchLastCommitDate('main');
+      const oldDate = await gitService.getBranchLastCommitDate('old-branch');
 
       expect(oldDate.getTime()).toBeLessThan(mainDate.getTime());
       // Should be approximately 60 days older
@@ -279,8 +279,8 @@ status: Draft
   });
 
   describe('getBranchLastModifiedMap', () => {
-    it('should return a map of all branches with dates', () => {
-      const map = gitService.getBranchLastModifiedMap();
+    it('should return a map of all branches with dates', async () => {
+      const map = await gitService.getBranchLastModifiedMap();
 
       expect(map.has('main')).toBe(true);
       expect(map.has('feature/test-feature')).toBe(true);
@@ -291,31 +291,56 @@ status: Draft
   });
 
   describe('getFileLastModified', () => {
-    it('should return last modified date for a file', () => {
-      const date = gitService.getFileLastModified('main', 'README.md');
+    it('should return last modified date for a file', async () => {
+      const date = await gitService.getFileLastModified('main', 'README.md');
       expect(date).toBeInstanceOf(Date);
       expect(date!.getTime()).toBeLessThanOrEqual(Date.now());
     });
 
-    it('should return null for non-existent file', () => {
-      const date = gitService.getFileLastModified('main', 'nonexistent.txt');
+    it('should return null for non-existent file', async () => {
+      const date = await gitService.getFileLastModified('main', 'nonexistent.txt');
       expect(date).toBeNull();
     });
   });
-});
 
-/**
- * Unit tests with mocked execSync for edge cases
- */
-describe('GitBranchService - Mocked', () => {
-  it('should handle empty branch list gracefully', () => {
-    const mockExecSync = vi.fn().mockReturnValue('');
+  describe('getFileModifiedMap', () => {
+    it('should return map of all task files with dates in one call', async () => {
+      const map = await gitService.getFileModifiedMap('feature/test-feature', 'backlog/tasks');
 
-    vi.doMock('child_process', () => ({
-      execSync: mockExecSync,
-    }));
+      // feature branch has task-1 and task-2
+      expect(map.size).toBeGreaterThanOrEqual(2);
 
-    // Re-import to get mocked version would require more setup
-    // For now, we test the behavior through integration tests above
+      // Check that filenames are just filenames, not full paths
+      for (const key of map.keys()) {
+        expect(key).not.toContain('/');
+        expect(key).toMatch(/\.md$/);
+      }
+
+      // All values should be dates
+      for (const date of map.values()) {
+        expect(date).toBeInstanceOf(Date);
+        expect(date.getTime()).toBeGreaterThan(0);
+      }
+    });
+
+    it('should match individual getFileLastModified calls', async () => {
+      const branch = 'main';
+      const batchMap = await gitService.getFileModifiedMap(branch, 'backlog/tasks');
+      const individualDate = await gitService.getFileLastModified(
+        branch,
+        'backlog/tasks/task-1 - Test-task.md'
+      );
+
+      const batchDate = batchMap.get('task-1 - Test-task.md');
+      expect(batchDate).toBeDefined();
+      expect(individualDate).toBeDefined();
+      // Timestamps should be within 1 second of each other
+      expect(Math.abs(batchDate!.getTime() - individualDate!.getTime())).toBeLessThan(1000);
+    });
+
+    it('should return empty map for non-existent paths', async () => {
+      const map = await gitService.getFileModifiedMap('main', 'nonexistent/path');
+      expect(map.size).toBe(0);
+    });
   });
 });

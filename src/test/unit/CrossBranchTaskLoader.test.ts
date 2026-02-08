@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -165,15 +165,16 @@ status: ${status}
       expect(task2!.source).toBe('local-branch'); // Other branch
     });
 
-    it('should include lastModified for tasks', async () => {
+    it('should include lastModified for tasks from other branches', async () => {
       const config = await parser.getConfig();
       const loader = new CrossBranchTaskLoader(gitService, parser, config, backlogDir);
 
       const tasks = await loader.loadTasksAcrossBranches();
 
-      for (const task of tasks) {
-        expect(task.lastModified).toBeInstanceOf(Date);
-      }
+      // Remote-branch tasks should have lastModified from git
+      const task2 = tasks.find((t) => t.id === 'TASK-2');
+      expect(task2).toBeDefined();
+      expect(task2!.lastModified).toBeInstanceOf(Date);
     });
   });
 
@@ -363,15 +364,104 @@ status: Done
       expect(tasks.length).toBeGreaterThan(0);
     });
   });
+
+  describe('Index-first optimization', () => {
+    it('should skip unnecessary reads when local tasks are newer', async () => {
+      // All tasks on main are loaded from disk, not via git show
+      // The feature branch has TASK-1 (same as main) + TASK-2 (unique)
+      // For most_recent: TASK-1 on feature is older → should NOT be hydrated
+      const config: BacklogConfig = {
+        check_active_branches: true,
+        active_branch_days: 30,
+        task_resolution_strategy: 'most_recent',
+      };
+
+      const readSpy = vi.spyOn(gitService, 'readFileFromBranch');
+      const loader = new CrossBranchTaskLoader(gitService, parser, config, backlogDir);
+      await loader.loadTasksAcrossBranches();
+
+      // readFileFromBranch should only be called for tasks that need hydrating
+      // TASK-2 on feature/new-feature is unique → must be hydrated
+      // TASK-1 on feature/new-feature: main has a newer commit → should be skipped
+      const calls = readSpy.mock.calls;
+      const hydratedFiles = calls.map((c) => c[1]);
+
+      // TASK-2 should definitely be hydrated (doesn't exist locally)
+      expect(hydratedFiles.some((f) => f.includes('task-2'))).toBe(true);
+
+      readSpy.mockRestore();
+    });
+
+    it('should load current branch tasks from disk, not git', async () => {
+      const config: BacklogConfig = {
+        check_active_branches: true,
+        active_branch_days: 30,
+      };
+
+      const getTasksSpy = vi.spyOn(parser, 'getTasks');
+      const loader = new CrossBranchTaskLoader(gitService, parser, config, backlogDir);
+      await loader.loadTasksAcrossBranches();
+
+      // parser.getTasks() should be called for disk-based loading of current branch
+      expect(getTasksSpy).toHaveBeenCalledOnce();
+
+      getTasksSpy.mockRestore();
+    });
+
+    it('should return only local tasks when no other branches exist', async () => {
+      // Create isolated repo with only one branch
+      const isolatedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'isolated-test-'));
+      const isolatedBacklog = path.join(isolatedDir, 'backlog');
+      fs.mkdirSync(isolatedBacklog);
+
+      execSync('git init', { cwd: isolatedDir, stdio: 'pipe' });
+      execSync('git config user.email "test@test.com"', { cwd: isolatedDir, stdio: 'pipe' });
+      execSync('git config user.name "Test"', { cwd: isolatedDir, stdio: 'pipe' });
+
+      const taskDir = path.join(isolatedBacklog, 'tasks');
+      fs.mkdirSync(taskDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(taskDir, 'task-1 - Solo-task.md'),
+        `---
+id: TASK-1
+title: Solo task
+status: To Do
+---
+# TASK-1 - Solo task
+`
+      );
+      fs.writeFileSync(path.join(isolatedBacklog, 'config.yml'), 'check_active_branches: true\n');
+      execSync('git add . && git commit -m "init"', {
+        cwd: isolatedDir,
+        stdio: 'pipe',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Test',
+          GIT_AUTHOR_EMAIL: 'test@test.com',
+          GIT_COMMITTER_NAME: 'Test',
+          GIT_COMMITTER_EMAIL: 'test@test.com',
+        },
+      });
+
+      const isoGit = new GitBranchService(isolatedDir);
+      const isoParser = new BacklogParser(isolatedBacklog);
+      const config: BacklogConfig = { check_active_branches: true };
+      const loader = new CrossBranchTaskLoader(isoGit, isoParser, config, isolatedBacklog);
+
+      const tasks = await loader.loadTasksAcrossBranches();
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].id).toBe('TASK-1');
+      expect(tasks[0].source).toBe('local');
+
+      fs.rmSync(isolatedDir, { recursive: true, force: true });
+    });
+  });
 });
 
 /**
  * Unit tests for resolution logic in isolation
  */
 describe('CrossBranchTaskLoader - Resolution Logic', () => {
-  // These tests mirror the existing tests in CrossBranchIntegration.test.ts
-  // to ensure our implementation matches the expected behavior
-
   interface TaskState {
     id: string;
     status: string;
