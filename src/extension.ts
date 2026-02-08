@@ -152,13 +152,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Register filter by status command (used by dashboard clickable cards)
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.filterByStatus', (status: string) => {
-      // Map status to filter value
-      const filterMap: Record<string, string> = {
-        'To Do': 'todo',
-        'In Progress': 'in-progress',
-        Done: 'done',
-      };
-      const filter = filterMap[status] || 'all';
+      const filter = status ? `status:${status}` : 'all';
 
       // Switch to list view and apply filter
       tasksProvider.setViewMode('list');

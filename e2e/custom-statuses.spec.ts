@@ -170,4 +170,25 @@ test.describe('Custom Statuses - List View', () => {
     // TASK-3 (Review) is not the last status, should not have Complete button
     await expect(page.locator('[data-testid="complete-btn-TASK-3"]')).toHaveCount(0);
   });
+
+  test('renders status filter buttons from configured statuses', async ({ page }) => {
+    const filterButtons = page.locator('.filter-buttons button.filter-btn[data-filter^="status:"]');
+    await expect(filterButtons).toHaveCount(customStatuses.length);
+
+    for (const status of customStatuses) {
+      const button = page.locator(`button[data-filter="status:${status}"]`);
+      await expect(button).toBeVisible();
+      await expect(button).toHaveText(status);
+    }
+  });
+
+  test('status filter buttons work with custom statuses', async ({ page }) => {
+    await page.locator('button[data-filter="status:Review"]').click();
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('[data-testid="task-row-TASK-3"]')).toBeVisible();
+
+    await page.locator('button[data-filter="status:Backlog"]').click();
+    await expect(page.locator('tbody tr')).toHaveCount(1);
+    await expect(page.locator('[data-testid="task-row-TASK-1"]')).toBeVisible();
+  });
 });

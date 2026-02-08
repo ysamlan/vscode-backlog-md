@@ -104,6 +104,59 @@ const sampleTasks: (Task & { blocksTaskIds?: string[] })[] = [
   },
 ];
 
+const crossBranchLikeTasks: (Task & { blocksTaskIds?: string[] })[] = [
+  {
+    id: 'BACK-239',
+    title: 'Feature task from current branch',
+    status: 'To Do',
+    labels: [],
+    assignee: [],
+    dependencies: [],
+    acceptanceCriteria: [],
+    definitionOfDone: [],
+    filePath: '/workspace/backlog/tasks/back-239-current.md',
+    source: 'local',
+  },
+  {
+    id: 'BACK-239',
+    title: 'Feature task from other branch',
+    status: 'Done',
+    labels: [],
+    assignee: [],
+    dependencies: [],
+    acceptanceCriteria: [],
+    definitionOfDone: [],
+    filePath: '/workspace/.backlog/branches/feature/backlog/tasks/back-239-feature.md',
+    source: 'local-branch',
+    branch: 'feature/filter-fix',
+  },
+  {
+    id: 'BACK-240',
+    title: 'Search target task',
+    status: 'To Do',
+    description: 'Contains unique searchable text',
+    labels: [],
+    assignee: [],
+    dependencies: [],
+    acceptanceCriteria: [],
+    definitionOfDone: [],
+    filePath: '/workspace/backlog/tasks/back-240.md',
+    source: 'local',
+  },
+  {
+    id: 'BACK-241',
+    title: 'In progress task',
+    status: 'In Progress',
+    labels: [],
+    assignee: [],
+    dependencies: [],
+    acceptanceCriteria: [],
+    definitionOfDone: [],
+    filePath: '/workspace/backlog/tasks/back-241.md',
+    source: 'local',
+  },
+];
+
 async function setupTasksView(page: ReturnType<typeof test.info>['page']) {
   await installVsCodeMock(page);
   await page.goto('/tasks.html');
@@ -117,6 +170,24 @@ async function setupTasksView(page: ReturnType<typeof test.info>['page']) {
   });
   await postMessageToWebview(page, { type: 'milestonesUpdated', milestones: [] });
   await postMessageToWebview(page, { type: 'tasksUpdated', tasks: sampleTasks });
+  await page.waitForTimeout(100);
+}
+
+async function setupListViewWithTasks(
+  page: ReturnType<typeof test.info>['page'],
+  tasks: (Task & { blocksTaskIds?: string[] })[]
+) {
+  await installVsCodeMock(page);
+  await page.goto('/tasks.html');
+  await page.waitForTimeout(100);
+
+  await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'list' });
+  await postMessageToWebview(page, {
+    type: 'statusesUpdated',
+    statuses: ['To Do', 'In Progress', 'Done'],
+  });
+  await postMessageToWebview(page, { type: 'milestonesUpdated', milestones: [] });
+  await postMessageToWebview(page, { type: 'tasksUpdated', tasks });
   await page.waitForTimeout(100);
 }
 
@@ -266,13 +337,13 @@ test.describe('Tasks View', () => {
     });
 
     test('filter by status works', async ({ page }) => {
-      await page.locator('button[data-filter="todo"]').click();
+      await page.locator('button[data-filter="status:To Do"]').click();
       const rows = page.locator('tbody tr');
       await expect(rows).toHaveCount(3);
     });
 
     test('filter by In Progress status works', async ({ page }) => {
-      await page.locator('button[data-filter="in-progress"]').click();
+      await page.locator('button[data-filter="status:In Progress"]').click();
       const rows = page.locator('tbody tr');
       await expect(rows).toHaveCount(2);
     });
@@ -282,6 +353,23 @@ test.describe('Tasks View', () => {
       await page.waitForTimeout(50);
       const rows = page.locator('tbody tr');
       await expect(rows).toHaveCount(1);
+    });
+
+    test('search and status filters work with cross-branch style duplicate IDs', async ({
+      page,
+    }) => {
+      await setupListViewWithTasks(page, crossBranchLikeTasks);
+
+      await expect(page.locator('tbody tr')).toHaveCount(4);
+
+      await page.locator('[data-testid="search-input"]').fill('unique searchable text');
+      await expect(page.locator('tbody tr')).toHaveCount(1);
+      await expect(page.locator('tbody tr')).toContainText('Search target task');
+
+      await page.locator('[data-testid="search-input"]').fill('');
+      await page.locator('button[data-filter="status:Done"]').click();
+      await expect(page.locator('tbody tr')).toHaveCount(1);
+      await expect(page.locator('tbody tr')).toContainText('Feature task from other branch');
     });
 
     test('clicking a row sends openTask message', async ({ page }) => {

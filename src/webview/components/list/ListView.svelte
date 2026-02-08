@@ -56,6 +56,9 @@
 
   // The "done" status is the last one in the configured statuses list
   let doneStatus = $derived(statuses.length > 0 ? statuses[statuses.length - 1] : 'Done');
+  let statusOrder = $derived(
+    Object.fromEntries(statuses.map((status, index) => [status, index])) as Record<string, number>
+  );
 
   let currentSort = $state<{ field: string; direction: 'asc' | 'desc' }>({
     field: 'status',
@@ -63,6 +66,28 @@
   });
   let showingCompleted = $state(false);
   let completedRequested = $state(false);
+
+  const LEGACY_FILTER_TO_STATUS: Record<string, string> = {
+    todo: 'To Do',
+    'in-progress': 'In Progress',
+    done: 'Done',
+  };
+
+  function getFilterStatus(filter: string): string | null {
+    if (filter.startsWith('status:')) {
+      return filter.slice('status:'.length);
+    }
+    return LEGACY_FILTER_TO_STATUS[filter] ?? null;
+  }
+
+  function isStatusFilterActive(status: string): boolean {
+    return getFilterStatus(currentFilter) === status && !showingCompleted;
+  }
+
+  function taskRowKey(task: TaskWithBlocks): string {
+    // filePath is unique across local and cross-branch task sources.
+    return task.filePath || `${task.id}:${task.source ?? 'local'}:${task.branch ?? ''}`;
+  }
 
   // Get unique labels from tasks (for dropdown)
   let allLabels = $derived([...new Set(tasks.flatMap((t) => t.labels))].sort());
@@ -95,19 +120,11 @@
 
     // In drafts/archived view, show all tasks (no status filtering)
     if (!isDraftsView && !isArchivedView) {
-      switch (currentFilter) {
-        case 'todo':
-          filtered = filtered.filter((t) => t.status === 'To Do');
-          break;
-        case 'in-progress':
-          filtered = filtered.filter((t) => t.status === 'In Progress');
-          break;
-        case 'done':
-          filtered = filtered.filter((t) => t.status === 'Done');
-          break;
-        case 'high-priority':
-          filtered = filtered.filter((t) => t.priority === 'high');
-          break;
+      const filterStatus = getFilterStatus(currentFilter);
+      if (filterStatus) {
+        filtered = filtered.filter((t) => t.status === filterStatus);
+      } else if (currentFilter === 'high-priority') {
+        filtered = filtered.filter((t) => t.priority === 'high');
       }
     }
 
@@ -144,9 +161,8 @@
       }
 
       if (currentSort.field === 'status') {
-        const order: Record<string, number> = { 'To Do': 0, 'In Progress': 1, Done: 2 };
-        aVal = order[aVal as string] ?? 0;
-        bVal = order[bVal as string] ?? 0;
+        aVal = statusOrder[aVal as string] ?? statuses.length;
+        bVal = statusOrder[bVal as string] ?? statuses.length;
       }
 
       if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
@@ -167,20 +183,18 @@
   type DisplayEntry = { task: TaskWithBlocks; isSubtask: boolean };
   let displayTasks = $derived.by((): DisplayEntry[] => {
     // Build a lookup of parentTaskId -> children present in sortedTasks
-    const childrenByParent = new Map<string, TaskWithBlocks[]>();
-    const subtaskIds = new Set<string>();
+    const childrenByParent: Record<string, TaskWithBlocks[]> = {};
+    const subtaskIds: Record<string, true> = {};
 
     for (const task of sortedTasks) {
       if (task.parentTaskId) {
-        subtaskIds.add(task.id);
-        const siblings = childrenByParent.get(task.parentTaskId) ?? [];
-        siblings.push(task);
-        childrenByParent.set(task.parentTaskId, siblings);
+        subtaskIds[task.id] = true;
+        (childrenByParent[task.parentTaskId] ??= []).push(task);
       }
     }
 
     // If there are no subtasks at all, skip the extra work
-    if (subtaskIds.size === 0) {
+    if (Object.keys(subtaskIds).length === 0) {
       return sortedTasks.map((task) => ({ task, isSubtask: false }));
     }
 
@@ -188,12 +202,12 @@
     for (const task of sortedTasks) {
       // Skip subtasks in their original sorted position; they will be
       // inserted after their parent instead.
-      if (subtaskIds.has(task.id)) continue;
+      if (subtaskIds[task.id]) continue;
 
       result.push({ task, isSubtask: false });
 
       // Append any children of this task immediately after it
-      const children = childrenByParent.get(task.id);
+      const children = childrenByParent[task.id];
       if (children) {
         for (const child of children) {
           result.push({ task: child, isSubtask: true });
@@ -203,7 +217,7 @@
 
     // Append orphaned subtasks whose parent is not in the current list
     for (const task of sortedTasks) {
-      if (subtaskIds.has(task.id) && !result.some((e) => e.task.id === task.id)) {
+      if (subtaskIds[task.id] && !result.some((e) => e.task.id === task.id)) {
         result.push({ task, isSubtask: true });
       }
     }
@@ -410,30 +424,16 @@
       >
         All
       </button>
-      <button
-        class="filter-btn"
-        class:active={currentFilter === 'todo' && !showingCompleted}
-        data-filter="todo"
-        onclick={() => { showingCompleted = false; onFilterChange('todo'); }}
-      >
-        To Do
-      </button>
-      <button
-        class="filter-btn"
-        class:active={currentFilter === 'in-progress' && !showingCompleted}
-        data-filter="in-progress"
-        onclick={() => { showingCompleted = false; onFilterChange('in-progress'); }}
-      >
-        In Progress
-      </button>
-      <button
-        class="filter-btn"
-        class:active={currentFilter === 'done' && !showingCompleted}
-        data-filter="done"
-        onclick={() => { showingCompleted = false; onFilterChange('done'); }}
-      >
-        Done
-      </button>
+      {#each statuses as status (status)}
+        <button
+          class="filter-btn"
+          class:active={isStatusFilterActive(status)}
+          data-filter={"status:" + status}
+          onclick={() => { showingCompleted = false; onFilterChange(`status:${status}`); }}
+        >
+          {status}
+        </button>
+      {/each}
       <button
         class="filter-btn"
         class:active={currentFilter === 'high-priority' && !showingCompleted}
@@ -531,7 +531,7 @@
           ondragleave={handleDragLeave}
           ondrop={handleDrop}
         >
-          {#each displayTasks as { task, isSubtask } (task.id)}
+          {#each displayTasks as { task, isSubtask } (taskRowKey(task))}
             {@const depsCount = task.dependencies?.length ?? 0}
             {@const blocksCount = task.blocksTaskIds?.length ?? 0}
             <tr
