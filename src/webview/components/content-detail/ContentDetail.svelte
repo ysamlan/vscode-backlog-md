@@ -350,6 +350,37 @@
     color: var(--vscode-textLink-foreground, #3794ff);
   }
 
+  .detail-body :global(table) {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+  }
+
+  .detail-body :global(th),
+  .detail-body :global(td) {
+    border: 1px solid var(--vscode-widget-border, #303031);
+    padding: 6px 12px;
+    text-align: left;
+  }
+
+  .detail-body :global(th) {
+    background: var(--vscode-sideBar-background, #252526);
+    font-weight: 600;
+  }
+
+  .detail-body :global(blockquote) {
+    border-left: 3px solid var(--vscode-textBlockQuote-border, #007acc);
+    margin: 8px 0;
+    padding: 4px 0 4px 12px;
+    color: var(--vscode-textBlockQuote-foreground, #cccccc);
+  }
+
+  .detail-body :global(hr) {
+    border: none;
+    border-top: 1px solid var(--vscode-widget-border, #303031);
+    margin: 16px 0;
+  }
+
   .decision-section {
     margin-bottom: 20px;
   }
@@ -376,5 +407,54 @@
   .section-content :global(ol) {
     margin: 4px 0 8px 0;
     padding-left: 20px;
+  }
+
+  .section-content :global(code) {
+    background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.17));
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+
+  .section-content :global(pre) {
+    background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.17));
+    padding: 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 8px 0;
+  }
+
+  .section-content :global(pre code) {
+    background: none;
+    padding: 0;
+  }
+
+  .section-content :global(a) {
+    color: var(--vscode-textLink-foreground, #3794ff);
+  }
+
+  .section-content :global(table) {
+    border-collapse: collapse;
+    margin: 8px 0;
+    width: 100%;
+  }
+
+  .section-content :global(th),
+  .section-content :global(td) {
+    border: 1px solid var(--vscode-widget-border, #303031);
+    padding: 6px 12px;
+    text-align: left;
+  }
+
+  .section-content :global(th) {
+    background: var(--vscode-sideBar-background, #252526);
+    font-weight: 600;
+  }
+
+  .section-content :global(blockquote) {
+    border-left: 3px solid var(--vscode-textBlockQuote-border, #007acc);
+    margin: 8px 0;
+    padding: 4px 0 4px 12px;
+    color: var(--vscode-textBlockQuote-foreground, #cccccc);
   }
 </style>

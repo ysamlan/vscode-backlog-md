@@ -140,6 +140,22 @@ test.describe('Document Detail', () => {
       filePath: '/test/docs/doc-1 - API-Reference.md',
     });
   });
+
+  test('renders tables with proper styling in document body', async ({ page }) => {
+    await postMessageToWebview(page, {
+      type: 'documentData',
+      document: sampleDocument,
+      contentHtml:
+        '<table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>A</td><td>1</td></tr></tbody></table>',
+    });
+    await page.waitForTimeout(100);
+
+    const table = page.locator('[data-testid="document-body"] table');
+    await expect(table).toBeVisible();
+    const th = table.locator('th').first();
+    const borderStyle = await th.evaluate((el) => getComputedStyle(el).borderBottomStyle);
+    expect(borderStyle).not.toBe('none');
+  });
 });
 
 test.describe('Decision Detail', () => {
