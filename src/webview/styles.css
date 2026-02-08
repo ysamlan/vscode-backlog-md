@@ -734,13 +734,13 @@ body {
 
 /* List view drag handle */
 .drag-handle-header {
-  width: 28px;
-  padding: 8px 4px !important;
+  width: 20px;
+  padding: 8px 2px !important;
 }
 
 .drag-handle {
-  width: 28px;
-  padding: 8px 4px !important;
+  width: 20px;
+  padding: 8px 2px !important;
   cursor: grab;
   color: var(--vscode-descriptionForeground, #858585);
   text-align: center;
@@ -1723,7 +1723,7 @@ body {
 }
 
 .drag-handle-blank {
-  width: 24px;
+  width: 20px;
 }
 
 /* Task detail: parent task title */
