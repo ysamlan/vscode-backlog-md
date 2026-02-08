@@ -70,7 +70,7 @@ export interface Task {
  */
 export function isReadOnlyTask(task?: Pick<Task, 'source' | 'branch'>): boolean {
   if (!task) return false;
-  return task.source === 'remote' || task.source === 'local-branch' || Boolean(task.branch);
+  return task.source === 'remote' || task.source === 'local-branch';
 }
 
 /**

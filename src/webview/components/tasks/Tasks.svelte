@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Task, Milestone, TaskStatus, DashboardStats, TabMode, BacklogDocument, BacklogDecision } from '../../lib/types';
+  import { getReadOnlyTaskContext, type Task, type Milestone, type TaskStatus, type DashboardStats, type TabMode, type BacklogDocument, type BacklogDecision } from '../../lib/types';
   import { vscode, onMessage } from '../../stores/vscode.svelte';
   import KanbanBoard from '../kanban/KanbanBoard.svelte';
   import ListView from '../list/ListView.svelte';
@@ -362,6 +362,10 @@
   function handleDeleteTask(taskId: string) {
     vscode.postMessage({ type: 'deleteTask', taskId });
   }
+
+  function handleReadOnlyDragAttempt(task: TaskWithBlocks) {
+    showToast(`Cannot reorder task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`);
+  }
 </script>
 
 <TabBar
@@ -419,6 +423,7 @@
         onOpenTask={handleOpenTask}
         onToggleColumnCollapse={handleToggleColumnCollapse}
         onToggleMilestoneCollapse={handleToggleMilestoneCollapse}
+        onReadOnlyDragAttempt={handleReadOnlyDragAttempt}
         onReorderTasks={handleReorderTasks}
         onUpdateTaskStatus={handleUpdateTaskStatus}
       />
@@ -442,6 +447,7 @@
       onLabelChange={handleLabelChange}
       onSearchChange={handleSearchChange}
       onReorderTasks={handleReorderTasks}
+      onReadOnlyDragAttempt={handleReadOnlyDragAttempt}
       onCompleteTask={handleCompleteTask}
       onPromoteDraft={handlePromoteDraft}
       onRequestCompletedTasks={handleRequestCompletedTasks}

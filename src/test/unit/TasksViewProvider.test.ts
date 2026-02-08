@@ -529,6 +529,37 @@ describe('TasksViewProvider', () => {
         expect.anything()
       );
     });
+
+    it('does not treat local tasks with branch metadata as read-only', async () => {
+      (mockParser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'TASK-LOCAL',
+        title: 'Local Task',
+        status: 'To Do',
+        source: 'local',
+        branch: 'feature/current',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/fake/backlog/tasks/task-local.md',
+      });
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({ type: 'updateTaskStatus', taskId: 'TASK-LOCAL', status: 'Done' });
+
+      expect(mockWebview.postMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'taskUpdateError',
+          taskId: 'TASK-LOCAL',
+          message: expect.stringContaining('read-only'),
+        })
+      );
+    });
   });
 
   describe('requestCompletedTasks', () => {

@@ -5,14 +5,14 @@
   interface Props {
     task: Task & { blocksTaskIds?: string[]; subtaskProgress?: { total: number; done: number } };
     onOpenTask: (taskId: string) => void;
+    onReadOnlyDragAttempt?: (task: Task) => void;
     ondragstart?: (e: DragEvent) => void;
     ondragend?: (e: DragEvent) => void;
   }
 
-  let { task, onOpenTask, ondragstart, ondragend }: Props = $props();
+  let { task, onOpenTask, onReadOnlyDragAttempt, ondragstart, ondragend }: Props = $props();
 
   let isSaving = $state(false);
-  let cardElement: HTMLDivElement;
 
   // Expose saving state for parent to control
   export function setSaving(saving: boolean) {
@@ -42,19 +42,25 @@
   }
 
   function handleDragStart(e: DragEvent) {
-    if (isReadOnlyTask(task)) return;
+    if (isReadOnlyTask(task)) {
+      onReadOnlyDragAttempt?.(task);
+      e.preventDefault();
+      return;
+    }
     if (!e.dataTransfer) return;
     e.dataTransfer.setData('text/plain', task.id);
     e.dataTransfer.effectAllowed = 'move';
+    const card = e.currentTarget as HTMLElement | null;
     // Small delay for visual effect
     setTimeout(() => {
-      cardElement?.classList.add('dragging');
+      card?.classList.add('dragging');
     }, 0);
     ondragstart?.(e);
   }
 
   function handleDragEnd(e: DragEvent) {
-    cardElement?.classList.remove('dragging');
+    const card = e.currentTarget as HTMLElement | null;
+    card?.classList.remove('dragging');
     ondragend?.(e);
   }
 
@@ -68,12 +74,11 @@
 </script>
 
 <div
-  bind:this={cardElement}
   class="task-card"
   class:saving={isSaving}
   class:readonly-task={isReadOnlyTask(task)}
   tabindex="0"
-  draggable={isReadOnlyTask(task) ? 'false' : 'true'}
+  draggable="true"
   data-task-id={task.id}
   data-ordinal={task.ordinal !== undefined ? task.ordinal : ''}
   data-testid="task-{task.id}"

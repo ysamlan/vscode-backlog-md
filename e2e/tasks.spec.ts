@@ -169,6 +169,7 @@ const readOnlyIndicatorTasks: (Task & { blocksTaskIds?: string[] })[] = [
     definitionOfDone: [],
     filePath: '/workspace/backlog/tasks/task-local-1.md',
     source: 'local',
+    branch: 'feature/current-work',
   },
   {
     id: 'TASK-REMOTE-1',
@@ -419,7 +420,7 @@ test.describe('Tasks View', () => {
       expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
     });
 
-    test('shows read-only branch indicator and hides drag handle for non-local task', async ({
+    test('shows read-only branch indicator and keeps drag handle visible for soft-block feedback', async ({
       page,
     }) => {
       await setupListViewWithTasks(page, readOnlyIndicatorTasks);
@@ -427,8 +428,22 @@ test.describe('Tasks View', () => {
       await expect(page.locator('[data-testid="readonly-indicator-TASK-REMOTE-1"]')).toContainText(
         'feature/filter-fix'
       );
-      await expect(page.locator('[data-testid="drag-handle-TASK-REMOTE-1"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="drag-handle-TASK-REMOTE-1"]')).toBeVisible();
       await expect(page.locator('[data-testid="drag-handle-TASK-LOCAL-1"]')).toBeVisible();
+    });
+
+    test('shows toast when dragging a read-only task in list view', async ({ page }) => {
+      await setupListViewWithTasks(page, readOnlyIndicatorTasks);
+      await clearPostedMessages(page);
+
+      const source = page.locator('[data-testid="drag-handle-TASK-REMOTE-1"]');
+      const target = page.locator('[data-testid="task-row-TASK-LOCAL-1"]');
+      await source.dragTo(target);
+
+      await expect(page.locator('.toast')).toContainText('Cannot reorder task: TASK-REMOTE-1');
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toBeUndefined();
     });
   });
 
@@ -539,7 +554,9 @@ test.describe('Tasks View', () => {
   });
 
   test.describe('Kanban Read-Only Cards', () => {
-    test('marks cross-branch card as read-only and disables dragging', async ({ page }) => {
+    test('marks cross-branch card as read-only and keeps local+branch tasks editable', async ({
+      page,
+    }) => {
       await installVsCodeMock(page);
       await page.goto('/tasks.html');
       await page.waitForTimeout(100);
@@ -558,12 +575,37 @@ test.describe('Tasks View', () => {
       );
       await expect(page.locator('[data-testid="task-TASK-REMOTE-1"]')).toHaveAttribute(
         'draggable',
-        'false'
+        'true'
       );
       await expect(page.locator('[data-testid="task-TASK-LOCAL-1"]')).toHaveAttribute(
         'draggable',
         'true'
       );
+    });
+
+    test('shows toast when attempting to drag read-only kanban card', async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/tasks.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'kanban' });
+      await postMessageToWebview(page, {
+        type: 'statusesUpdated',
+        statuses: ['To Do', 'In Progress', 'Done'],
+      });
+      await postMessageToWebview(page, { type: 'milestonesUpdated', milestones: [] });
+      await postMessageToWebview(page, { type: 'tasksUpdated', tasks: readOnlyIndicatorTasks });
+      await page.waitForTimeout(100);
+      await clearPostedMessages(page);
+
+      const source = page.locator('[data-testid="task-TASK-REMOTE-1"]');
+      const target = page.locator('[data-testid="task-list-To Do"]');
+      await source.dragTo(target);
+
+      await expect(page.locator('.toast')).toContainText('Cannot reorder task: TASK-REMOTE-1');
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toBeUndefined();
     });
   });
 

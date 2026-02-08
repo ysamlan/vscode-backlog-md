@@ -650,6 +650,37 @@ describe('TaskDetailProvider', () => {
       );
       expect(mockWriter.updateTask).not.toHaveBeenCalled();
     });
+
+    it('keeps local tasks editable even when branch metadata exists', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Local Task',
+        description: 'Description',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath,
+        source: 'local',
+        branch: 'feature/current',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.isReadOnly).toBe(false);
+      expect(taskDataCall![0].data.readOnlyReason).toBeUndefined();
+    });
   });
 
   describe('handleMessage restoreTask', () => {

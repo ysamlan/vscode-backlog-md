@@ -16,10 +16,20 @@
     collapsed: boolean;
     onToggleCollapse: (milestone: string) => void;
     onOpenTask: (taskId: string) => void;
+    onReadOnlyDragAttempt?: (task: Task) => void;
     onDrop: (taskId: string, newStatus: string, dropIndex: number, taskListElement: HTMLElement) => void;
   }
 
-  let { milestoneName, tasks, columns, collapsed, onToggleCollapse, onOpenTask, onDrop }: Props =
+  let {
+    milestoneName,
+    tasks,
+    columns,
+    collapsed,
+    onToggleCollapse,
+    onOpenTask,
+    onReadOnlyDragAttempt,
+    onDrop,
+  }: Props =
     $props();
 
   // Milestone key for tracking
@@ -84,6 +94,7 @@
           mini={true}
           onToggleCollapse={noOpToggle}
           {onOpenTask}
+          {onReadOnlyDragAttempt}
           {onDrop}
         />
       {/each}

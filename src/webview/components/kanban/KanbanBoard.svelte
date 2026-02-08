@@ -21,6 +21,7 @@
     onOpenTask: (taskId: string) => void;
     onToggleColumnCollapse: (status: string) => void;
     onToggleMilestoneCollapse: (milestone: string) => void;
+    onReadOnlyDragAttempt?: (task: Task) => void;
     onReorderTasks: (updates: Array<{ taskId: string; ordinal: number }>) => void;
     onUpdateTaskStatus: (
       taskId: string,
@@ -40,6 +41,7 @@
     onOpenTask,
     onToggleColumnCollapse,
     onToggleMilestoneCollapse,
+    onReadOnlyDragAttempt,
     onReorderTasks,
     onUpdateTaskStatus,
   }: Props = $props();
@@ -49,15 +51,12 @@
 
   // Group tasks by milestone
   let milestoneGroups = $derived.by(() => {
-    const milestoneMap = new Map<string | null, TaskWithBlocks[]>();
+    const milestoneMap: Record<string, TaskWithBlocks[]> = {};
     const uncategorized: TaskWithBlocks[] = [];
 
     for (const task of topLevelTasks) {
       if (task.milestone) {
-        if (!milestoneMap.has(task.milestone)) {
-          milestoneMap.set(task.milestone, []);
-        }
-        milestoneMap.get(task.milestone)!.push(task);
+        (milestoneMap[task.milestone] ??= []).push(task);
       } else {
         uncategorized.push(task);
       }
@@ -65,25 +64,25 @@
 
     // Sort milestones: config milestones first (in order), then others alphabetically
     const configMilestoneNames = configMilestones.map((m) => m.name);
-    const milestoneNames = [...milestoneMap.keys()].sort((a, b) => {
-      const aIdx = configMilestoneNames.indexOf(a!);
-      const bIdx = configMilestoneNames.indexOf(b!);
+    const milestoneNames = Object.keys(milestoneMap).sort((a, b) => {
+      const aIdx = configMilestoneNames.indexOf(a);
+      const bIdx = configMilestoneNames.indexOf(b);
       if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
       if (aIdx !== -1) return -1;
       if (bIdx !== -1) return 1;
-      return (a ?? '').localeCompare(b ?? '');
+      return a.localeCompare(b);
     });
 
-    // Add uncategorized at end if any
+    const groups = milestoneNames.map((name) => ({
+      name,
+      tasks: milestoneMap[name],
+    }));
+
     if (uncategorized.length > 0) {
-      milestoneMap.set(null, uncategorized);
-      milestoneNames.push(null);
+      groups.push({ name: null, tasks: uncategorized });
     }
 
-    return milestoneNames.map((name) => ({
-      name,
-      tasks: milestoneMap.get(name)!,
-    }));
+    return groups;
   });
 
   function handleDrop(
@@ -140,6 +139,7 @@
         collapsed={collapsedMilestones.has(group.name ?? '__uncategorized__')}
         onToggleCollapse={onToggleMilestoneCollapse}
         {onOpenTask}
+        {onReadOnlyDragAttempt}
         onDrop={handleDrop}
       />
     {/each}
@@ -155,6 +155,7 @@
         collapsed={collapsedColumns.has(col.status)}
         onToggleCollapse={onToggleColumnCollapse}
         {onOpenTask}
+        {onReadOnlyDragAttempt}
         onDrop={handleDrop}
       />
     {/each}

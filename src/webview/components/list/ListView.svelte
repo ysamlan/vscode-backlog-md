@@ -23,6 +23,7 @@
     onLabelChange: (label: string) => void;
     onSearchChange: (query: string) => void;
     onReorderTasks?: (updates: Array<{ taskId: string; ordinal: number }>) => void;
+    onReadOnlyDragAttempt?: (task: TaskWithBlocks) => void;
     onCompleteTask?: (taskId: string) => void;
     onPromoteDraft?: (taskId: string) => void;
     onRestoreTask?: (taskId: string) => void;
@@ -47,6 +48,7 @@
     onLabelChange,
     onSearchChange,
     onReorderTasks,
+    onReadOnlyDragAttempt,
     onCompleteTask,
     onPromoteDraft,
     onRestoreTask,
@@ -268,7 +270,12 @@
   function handleDragStart(e: DragEvent, taskId: string) {
     if (!isDragEnabled) return;
     const task = sortedTasks.find((t) => t.id === taskId);
-    if (!task || isReadOnlyTask(task)) return;
+    if (!task) return;
+    if (isReadOnlyTask(task)) {
+      onReadOnlyDragAttempt?.(task);
+      e.preventDefault();
+      return;
+    }
     draggedTaskId = taskId;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
@@ -555,7 +562,7 @@
               data-task-id={task.id}
               data-testid="task-row-{task.id}"
               tabindex="0"
-              draggable={isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted && !isSubtask && !isReadOnly ? 'true' : undefined}
+              draggable={isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted && !isSubtask ? 'true' : undefined}
               class:dragging={draggedTaskId === task.id}
               class:drop-before={dropTargetTaskId === task.id && dropPosition === 'before'}
               class:drop-after={dropTargetTaskId === task.id && dropPosition === 'after'}
@@ -571,11 +578,12 @@
               ondragover={(e) => handleDragOver(e, task.id)}
             >
               {#if isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted}
-                {#if isSubtask || isReadOnly}
+                {#if isSubtask}
                   <td class="drag-handle drag-handle-blank"></td>
                 {:else}
                   <td
                     class="drag-handle"
+                    class:drag-handle-readonly={isReadOnly}
                     data-testid="drag-handle-{task.id}"
                     onclick={(e) => e.stopPropagation()}
                   >

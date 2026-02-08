@@ -14,6 +14,7 @@
     mini?: boolean;
     onToggleCollapse: (status: string) => void;
     onOpenTask: (taskId: string) => void;
+    onReadOnlyDragAttempt?: (task: Task) => void;
     onDrop: (taskId: string, newStatus: string, dropIndex: number, taskListElement: HTMLElement) => void;
   }
 
@@ -26,11 +27,11 @@
     mini = false,
     onToggleCollapse,
     onOpenTask,
+    onReadOnlyDragAttempt,
     onDrop,
   }: Props = $props();
 
-  let taskListElement: HTMLElement;
-  let dropIndicator: HTMLElement | null = null;
+  let dropIndicatorIndex = $state<number | null>(null);
 
   // Sort tasks by ordinal (tasks with ordinal first, then by ID)
   let sortedTasks = $derived.by(() => {
@@ -56,14 +57,17 @@
 
     const draggingCard = document.querySelector('.task-card.dragging');
     if (!draggingCard) return;
+    const taskListElement = e.currentTarget as HTMLElement | null;
+    if (!taskListElement) return;
 
-    const dropTarget = getDropTarget(e, draggingCard as HTMLElement);
-    showDropIndicator(dropTarget);
+    const dropTarget = getDropTarget(taskListElement, e, draggingCard as HTMLElement);
+    dropIndicatorIndex = getDropIndex(taskListElement, dropTarget);
   }
 
   function handleDragLeave(e: DragEvent) {
     // Only clear if leaving the list entirely
-    if (!taskListElement.contains(e.relatedTarget as Node)) {
+    const taskListElement = e.currentTarget as HTMLElement | null;
+    if (taskListElement && !taskListElement.contains(e.relatedTarget as Node)) {
       clearDropIndicators();
     }
   }
@@ -74,19 +78,28 @@
 
     const taskId = e.dataTransfer?.getData('text/plain');
     if (!taskId) return;
+    const taskListElement = e.currentTarget as HTMLElement | null;
+    if (!taskListElement) return;
     const droppedTask = sortedTasks.find((t) => t.id === taskId);
-    if (droppedTask && isReadOnlyTask(droppedTask)) return;
+    if (droppedTask && isReadOnlyTask(droppedTask)) {
+      onReadOnlyDragAttempt?.(droppedTask);
+      return;
+    }
 
     const draggingCard = document.querySelector('.task-card.dragging');
     if (!draggingCard) return;
 
-    const dropTarget = getDropTarget(e, draggingCard as HTMLElement);
-    const dropIndex = getDropIndex(dropTarget);
+    const dropTarget = getDropTarget(taskListElement, e, draggingCard as HTMLElement);
+    const dropIndex = getDropIndex(taskListElement, dropTarget);
 
     onDrop(taskId, status, dropIndex, taskListElement);
   }
 
-  function getDropTarget(e: DragEvent, draggedCard: HTMLElement): HTMLElement | null {
+  function getDropTarget(
+    taskListElement: HTMLElement,
+    e: DragEvent,
+    draggedCard: HTMLElement
+  ): HTMLElement | null {
     const cards = [...taskListElement.querySelectorAll('.task-card:not(.dragging)')].filter(
       (c) => c !== draggedCard
     );
@@ -98,30 +111,14 @@
     );
   }
 
-  function getDropIndex(dropTarget: HTMLElement | null): number {
+  function getDropIndex(taskListElement: HTMLElement, dropTarget: HTMLElement | null): number {
     if (!dropTarget) return sortedTasks.length;
     const cards = [...taskListElement.querySelectorAll('.task-card:not(.dragging)')];
     return cards.indexOf(dropTarget);
   }
 
-  function showDropIndicator(beforeElement: HTMLElement | null) {
-    clearDropIndicators();
-    taskListElement.classList.add('drop-target');
-
-    dropIndicator = document.createElement('div');
-    dropIndicator.className = 'drop-indicator';
-
-    if (beforeElement) {
-      taskListElement.insertBefore(dropIndicator, beforeElement);
-    } else {
-      taskListElement.appendChild(dropIndicator);
-    }
-  }
-
   function clearDropIndicators() {
-    dropIndicator?.remove();
-    dropIndicator = null;
-    taskListElement?.classList.remove('drop-target');
+    dropIndicatorIndex = null;
   }
 </script>
 
@@ -152,8 +149,8 @@
     </div>
   {/if}
   <div
-    bind:this={taskListElement}
     class="task-list"
+    class:drop-target={dropIndicatorIndex !== null}
     data-status={status}
     data-milestone={milestone}
     data-testid="task-list-{status}"
@@ -162,8 +159,14 @@
     ondrop={handleDrop}
     role="list"
   >
-    {#each sortedTasks as task (task.id)}
-      <TaskCard {task} {onOpenTask} />
+    {#each sortedTasks as task, index (task.id)}
+      {#if dropIndicatorIndex === index}
+        <div class="drop-indicator"></div>
+      {/if}
+      <TaskCard {task} {onOpenTask} {onReadOnlyDragAttempt} />
     {/each}
+    {#if dropIndicatorIndex === sortedTasks.length}
+      <div class="drop-indicator"></div>
+    {/if}
   </div>
 </div>
