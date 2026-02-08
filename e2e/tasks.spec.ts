@@ -157,6 +157,34 @@ const crossBranchLikeTasks: (Task & { blocksTaskIds?: string[] })[] = [
   },
 ];
 
+const readOnlyIndicatorTasks: (Task & { blocksTaskIds?: string[] })[] = [
+  {
+    id: 'TASK-LOCAL-1',
+    title: 'Local editable task',
+    status: 'To Do',
+    labels: [],
+    assignee: [],
+    dependencies: [],
+    acceptanceCriteria: [],
+    definitionOfDone: [],
+    filePath: '/workspace/backlog/tasks/task-local-1.md',
+    source: 'local',
+  },
+  {
+    id: 'TASK-REMOTE-1',
+    title: 'Cross-branch read-only task',
+    status: 'In Progress',
+    labels: [],
+    assignee: [],
+    dependencies: [],
+    acceptanceCriteria: [],
+    definitionOfDone: [],
+    filePath: '/workspace/.backlog/branches/feature/backlog/tasks/task-remote-1.md',
+    source: 'local-branch',
+    branch: 'feature/filter-fix',
+  },
+];
+
 async function setupTasksView(page: ReturnType<typeof test.info>['page']) {
   await installVsCodeMock(page);
   await page.goto('/tasks.html');
@@ -390,6 +418,18 @@ test.describe('Tasks View', () => {
       const clientWidth = await container.evaluate((el) => el.clientWidth);
       expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
     });
+
+    test('shows read-only branch indicator and hides drag handle for non-local task', async ({
+      page,
+    }) => {
+      await setupListViewWithTasks(page, readOnlyIndicatorTasks);
+
+      await expect(page.locator('[data-testid="readonly-indicator-TASK-REMOTE-1"]')).toContainText(
+        'feature/filter-fix'
+      );
+      await expect(page.locator('[data-testid="drag-handle-TASK-REMOTE-1"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="drag-handle-TASK-LOCAL-1"]')).toBeVisible();
+    });
   });
 
   test.describe('List View - Ordinal Ordering', () => {
@@ -495,6 +535,35 @@ test.describe('Tasks View', () => {
       // TASK-1 should be in the updates (it was the dragged card)
       const task1Update = updates.find((u) => u.taskId === 'TASK-1');
       expect(task1Update).toBeDefined();
+    });
+  });
+
+  test.describe('Kanban Read-Only Cards', () => {
+    test('marks cross-branch card as read-only and disables dragging', async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/tasks.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'kanban' });
+      await postMessageToWebview(page, {
+        type: 'statusesUpdated',
+        statuses: ['To Do', 'In Progress', 'Done'],
+      });
+      await postMessageToWebview(page, { type: 'milestonesUpdated', milestones: [] });
+      await postMessageToWebview(page, { type: 'tasksUpdated', tasks: readOnlyIndicatorTasks });
+      await page.waitForTimeout(100);
+
+      await expect(page.locator('[data-testid="readonly-indicator-TASK-REMOTE-1"]')).toContainText(
+        'feature/filter-fix'
+      );
+      await expect(page.locator('[data-testid="task-TASK-REMOTE-1"]')).toHaveAttribute(
+        'draggable',
+        'false'
+      );
+      await expect(page.locator('[data-testid="task-TASK-LOCAL-1"]')).toHaveAttribute(
+        'draggable',
+        'true'
+      );
     });
   });
 

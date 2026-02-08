@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Task } from '../../lib/types';
+  import { isReadOnlyTask, type Task } from '../../lib/types';
   import TaskCard from '../shared/TaskCard.svelte';
   import { sortCardsByOrdinal, type CardData } from '../../../core/ordinalUtils';
 
@@ -74,6 +74,8 @@
 
     const taskId = e.dataTransfer?.getData('text/plain');
     if (!taskId) return;
+    const droppedTask = sortedTasks.find((t) => t.id === taskId);
+    if (droppedTask && isReadOnlyTask(droppedTask)) return;
 
     const draggingCard = document.querySelector('.task-card.dragging');
     if (!draggingCard) return;

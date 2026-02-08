@@ -65,6 +65,26 @@ export interface Task {
 }
 
 /**
+ * Returns true when a task should be treated as read-only in the UI.
+ * Cross-branch/remote tasks are view-only and must not allow mutations.
+ */
+export function isReadOnlyTask(task?: Pick<Task, 'source' | 'branch'>): boolean {
+  if (!task) return false;
+  return task.source === 'remote' || task.source === 'local-branch' || Boolean(task.branch);
+}
+
+/**
+ * Human-readable source context for read-only task messaging.
+ */
+export function getReadOnlyTaskContext(task?: Pick<Task, 'source' | 'branch'>): string {
+  if (!task) return 'non-local source';
+  if (task.branch) return task.branch;
+  if (task.source === 'remote') return 'remote source';
+  if (task.source === 'local-branch') return 'another branch';
+  return 'non-local source';
+}
+
+/**
  * Represents a milestone
  */
 export interface Milestone {

@@ -589,6 +589,69 @@ describe('TaskDetailProvider', () => {
     });
   });
 
+  describe('read-only cross-branch task behavior', () => {
+    it('includes read-only metadata in taskData for cross-branch tasks', async () => {
+      const filePath = '/test/.backlog/branches/feature/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Cross Branch Task',
+        description: 'Description',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath,
+        source: 'local-branch',
+        branch: 'feature/other',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.isReadOnly).toBe(true);
+      expect(taskDataCall![0].data.readOnlyReason).toContain('feature/other');
+    });
+
+    it('blocks updateField writes for read-only tasks', async () => {
+      const filePath = '/test/.backlog/branches/feature/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Cross Branch Task',
+        description: 'Description',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath,
+        source: 'local-branch',
+        branch: 'feature/other',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as Mock).mock.calls[0][0];
+      await messageHandler({ type: 'updateField', field: 'title', value: 'Should not save' });
+
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        expect.stringContaining('read-only')
+      );
+      expect(mockWriter.updateTask).not.toHaveBeenCalled();
+    });
+  });
+
   describe('handleMessage restoreTask', () => {
     it('should call restoreArchivedTask and close panel', async () => {
       const filePath = '/test/backlog/archive/tasks/task-5.md';

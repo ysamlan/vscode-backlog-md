@@ -465,6 +465,72 @@ describe('TasksViewProvider', () => {
     });
   });
 
+  describe('read-only cross-branch task guards', () => {
+    it('blocks updateTaskStatus for read-only tasks and posts explicit error', async () => {
+      (mockParser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'TASK-REMOTE',
+        title: 'Remote Task',
+        status: 'To Do',
+        source: 'local-branch',
+        branch: 'feature/other',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/fake/.backlog/branches/feature/remote-task.md',
+      });
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({ type: 'updateTaskStatus', taskId: 'TASK-REMOTE', status: 'Done' });
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'taskUpdateError',
+          taskId: 'TASK-REMOTE',
+          originalStatus: 'To Do',
+          message: expect.stringContaining('read-only'),
+        })
+      );
+    });
+
+    it('blocks completeTask for read-only tasks before confirmation prompt', async () => {
+      (mockParser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'TASK-REMOTE',
+        title: 'Remote Task',
+        status: 'Done',
+        source: 'remote',
+        branch: 'origin/main',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/fake/.backlog/branches/origin-main/remote-task.md',
+      });
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({ type: 'completeTask', taskId: 'TASK-REMOTE' });
+
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        expect.stringContaining('read-only')
+      );
+      expect(vscode.window.showWarningMessage).not.toHaveBeenCalledWith(
+        expect.stringContaining('Move task'),
+        expect.anything(),
+        expect.anything()
+      );
+    });
+  });
+
   describe('requestCompletedTasks', () => {
     it('should send completed tasks to webview', async () => {
       const completedTasks = [

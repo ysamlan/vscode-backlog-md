@@ -6,6 +6,7 @@
     onDelete?: () => void;
     isDraft?: boolean;
     isArchived?: boolean;
+    isReadOnly?: boolean;
   }
 
   let {
@@ -15,6 +16,7 @@
     onDelete,
     isDraft = false,
     isArchived = false,
+    isReadOnly = false,
   }: Props = $props();
 </script>
 
@@ -36,7 +38,7 @@
     </svg>
     Open Raw Markdown
   </button>
-  {#if isArchived}
+  {#if isArchived && !isReadOnly}
     <button class="restore-btn" data-testid="restore-btn" onclick={onRestore}>
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -72,7 +74,7 @@
       </svg>
       Delete Permanently
     </button>
-  {:else if !isDraft}
+  {:else if !isDraft && !isReadOnly}
     <button class="archive-btn" data-testid="archive-btn" onclick={onArchive}>
       <svg
         xmlns="http://www.w3.org/2000/svg"

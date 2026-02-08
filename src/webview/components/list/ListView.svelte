@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Task, Milestone } from '../../lib/types';
+  import { isReadOnlyTask, getReadOnlyTaskContext, type Task, type Milestone } from '../../lib/types';
   import { statusToClass, customStatusStyle } from '../../lib/statusColors';
   import { compareByOrdinal, calculateOrdinalsForDrop, type CardData } from '../../../core/ordinalUtils';
   import PriorityIcon from '../shared/PriorityIcon.svelte';
@@ -267,6 +267,8 @@
 
   function handleDragStart(e: DragEvent, taskId: string) {
     if (!isDragEnabled) return;
+    const task = sortedTasks.find((t) => t.id === taskId);
+    if (!task || isReadOnlyTask(task)) return;
     draggedTaskId = taskId;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
@@ -289,7 +291,15 @@
     // Only allow reordering within the same status group
     const draggedTask = sortedTasks.find((t) => t.id === draggedTaskId);
     const targetTask = sortedTasks.find((t) => t.id === taskId);
-    if (!draggedTask || !targetTask || draggedTask.status !== targetTask.status) return;
+    if (
+      !draggedTask ||
+      !targetTask ||
+      draggedTask.status !== targetTask.status ||
+      isReadOnlyTask(draggedTask) ||
+      isReadOnlyTask(targetTask)
+    ) {
+      return;
+    }
 
     e.preventDefault();
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
@@ -322,7 +332,13 @@
 
     const draggedTask = sortedTasks.find((t) => t.id === draggedTaskId);
     const targetTask = sortedTasks.find((t) => t.id === dropTargetTaskId);
-    if (!draggedTask || !targetTask || draggedTask.status !== targetTask.status) {
+    if (
+      !draggedTask ||
+      !targetTask ||
+      draggedTask.status !== targetTask.status ||
+      isReadOnlyTask(draggedTask) ||
+      isReadOnlyTask(targetTask)
+    ) {
       handleDragEnd();
       return;
     }
@@ -534,11 +550,12 @@
           {#each displayTasks as { task, isSubtask } (taskRowKey(task))}
             {@const depsCount = task.dependencies?.length ?? 0}
             {@const blocksCount = task.blocksTaskIds?.length ?? 0}
+            {@const isReadOnly = isReadOnlyTask(task)}
             <tr
               data-task-id={task.id}
               data-testid="task-row-{task.id}"
               tabindex="0"
-              draggable={isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted && !isSubtask ? 'true' : undefined}
+              draggable={isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted && !isSubtask && !isReadOnly ? 'true' : undefined}
               class:dragging={draggedTaskId === task.id}
               class:drop-before={dropTargetTaskId === task.id && dropPosition === 'before'}
               class:drop-after={dropTargetTaskId === task.id && dropPosition === 'after'}
@@ -546,6 +563,7 @@
               class:draft-row={isDraftsView}
               class:archived-row={isArchivedView}
               class:subtask-row={isSubtask}
+              class:readonly-row={isReadOnly}
               onclick={() => handleRowClickGuarded(task.id)}
               onkeydown={(e) => handleRowKeydown(e, task.id)}
               ondragstart={(e) => handleDragStart(e, task.id)}
@@ -553,7 +571,7 @@
               ondragover={(e) => handleDragOver(e, task.id)}
             >
               {#if isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted}
-                {#if isSubtask}
+                {#if isSubtask || isReadOnly}
                   <td class="drag-handle drag-handle-blank"></td>
                 {:else}
                   <td
@@ -575,6 +593,16 @@
                   <span class="draft-badge">DRAFT</span>
                 {/if}
                 {task.title}
+                {#if isReadOnly}
+                  <span
+                    class="readonly-indicator"
+                    data-testid="readonly-indicator-{task.id}"
+                    title="Read-only task from {getReadOnlyTaskContext(task)}"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3v12"/><path d="M18 9a3 3 0 0 0-3-3H6"/><path d="M6 15h9a3 3 0 1 1 0 6h-3"/></svg>
+                    {getReadOnlyTaskContext(task)}
+                  </span>
+                {/if}
                 {#if depsCount > 0 || blocksCount > 0}
                   <span
                     class="deps-indicator"

@@ -33,6 +33,7 @@ export type {
   ExtensionMessage,
   DataSourceMode,
 } from '../../core/types';
+export { isReadOnlyTask, getReadOnlyTaskContext } from '../../core/types';
 
 /**
  * Dashboard statistics data structure
@@ -66,6 +67,8 @@ export interface TaskDetailData {
   descriptionHtml: string;
   isDraft?: boolean;
   isArchived?: boolean;
+  isReadOnly?: boolean;
+  readOnlyReason?: string;
   parentTask?: { id: string; title: string };
   subtaskSummaries?: Array<{ id: string; title: string; status: string }>;
 }

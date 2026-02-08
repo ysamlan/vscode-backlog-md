@@ -3,9 +3,10 @@
     description: string;
     descriptionHtml: string;
     onUpdate: (value: string) => void;
+    isReadOnly?: boolean;
   }
 
-  let { description, descriptionHtml, onUpdate }: Props = $props();
+  let { description, descriptionHtml, onUpdate, isReadOnly = false }: Props = $props();
 
   let isEditing = $state(false);
   let textareaValue = $state('');
@@ -19,6 +20,7 @@
   });
 
   function toggleEdit() {
+    if (isReadOnly) return;
     if (isEditing) {
       // Save and switch to view mode
       onUpdate(textareaValue);
@@ -47,6 +49,7 @@
   }
 
   function handleViewClick() {
+    if (isReadOnly) return;
     isEditing = true;
   }
 </script>
@@ -54,7 +57,12 @@
 <div class="section">
   <div class="section-header">
     <div class="section-title">Description</div>
-    <button class="edit-btn" data-testid="edit-description-btn" onclick={toggleEdit}>
+    <button
+      class="edit-btn"
+      data-testid="edit-description-btn"
+      onclick={toggleEdit}
+      disabled={isReadOnly}
+    >
       {isEditing ? 'Done' : 'Edit'}
     </button>
   </div>
@@ -65,6 +73,7 @@
         data-testid="description-textarea"
         placeholder="Add a description..."
         bind:value={textareaValue}
+        disabled={isReadOnly}
         oninput={handleInput}
         onkeydown={handleKeydown}
       ></textarea>
@@ -75,7 +84,7 @@
         onclick={handleViewClick}
         onkeydown={(e) => e.key === 'Enter' && handleViewClick()}
         role="button"
-        tabindex="0"
+        tabindex={isReadOnly ? -1 : 0}
       >
         {#if descriptionHtml}
           {@html descriptionHtml}

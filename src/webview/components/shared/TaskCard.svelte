@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Task } from '../../lib/types';
+  import { isReadOnlyTask, getReadOnlyTaskContext, type Task } from '../../lib/types';
   import PriorityIcon from './PriorityIcon.svelte';
 
   interface Props {
@@ -42,6 +42,7 @@
   }
 
   function handleDragStart(e: DragEvent) {
+    if (isReadOnlyTask(task)) return;
     if (!e.dataTransfer) return;
     e.dataTransfer.setData('text/plain', task.id);
     e.dataTransfer.effectAllowed = 'move';
@@ -63,14 +64,16 @@
   let hasBlocks = $derived((task.blocksTaskIds?.length ?? 0) > 0);
   let showDepsSection = $derived(hasDependencies || hasBlocks);
   let hasSubtaskProgress = $derived(task.subtaskProgress !== undefined && task.subtaskProgress.total > 0);
+  let readOnlyContext = $derived(getReadOnlyTaskContext(task));
 </script>
 
 <div
   bind:this={cardElement}
   class="task-card"
   class:saving={isSaving}
+  class:readonly-task={isReadOnlyTask(task)}
   tabindex="0"
-  draggable="true"
+  draggable={isReadOnlyTask(task) ? 'false' : 'true'}
   data-task-id={task.id}
   data-ordinal={task.ordinal !== undefined ? task.ordinal : ''}
   data-testid="task-{task.id}"
@@ -88,6 +91,16 @@
     {#each displayLabels as label (label)}
       <span class="task-label">{label}</span>
     {/each}
+    {#if isReadOnlyTask(task)}
+      <span
+        class="readonly-indicator"
+        data-testid="readonly-indicator-{task.id}"
+        title="Read-only task from {readOnlyContext}"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3v12"/><path d="M18 9a3 3 0 0 0-3-3H6"/><path d="M6 15h9a3 3 0 1 1 0 6h-3"/></svg>
+        {readOnlyContext}
+      </span>
+    {/if}
   </div>
   {#if showDepsSection}
     <div class="task-card-deps">

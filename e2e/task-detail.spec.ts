@@ -44,6 +44,21 @@ const sampleTaskData = {
     '<p>This is a sample task description with <strong>markdown</strong> formatting.</p>',
 };
 
+const readOnlyTaskData = {
+  ...sampleTaskData,
+  task: {
+    ...sampleTask,
+    id: 'TASK-REMOTE-1',
+    title: 'Cross Branch Task',
+    source: 'local-branch',
+    branch: 'feature/filter-fix',
+    filePath: '/workspace/.backlog/branches/feature/backlog/tasks/task-remote-1.md',
+  },
+  isReadOnly: true,
+  readOnlyReason: 'Task is from branch feature/filter-fix and is read-only.',
+  subtaskSummaries: [{ id: 'TASK-REMOTE-1.1', title: 'Child', status: 'To Do' }],
+};
+
 test.describe('Task Detail', () => {
   test.beforeEach(async ({ page }) => {
     await installVsCodeMock(page);
@@ -439,5 +454,30 @@ test.describe('Task Detail', () => {
 
     const message = await getLastPostedMessage(page);
     expect(message).toEqual({ type: 'refresh' });
+  });
+
+  test.describe('Read-only cross-branch mode', () => {
+    test.beforeEach(async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/task-detail.html');
+      await page.waitForTimeout(100);
+      await postMessageToWebview(page, { type: 'taskData', data: readOnlyTaskData });
+      await page.waitForTimeout(50);
+    });
+
+    test('shows read-only banner with branch context', async ({ page }) => {
+      await expect(page.locator('[data-testid="readonly-banner"]')).toContainText(
+        'feature/filter-fix'
+      );
+    });
+
+    test('disables mutating controls', async ({ page }) => {
+      await expect(page.locator('[data-testid="title-input"]')).toBeDisabled();
+      await expect(page.locator('[data-testid="status-select"]')).toBeDisabled();
+      await expect(page.locator('[data-testid="priority-select"]')).toBeDisabled();
+      await expect(page.locator('[data-testid="add-label-input"]')).toBeDisabled();
+      await expect(page.locator('[data-testid="archive-btn"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="add-subtask-btn"]')).toBeDisabled();
+    });
   });
 });

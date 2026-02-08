@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { BacklogParser, computeSubtasks } from '../core/BacklogParser';
 import { BacklogWriter, computeContentHash, FileConflictError } from '../core/BacklogWriter';
-import type { Task } from '../core/types';
+import { isReadOnlyTask, getReadOnlyTaskContext, type Task } from '../core/types';
 
 // Dynamic import for marked (ESM module)
 let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
@@ -32,6 +32,8 @@ interface TaskDetailData {
   descriptionHtml: string;
   isDraft?: boolean;
   isArchived?: boolean;
+  isReadOnly?: boolean;
+  readOnlyReason?: string;
   parentTask?: { id: string; title: string };
   subtaskSummaries?: Array<{ id: string; title: string; status: string }>;
 }
@@ -264,6 +266,10 @@ export class TaskDetailProvider {
         descriptionHtml,
         isDraft: task.folder === 'drafts',
         isArchived: task.folder === 'archive',
+        isReadOnly: isReadOnlyTask(task),
+        readOnlyReason: isReadOnlyTask(task)
+          ? `Task is from ${getReadOnlyTaskContext(task)} and is read-only.`
+          : undefined,
         parentTask,
         subtaskSummaries,
       };
@@ -323,6 +329,8 @@ export class TaskDetailProvider {
           message.listType &&
           message.itemId !== undefined
         ) {
+          const currentTask = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+          if (this.blockReadOnlyMutation(currentTask, 'update checklist items')) break;
           try {
             await this.writer.toggleChecklistItem(
               TaskDetailProvider.currentTaskId,
@@ -340,6 +348,7 @@ export class TaskDetailProvider {
       case 'updateField':
         if (TaskDetailProvider.currentTaskId && this.parser && message.field) {
           const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+          if (this.blockReadOnlyMutation(task, `update ${message.field}`)) break;
           if (!task?.filePath || !fs.existsSync(task.filePath)) {
             const choice = await vscode.window.showErrorMessage(
               'The task file has been deleted or moved.',
@@ -376,6 +385,8 @@ export class TaskDetailProvider {
 
       case 'promoteDraft': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
+        const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        if (this.blockReadOnlyMutation(task, 'promote this draft')) break;
 
         try {
           await this.writer.promoteDraft(TaskDetailProvider.currentTaskId, this.parser);
@@ -393,6 +404,7 @@ export class TaskDetailProvider {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
 
         const draftTask = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        if (this.blockReadOnlyMutation(draftTask, 'discard this draft')) break;
         if (!draftTask) break;
 
         const discardConfirmation = await vscode.window.showWarningMessage(
@@ -417,6 +429,8 @@ export class TaskDetailProvider {
 
       case 'archiveTask': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
+        const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        if (this.blockReadOnlyMutation(task, 'archive this task')) break;
 
         try {
           await this.writer.archiveTask(TaskDetailProvider.currentTaskId, this.parser);
@@ -430,6 +444,8 @@ export class TaskDetailProvider {
 
       case 'restoreTask': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
+        const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        if (this.blockReadOnlyMutation(task, 'restore this task')) break;
 
         try {
           await this.writer.restoreArchivedTask(TaskDetailProvider.currentTaskId, this.parser);
@@ -447,6 +463,7 @@ export class TaskDetailProvider {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
 
         const deleteTarget = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        if (this.blockReadOnlyMutation(deleteTarget, 'delete this task')) break;
         if (!deleteTarget) break;
 
         const deleteConfirmation = await vscode.window.showWarningMessage(
@@ -471,6 +488,8 @@ export class TaskDetailProvider {
 
       case 'createSubtask': {
         if (!message.parentTaskId || !this.parser) break;
+        const parentTask = await this.parser.getTask(message.parentTaskId);
+        if (this.blockReadOnlyMutation(parentTask, 'create a subtask')) break;
 
         try {
           const backlogPath = path.dirname(
@@ -547,5 +566,13 @@ export class TaskDetailProvider {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  private blockReadOnlyMutation(task: Task | undefined, action: string): boolean {
+    if (!task || !isReadOnlyTask(task)) return false;
+    vscode.window.showErrorMessage(
+      `Cannot ${action}: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
+    );
+    return true;
   }
 }

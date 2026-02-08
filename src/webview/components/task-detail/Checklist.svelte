@@ -6,9 +6,10 @@
     items: ChecklistItem[];
     listType: 'acceptanceCriteria' | 'definitionOfDone';
     onToggle: (listType: string, itemId: number) => void;
+    isReadOnly?: boolean;
   }
 
-  let { title, items, listType, onToggle }: Props = $props();
+  let { title, items, listType, onToggle, isReadOnly = false }: Props = $props();
 
   const checkedCount = $derived(items.filter((i) => i.checked).length);
   const totalCount = $derived(items.length);
@@ -38,8 +39,9 @@
           <button
             type="button"
             class="checklist-toggle"
-            onclick={() => onToggle(listType, item.id)}
+            onclick={() => !isReadOnly && onToggle(listType, item.id)}
             aria-pressed={item.checked}
+            disabled={isReadOnly}
           >
             <span class="checkbox">{item.checked ? '☑' : '☐'}</span>
             <span class="checklist-text">{item.text}</span>

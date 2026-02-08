@@ -371,6 +371,14 @@ body {
   transform: translateY(-1px);
 }
 
+.task-card.readonly-task {
+  cursor: default;
+}
+
+.task-card.readonly-task:hover {
+  transform: none;
+}
+
 .task-card.dragging {
   opacity: 0.6;
   cursor: grabbing;
@@ -586,6 +594,19 @@ body {
 
 .deps-indicator svg {
   opacity: 0.7;
+}
+
+.readonly-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground, #858585);
+}
+
+.readonly-indicator svg {
+  opacity: 0.75;
 }
 
 /* Task card optimistic UI */
@@ -813,6 +834,11 @@ body {
 
 .task-table tr.draft-row {
   opacity: 0.85;
+}
+
+.task-table tr.readonly-row .drag-handle {
+  cursor: default;
+  opacity: 0.35;
 }
 
 .draft-badge {
@@ -1704,6 +1730,11 @@ body {
 
 .draft-discard-btn:hover {
   background: var(--vscode-button-secondaryHoverBackground, #3c3c3c);
+}
+
+.readonly-banner {
+  background: var(--vscode-inputValidation-warningBackground, rgba(245, 158, 11, 0.12));
+  border-color: var(--vscode-inputValidation-warningBorder, rgba(245, 158, 11, 0.35));
 }
 
 /* Subtask progress indicator on kanban cards */

@@ -10,6 +10,7 @@
     priority: TaskPriority | undefined;
     statuses: string[];
     isBlocked: boolean;
+    isReadOnly?: boolean;
     onUpdateTitle: (title: string) => void;
     onUpdateStatus: (status: string) => void;
     onUpdatePriority: (priority: string | undefined) => void;
@@ -22,6 +23,7 @@
     priority,
     statuses,
     isBlocked,
+    isReadOnly = false,
     onUpdateTitle,
     onUpdateStatus,
     onUpdatePriority,
@@ -91,6 +93,7 @@
     data-testid="title-input"
     bind:value={titleValue}
     bind:this={titleEl}
+    disabled={isReadOnly}
     onblur={handleTitleBlur}
     onkeydown={handleTitleKeydown}
     oninput={autoResize}
@@ -102,6 +105,7 @@
       style={statusInlineStyle}
       data-testid="status-select"
       value={status}
+      disabled={isReadOnly}
       onchange={handleStatusChange}
     >
       {#each statuses as s (s)}
@@ -116,6 +120,7 @@
         class="dropdown-select priority-select {priorityClass}"
         data-testid="priority-select"
         value={priority || ''}
+        disabled={isReadOnly}
         onchange={handlePriorityChange}
       >
         <option value="">No Priority</option>

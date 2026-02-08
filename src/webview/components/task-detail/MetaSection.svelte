@@ -9,6 +9,7 @@
     uniqueAssignees: string[];
     milestones: string[];
     parentTask?: { id: string; title: string };
+    isReadOnly?: boolean;
     onUpdateLabels: (labels: string[]) => void;
     onUpdateAssignees: (assignees: string[]) => void;
     onUpdateMilestone: (milestone: string | undefined) => void;
@@ -26,6 +27,7 @@
     uniqueAssignees,
     milestones,
     parentTask,
+    isReadOnly = false,
     onUpdateLabels,
     onUpdateAssignees,
     onUpdateMilestone,
@@ -37,6 +39,7 @@
   let assigneeInput = $state('');
 
   function handleAddLabel(e: KeyboardEvent) {
+    if (isReadOnly) return;
     if (e.key === 'Enter') {
       const newLabel = labelInput.trim();
       if (newLabel && !labels.includes(newLabel)) {
@@ -50,10 +53,12 @@
   }
 
   function handleRemoveLabel(label: string) {
+    if (isReadOnly) return;
     onUpdateLabels(labels.filter((l) => l !== label));
   }
 
   function handleAddAssignee(e: KeyboardEvent) {
+    if (isReadOnly) return;
     if (e.key === 'Enter') {
       const newAssignee = assigneeInput.trim();
       if (newAssignee && !assignees.includes(newAssignee)) {
@@ -67,10 +72,12 @@
   }
 
   function handleRemoveAssignee(assignee: string) {
+    if (isReadOnly) return;
     onUpdateAssignees(assignees.filter((a) => a !== assignee));
   }
 
   function handleMilestoneChange(e: Event) {
+    if (isReadOnly) return;
     const value = (e.target as HTMLSelectElement).value || undefined;
     onUpdateMilestone(value);
   }
@@ -116,10 +123,11 @@
             <span
               class="remove-label"
               data-testid="remove-label-{label}"
-              onclick={() => handleRemoveLabel(label)}
-              onkeydown={(e) => e.key === 'Enter' && handleRemoveLabel(label)}
+              onclick={() => !isReadOnly && handleRemoveLabel(label)}
+              onkeydown={(e) => e.key === 'Enter' && !isReadOnly && handleRemoveLabel(label)}
               role="button"
-              tabindex="0"
+              tabindex={isReadOnly ? -1 : 0}
+              aria-disabled={isReadOnly}
             >
               ×
             </span>
@@ -132,6 +140,7 @@
           placeholder="+ Add"
           list="labelSuggestions"
           bind:value={labelInput}
+          disabled={isReadOnly}
           onkeydown={handleAddLabel}
         />
       </div>
@@ -147,10 +156,11 @@
             <span
               class="remove-assignee"
               data-testid="remove-assignee-{assignee}"
-              onclick={() => handleRemoveAssignee(assignee)}
-              onkeydown={(e) => e.key === 'Enter' && handleRemoveAssignee(assignee)}
+              onclick={() => !isReadOnly && handleRemoveAssignee(assignee)}
+              onkeydown={(e) => e.key === 'Enter' && !isReadOnly && handleRemoveAssignee(assignee)}
               role="button"
-              tabindex="0"
+              tabindex={isReadOnly ? -1 : 0}
+              aria-disabled={isReadOnly}
             >
               ×
             </span>
@@ -163,6 +173,7 @@
           placeholder="+ Add"
           list="assigneeSuggestions"
           bind:value={assigneeInput}
+          disabled={isReadOnly}
           onkeydown={handleAddAssignee}
         />
       </div>
@@ -176,6 +187,7 @@
           class="dropdown-select milestone-select"
           data-testid="milestone-select"
           value={milestone || ''}
+          disabled={isReadOnly}
           onchange={handleMilestoneChange}
         >
           <option value="">None</option>

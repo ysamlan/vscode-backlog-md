@@ -1,6 +1,12 @@
 import * as vscode from 'vscode';
 import { BaseViewProvider } from './BaseViewProvider';
-import { WebviewMessage, DataSourceMode, Task } from '../core/types';
+import {
+  WebviewMessage,
+  DataSourceMode,
+  Task,
+  isReadOnlyTask,
+  getReadOnlyTaskContext,
+} from '../core/types';
 import { BacklogWriter } from '../core/BacklogWriter';
 import { computeSubtasks } from '../core/BacklogParser';
 
@@ -227,6 +233,15 @@ export class TasksViewProvider extends BaseViewProvider {
         const taskId = message.taskId;
         // Get original status before update for rollback
         const task = await this.parser.getTask(taskId);
+        if (task && isReadOnlyTask(task)) {
+          this.postMessage({
+            type: 'taskUpdateError',
+            taskId,
+            originalStatus: task.status,
+            message: `Cannot update status: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`,
+          });
+          break;
+        }
         const originalStatus = task?.status || 'To Do';
 
         try {
@@ -262,6 +277,16 @@ export class TasksViewProvider extends BaseViewProvider {
       case 'reorderTask': {
         if (!this.parser) break;
         const taskId = message.taskId;
+        const task = await this.parser.getTask(taskId);
+        if (task && isReadOnlyTask(task)) {
+          this.postMessage({
+            type: 'taskUpdateError',
+            taskId,
+            originalStatus: task.status,
+            message: `Cannot reorder task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`,
+          });
+          break;
+        }
         try {
           const writer = new BacklogWriter();
           await writer.updateTask(taskId, { ordinal: message.ordinal }, this.parser);
@@ -277,6 +302,29 @@ export class TasksViewProvider extends BaseViewProvider {
 
       case 'reorderTasks': {
         if (!this.parser) break;
+        const readonlyTasks: Task[] = [];
+        for (const update of message.updates) {
+          const task = await this.parser.getTask(update.taskId);
+          if (task && isReadOnlyTask(task)) {
+            readonlyTasks.push(task);
+          }
+        }
+        if (readonlyTasks.length > 0) {
+          for (const task of readonlyTasks) {
+            this.postMessage({
+              type: 'taskUpdateError',
+              taskId: task.id,
+              originalStatus: task.status,
+              message: `Cannot reorder task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`,
+            });
+          }
+          for (const update of message.updates) {
+            if (!readonlyTasks.some((t) => t.id === update.taskId)) {
+              this.postMessage({ type: 'taskUpdateSuccess', taskId: update.taskId });
+            }
+          }
+          break;
+        }
         try {
           const writer = new BacklogWriter();
           // Update all tasks with new ordinals
@@ -300,6 +348,12 @@ export class TasksViewProvider extends BaseViewProvider {
       case 'archiveTask': {
         if (!this.parser || !message.taskId) break;
         const task = await this.parser.getTask(message.taskId);
+        if (task && isReadOnlyTask(task)) {
+          vscode.window.showErrorMessage(
+            `Cannot archive task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
+          );
+          break;
+        }
         const confirmation = await vscode.window.showWarningMessage(
           `Archive task "${task?.title}"?`,
           { modal: true },
@@ -321,6 +375,12 @@ export class TasksViewProvider extends BaseViewProvider {
       case 'completeTask': {
         if (!this.parser || !message.taskId) break;
         const completeTarget = await this.parser.getTask(message.taskId);
+        if (completeTarget && isReadOnlyTask(completeTarget)) {
+          vscode.window.showErrorMessage(
+            `Cannot complete task: ${completeTarget.id} is read-only from ${getReadOnlyTaskContext(completeTarget)}.`
+          );
+          break;
+        }
         const completeConfirmation = await vscode.window.showWarningMessage(
           `Move task "${completeTarget?.title}" to completed?`,
           { modal: true },
@@ -341,6 +401,13 @@ export class TasksViewProvider extends BaseViewProvider {
 
       case 'promoteDraft': {
         if (!this.parser || !message.taskId) break;
+        const draft = await this.parser.getTask(message.taskId);
+        if (draft && isReadOnlyTask(draft)) {
+          vscode.window.showErrorMessage(
+            `Cannot promote draft: ${draft.id} is read-only from ${getReadOnlyTaskContext(draft)}.`
+          );
+          break;
+        }
         try {
           const writer = new BacklogWriter();
           await writer.promoteDraft(message.taskId, this.parser);
@@ -353,6 +420,13 @@ export class TasksViewProvider extends BaseViewProvider {
 
       case 'restoreTask': {
         if (!this.parser || !message.taskId) break;
+        const task = await this.parser.getTask(message.taskId);
+        if (task && isReadOnlyTask(task)) {
+          vscode.window.showErrorMessage(
+            `Cannot restore task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
+          );
+          break;
+        }
         try {
           const writer = new BacklogWriter();
           await writer.restoreArchivedTask(message.taskId, this.parser);
@@ -366,6 +440,12 @@ export class TasksViewProvider extends BaseViewProvider {
       case 'deleteTask': {
         if (!this.parser || !message.taskId) break;
         const taskToDelete = await this.parser.getTask(message.taskId);
+        if (taskToDelete && isReadOnlyTask(taskToDelete)) {
+          vscode.window.showErrorMessage(
+            `Cannot delete task: ${taskToDelete.id} is read-only from ${getReadOnlyTaskContext(taskToDelete)}.`
+          );
+          break;
+        }
         const deleteConfirmation = await vscode.window.showWarningMessage(
           `Permanently delete task "${taskToDelete?.title}"? This cannot be undone.`,
           { modal: true },

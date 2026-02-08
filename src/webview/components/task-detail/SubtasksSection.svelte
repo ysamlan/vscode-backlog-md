@@ -12,9 +12,10 @@
     statuses?: string[];
     onOpenTask: (taskId: string) => void;
     onCreateSubtask: () => void;
+    isReadOnly?: boolean;
   }
 
-  let { subtasks, statuses = [], onOpenTask, onCreateSubtask }: Props = $props();
+  let { subtasks, statuses = [], onOpenTask, onCreateSubtask, isReadOnly = false }: Props = $props();
 
   // The last configured status is treated as "done"
   let doneStatus = $derived(statuses.length > 0 ? statuses[statuses.length - 1] : 'Done');
@@ -47,7 +48,8 @@
     type="button"
     class="add-subtask-btn"
     data-testid="add-subtask-btn"
-    onclick={onCreateSubtask}
+    onclick={() => !isReadOnly && onCreateSubtask()}
+    disabled={isReadOnly}
   >
     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M5 12h14"/><path d="M12 5v14"/>

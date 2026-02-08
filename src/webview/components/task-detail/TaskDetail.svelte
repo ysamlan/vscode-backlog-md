@@ -24,6 +24,8 @@
   let descriptionHtml = $state('');
   let isDraft = $state(false);
   let isArchived = $state(false);
+  let isReadOnly = $state(false);
+  let readOnlyReason = $state('');
   let parentTask: { id: string; title: string } | undefined = $state(undefined);
   let subtaskSummaries: Array<{ id: string; title: string; status: string }> | undefined = $state(undefined);
 
@@ -43,6 +45,8 @@
           descriptionHtml = data.descriptionHtml;
           isDraft = data.isDraft ?? false;
           isArchived = data.isArchived ?? false;
+          isReadOnly = data.isReadOnly ?? false;
+          readOnlyReason = data.readOnlyReason ?? '';
           parentTask = data.parentTask;
           subtaskSummaries = data.subtaskSummaries;
           viewState = 'ready';
@@ -159,12 +163,18 @@
     priority={task.priority}
     {statuses}
     {isBlocked}
+    {isReadOnly}
     onUpdateTitle={handleUpdateTitle}
     onUpdateStatus={handleUpdateStatus}
     onUpdatePriority={handleUpdatePriority}
   />
 
-  {#if isArchived}
+  {#if isReadOnly}
+    <div class="draft-banner readonly-banner" data-testid="readonly-banner">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12"/><path d="M18 9a3 3 0 0 0-3-3H6"/><path d="M6 15h9a3 3 0 1 1 0 6h-3"/></svg>
+      <span>{readOnlyReason || 'This task is read-only.'}</span>
+    </div>
+  {:else if isArchived}
     <div class="draft-banner archived-banner">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
       <span>Archived — this task has been archived</span>
@@ -198,6 +208,7 @@
     onUpdateMilestone={handleUpdateMilestone}
     onOpenTask={handleOpenTask}
     onFilterByLabel={handleFilterByLabel}
+    {isReadOnly}
   />
 
   {#if subtaskSummaries && subtaskSummaries.length > 0}
@@ -206,6 +217,7 @@
       {statuses}
       onOpenTask={handleOpenTask}
       onCreateSubtask={handleCreateSubtask}
+      {isReadOnly}
     />
   {/if}
 
@@ -213,6 +225,7 @@
     description={task.description || ''}
     {descriptionHtml}
     onUpdate={handleUpdateDescription}
+    {isReadOnly}
   />
 
   <Checklist
@@ -220,6 +233,7 @@
     items={task.acceptanceCriteria}
     listType="acceptanceCriteria"
     onToggle={handleToggleChecklist}
+    {isReadOnly}
   />
 
   <Checklist
@@ -227,6 +241,7 @@
     items={task.definitionOfDone}
     listType="definitionOfDone"
     onToggle={handleToggleChecklist}
+    {isReadOnly}
   />
 
   <ActionButtons
@@ -236,5 +251,6 @@
     onDelete={handleDelete}
     {isDraft}
     {isArchived}
+    {isReadOnly}
   />
 {/if}
