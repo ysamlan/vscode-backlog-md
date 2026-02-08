@@ -92,7 +92,7 @@ body {
 /* Status badge styles - theme-aware colors */
 .status-badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px 6px;
   border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
@@ -257,6 +257,16 @@ body {
   flex-direction: row;
   gap: 8px;
   overflow-x: auto;
+}
+
+@media (max-width: 500px) {
+  .kanban-board.milestone-grouped .milestone-content .kanban-board.nested {
+    flex-wrap: wrap;
+  }
+  .kanban-board.milestone-grouped .milestone-content .kanban-board.nested .kanban-column {
+    min-width: 120px;
+    flex: 1 1 calc(50% - 4px);
+  }
 }
 
 .kanban-column {
@@ -561,7 +571,7 @@ body {
 
 .dep-overflow {
   color: var(--vscode-descriptionForeground, #858585);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 /* List view dependency indicator */
@@ -767,6 +777,10 @@ body {
   color: var(--vscode-descriptionForeground, #858585);
   text-align: center;
   padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .empty-state-icon {
@@ -803,11 +817,11 @@ body {
 
 .draft-badge {
   display: inline-block;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  padding: 1px 5px;
-  border-radius: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
   margin-right: 6px;
   vertical-align: middle;
   background: var(--vscode-badge-background, #4d4d4d);
@@ -1447,7 +1461,7 @@ body {
 }
 
 .stat-value {
-  font-size: 28px;
+  font-size: clamp(18px, 5vw, 24px);
   font-weight: 700;
   color: var(--vscode-foreground, #cccccc);
   margin-bottom: 4px;
