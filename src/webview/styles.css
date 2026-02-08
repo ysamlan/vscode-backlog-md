@@ -734,16 +734,24 @@ body {
 
 /* List view drag handle */
 .drag-handle-header {
-  width: 20px;
-  padding: 8px 2px !important;
+  width: 16px;
+  padding: 8px 0 8px 2px !important;
+}
+
+.drag-handle-header + th {
+  padding-left: 4px;
 }
 
 .drag-handle {
-  width: 20px;
-  padding: 8px 2px !important;
+  width: 16px;
+  padding: 8px 0 8px 2px !important;
   cursor: grab;
   color: var(--vscode-descriptionForeground, #858585);
   text-align: center;
+}
+
+.drag-handle + td {
+  padding-left: 4px;
 }
 
 .drag-handle:hover {
@@ -1723,7 +1731,7 @@ body {
 }
 
 .drag-handle-blank {
-  width: 20px;
+  width: 16px;
 }
 
 /* Task detail: parent task title */
