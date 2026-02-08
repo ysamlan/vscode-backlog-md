@@ -286,6 +286,7 @@ export class TaskDetailProvider {
     itemId?: number;
     field?: string;
     value?: string | string[];
+    label?: string;
   }): Promise<void> {
     switch (message.type) {
       case 'refresh':
@@ -306,6 +307,12 @@ export class TaskDetailProvider {
       case 'openTask':
         if (message.taskId) {
           await this.openTask(message.taskId);
+        }
+        break;
+
+      case 'filterByLabel':
+        if (message.label) {
+          vscode.commands.executeCommand('backlog.filterByLabel', message.label);
         }
         break;
 

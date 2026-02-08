@@ -13,6 +13,7 @@
     onUpdateAssignees: (assignees: string[]) => void;
     onUpdateMilestone: (milestone: string | undefined) => void;
     onOpenTask: (taskId: string) => void;
+    onFilterByLabel: (label: string) => void;
   }
 
   let {
@@ -29,6 +30,7 @@
     onUpdateAssignees,
     onUpdateMilestone,
     onOpenTask,
+    onFilterByLabel,
   }: Props = $props();
 
   let labelInput = $state('');
@@ -102,7 +104,15 @@
       <div class="labels-container" data-testid="labels-container">
         {#each labels as label (label)}
           <span class="label editable-label" data-label={label}>
-            {label}
+            <button
+              type="button"
+              class="label-link"
+              data-testid="label-link-{label}"
+              title="Filter by {label}"
+              onclick={() => onFilterByLabel(label)}
+            >
+              {label}
+            </button>
             <span
               class="remove-label"
               data-testid="remove-label-{label}"

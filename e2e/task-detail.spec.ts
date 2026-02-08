@@ -230,6 +230,37 @@ test.describe('Task Detail', () => {
       await expect(page.locator('.label').filter({ hasText: 'urgent' })).toBeVisible();
     });
 
+    test('label text is clickable and sends filterByLabel message', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      await page.locator('[data-testid="label-link-bug"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'filterByLabel',
+        label: 'bug',
+      });
+    });
+
+    test('clicking different labels sends different filterByLabel messages', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      await page.locator('[data-testid="label-link-urgent"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'filterByLabel',
+        label: 'urgent',
+      });
+    });
+
+    test('label link has filter tooltip', async ({ page }) => {
+      await expect(page.locator('[data-testid="label-link-bug"]')).toHaveAttribute(
+        'title',
+        'Filter by bug'
+      );
+    });
+
     test('adds a new label on Enter', async ({ page }) => {
       await clearPostedMessages(page);
 

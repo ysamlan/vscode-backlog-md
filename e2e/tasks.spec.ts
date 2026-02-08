@@ -672,6 +672,41 @@ test.describe('Tasks View', () => {
       await expect(page.locator('[data-testid="row-labels-TASK-L4"]')).toHaveCount(0);
     });
 
+    test('setLabelFilter message sets the label dropdown value', async ({ page }) => {
+      await setupLabelView(page);
+
+      // Send setLabelFilter message (as if from task detail clickable label)
+      await postMessageToWebview(page, { type: 'setLabelFilter', label: 'bug' });
+      await page.waitForTimeout(50);
+
+      // Label dropdown should be set to "bug"
+      const labelFilter = page.locator('[data-testid="label-filter"]');
+      await expect(labelFilter).toHaveValue('bug');
+
+      // Only TASK-L2 has "bug" label
+      const rows = page.locator('tbody tr');
+      await expect(rows).toHaveCount(1);
+      await expect(page.locator('[data-testid="task-row-TASK-L2"]')).toBeVisible();
+    });
+
+    test('setLabelFilter message switches to list view and filters', async ({ page }) => {
+      await setupLabelView(page);
+
+      // Start in kanban view
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'kanban' });
+      await page.waitForTimeout(50);
+      await expect(page.locator('#kanban-view')).toBeVisible();
+
+      // Simulate extension switching to list + setting label filter
+      await postMessageToWebview(page, { type: 'activeTabChanged', tab: 'list' });
+      await postMessageToWebview(page, { type: 'setLabelFilter', label: 'ui' });
+      await page.waitForTimeout(50);
+
+      // Should now show list view filtered by "ui" (TASK-L2 and TASK-L3)
+      const rows = page.locator('tbody tr');
+      await expect(rows).toHaveCount(2);
+    });
+
     test('label filter dropdown is hidden when no tasks have labels', async ({ page }) => {
       await installVsCodeMock(page);
       await page.goto('/tasks.html');

@@ -166,6 +166,16 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Register filter by label command (used by task detail clickable labels)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.filterByLabel', (label: string) => {
+      // Switch to list view and apply label filter
+      tasksProvider.setViewMode('list');
+      vscode.commands.executeCommand('setContext', 'backlog.viewMode', 'list');
+      tasksProvider.setLabelFilter(label);
+    })
+  );
+
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.openTaskDetail', (taskId: string) => {
       taskDetailProvider.openTask(taskId);

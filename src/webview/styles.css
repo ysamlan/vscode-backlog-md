@@ -1124,6 +1124,20 @@ body {
   cursor: default;
 }
 
+/* Clickable label text in task detail */
+.label-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.label-link:hover {
+  text-decoration: underline;
+}
+
 .remove-label,
 .remove-assignee {
   cursor: pointer;

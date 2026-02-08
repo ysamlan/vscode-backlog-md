@@ -551,6 +551,13 @@ export class TasksViewProvider extends BaseViewProvider {
   }
 
   /**
+   * Set the label filter in the list view from external command
+   */
+  setLabelFilter(label: string): void {
+    this.postMessage({ type: 'setLabelFilter', label });
+  }
+
+  /**
    * Refresh documents list and send to webview
    */
   async refreshDocuments(): Promise<void> {

@@ -1,9 +1,10 @@
 ---
 id: TASK-105
 title: Clickable labels in task detail view to filter list by label
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-08 13:13'
+updated_date: '2026-02-08 18:27'
 labels:
   - feature
   - ui
@@ -34,8 +35,14 @@ In the task detail webview, label badges are currently static display elements. 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Clicking a label badge in task detail view switches to list view filtered by that label
-- [ ] #2 Label filter dropdown in list view reflects the selected label
-- [ ] #3 Clicking a different label updates the filter accordingly
-- [ ] #4 Works for all labels including multi-word labels
+- [x] #1 Clicking a label badge in task detail view switches to list view filtered by that label
+- [x] #2 Label filter dropdown in list view reflects the selected label
+- [x] #3 Clicking a different label updates the filter accordingly
+- [x] #4 Works for all labels including multi-word labels
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Made label badges in task detail view clickable. Clicking a label sends a `filterByLabel` message through the extension host, which switches the sidebar to list view and sets the label filter dropdown to that label. Full message flow: MetaSection.svelte -> TaskDetail.svelte -> TaskDetailProvider.ts -> extension.ts command -> TasksViewProvider.setLabelFilter() -> Tasks.svelte -> ListView.svelte. Added 5 Playwright e2e tests (3 for task-detail label clicks, 2 for list view label filter message handling).
+<!-- SECTION:FINAL_SUMMARY:END -->

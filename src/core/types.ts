@@ -183,6 +183,7 @@ export type WebviewMessage =
   | { type: 'toggleMilestoneGrouping'; enabled: boolean }
   | { type: 'toggleMilestoneCollapse'; milestone: string }
   | { type: 'filterByStatus'; status: string }
+  | { type: 'filterByLabel'; label: string }
   | { type: 'completeTask'; taskId: string }
   | { type: 'promoteDraft'; taskId: string }
   | { type: 'discardDraft'; taskId: string }
@@ -221,6 +222,7 @@ export type ExtensionMessage =
   | { type: 'milestoneGroupingChanged'; enabled: boolean }
   | { type: 'milestoneCollapseChanged'; collapsedMilestones: string[] }
   | { type: 'setFilter'; filter: string }
+  | { type: 'setLabelFilter'; label: string }
   | { type: 'draftsModeChanged'; enabled: boolean }
   | { type: 'completedTasksUpdated'; tasks: Task[] }
   | {

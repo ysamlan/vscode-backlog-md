@@ -46,6 +46,7 @@
   // List view state
   let currentFilter = $state('all');
   let currentMilestone = $state('');
+  let currentLabel = $state('');
   let searchQuery = $state('');
 
   // Toast state
@@ -138,6 +139,11 @@
 
       case 'setFilter':
         currentFilter = message.filter;
+        break;
+
+      case 'setLabelFilter':
+        currentLabel = message.label;
+        currentFilter = 'all';
         break;
 
       case 'completedTasksUpdated':
@@ -333,6 +339,10 @@
     searchQuery = query;
   }
 
+  function handleLabelChange(label: string) {
+    currentLabel = label;
+  }
+
   function handleCompleteTask(taskId: string) {
     vscode.postMessage({ type: 'completeTask', taskId });
   }
@@ -422,12 +432,14 @@
       milestones={configMilestones}
       {currentFilter}
       {currentMilestone}
+      {currentLabel}
       {searchQuery}
       isDraftsView={activeTab === 'drafts'}
       {completedTasks}
       onOpenTask={handleOpenTask}
       onFilterChange={handleFilterChange}
       onMilestoneChange={handleMilestoneChange}
+      onLabelChange={handleLabelChange}
       onSearchChange={handleSearchChange}
       onReorderTasks={handleReorderTasks}
       onCompleteTask={handleCompleteTask}
@@ -443,11 +455,13 @@
       milestones={configMilestones}
       {currentFilter}
       {currentMilestone}
+      {currentLabel}
       {searchQuery}
       isArchivedView={true}
       onOpenTask={handleOpenTask}
       onFilterChange={handleFilterChange}
       onMilestoneChange={handleMilestoneChange}
+      onLabelChange={handleLabelChange}
       onSearchChange={handleSearchChange}
       onRestoreTask={handleRestoreTask}
       onDeleteTask={handleDeleteTask}

@@ -12,6 +12,7 @@
     milestones: Milestone[];
     currentFilter: string;
     currentMilestone: string;
+    currentLabel: string;
     searchQuery: string;
     isDraftsView?: boolean;
     isArchivedView?: boolean;
@@ -19,6 +20,7 @@
     onOpenTask: (taskId: string) => void;
     onFilterChange: (filter: string) => void;
     onMilestoneChange: (milestone: string) => void;
+    onLabelChange: (label: string) => void;
     onSearchChange: (query: string) => void;
     onReorderTasks?: (updates: Array<{ taskId: string; ordinal: number }>) => void;
     onCompleteTask?: (taskId: string) => void;
@@ -34,6 +36,7 @@
     milestones,
     currentFilter,
     currentMilestone,
+    currentLabel,
     searchQuery,
     isDraftsView = false,
     isArchivedView = false,
@@ -41,6 +44,7 @@
     onOpenTask,
     onFilterChange,
     onMilestoneChange,
+    onLabelChange,
     onSearchChange,
     onReorderTasks,
     onCompleteTask,
@@ -57,7 +61,6 @@
     field: 'status',
     direction: 'asc',
   });
-  let currentLabel = $state('');
   let showingCompleted = $state(false);
   let completedRequested = $state(false);
 
@@ -463,7 +466,7 @@
         <select
           class="label-filter"
           value={currentLabel}
-          onchange={(e) => { currentLabel = (e.target as HTMLSelectElement).value; }}
+          onchange={(e) => onLabelChange((e.target as HTMLSelectElement).value)}
           data-testid="label-filter"
         >
           <option value="">All Labels</option>

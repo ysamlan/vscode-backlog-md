@@ -98,6 +98,10 @@
     vscode.postMessage({ type: 'openTask', taskId });
   }
 
+  function handleFilterByLabel(label: string) {
+    vscode.postMessage({ type: 'filterByLabel', label });
+  }
+
   function handleOpenFile() {
     vscode.postMessage({ type: 'openFile' });
   }
@@ -193,6 +197,7 @@
     onUpdateAssignees={handleUpdateAssignees}
     onUpdateMilestone={handleUpdateMilestone}
     onOpenTask={handleOpenTask}
+    onFilterByLabel={handleFilterByLabel}
   />
 
   {#if subtaskSummaries && subtaskSummaries.length > 0}
