@@ -45,6 +45,49 @@ interface RawFrontmatter {
 }
 
 /**
+ * Pre-process YAML frontmatter to quote unquoted @-prefixed values
+ * in assignee/reporter fields. YAML treats @ as a reserved character,
+ * so bare values like `reporter: @alice` cause parse errors.
+ * Matches upstream Backlog.md behavior (src/markdown/parser.ts).
+ */
+function preprocessFrontmatter(raw: string): string {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => {
+      const match = line.match(/^(\s*(?:assignee|reporter):\s*)(.*)$/);
+      if (!match) return line;
+
+      const prefix = match[1];
+      const value = (match[2] ?? '').trim();
+
+      // Inline array — quote any bare @-prefixed entries
+      if (value.startsWith('[')) {
+        const listMatch = value.match(/^\[(.*)\]\s*(#.*)?$/);
+        if (!listMatch) return line;
+        const items = (listMatch[1] ?? '')
+          .split(',')
+          .map((e) => e.trim())
+          .filter((e) => e.length > 0);
+        const normalized = items.map((entry) => {
+          if (entry.startsWith("'") || entry.startsWith('"')) return entry;
+          if (entry.startsWith('@'))
+            return `"${entry.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+          return entry;
+        });
+        const comment = listMatch[2] ? ` ${listMatch[2]}` : '';
+        return `${prefix}[${normalized.join(', ')}]${comment}`;
+      }
+
+      // Bare scalar — quote if not already quoted and not a block indicator
+      if (value && !value.startsWith("'") && !value.startsWith('"') && !value.startsWith('-')) {
+        return `${prefix}"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+      }
+      return line;
+    })
+    .join('\n');
+}
+
+/**
  * Compute subtask relationships from parentTaskId fields.
  * Populates the `subtasks` array on parent tasks by scanning all tasks
  * for those with a matching `parentTaskId`.
@@ -372,7 +415,7 @@ export class BacklogParser {
 
       // Parse frontmatter using js-yaml
       try {
-        const frontmatterYaml = frontmatterLines.join('\n');
+        const frontmatterYaml = preprocessFrontmatter(frontmatterLines.join('\n'));
         const frontmatter = yaml.load(frontmatterYaml) as RawFrontmatter | null;
         if (frontmatter) {
           this.applyFrontmatter(frontmatter, task);

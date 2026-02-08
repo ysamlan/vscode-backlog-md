@@ -1086,6 +1086,54 @@ labels: {bad: yaml:
       expect(task?.id).toBe('TASK-1');
     });
 
+    it('should handle unquoted @-prefixed reporter value', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: BACK-91
+title: 'Fix Windows issues: empty task list'
+status: Done
+reporter: @MrLesk
+assignee: @MrLesk
+created_date: '2025-06-19'
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/back-91.md');
+      expect(task).toBeDefined();
+      expect(task?.title).toBe('Fix Windows issues: empty task list');
+      expect(task?.reporter).toBe('@MrLesk');
+      expect(task?.assignee).toEqual(['@MrLesk']);
+    });
+
+    it('should handle unquoted @-prefixed values in inline arrays', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Team task
+status: To Do
+assignee: [@alice, @bob]
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task).toBeDefined();
+      expect(task?.assignee).toEqual(['@alice', '@bob']);
+    });
+
+    it('should not double-quote already-quoted @-prefixed values', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Already quoted
+status: To Do
+reporter: '@quoted'
+assignee: ["@alice", '@bob']
+---
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task).toBeDefined();
+      expect(task?.reporter).toBe('@quoted');
+      expect(task?.assignee).toEqual(['@alice', '@bob']);
+    });
+
     it('should handle file with only frontmatter delimiters and no content', () => {
       const parser = new BacklogParser('/fake/path');
       const content = `---
