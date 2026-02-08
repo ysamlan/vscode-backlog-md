@@ -28,6 +28,7 @@
 
   let titleValue = $state('');
   let originalTitle = $state('');
+  let titleEl: HTMLTextAreaElement | undefined = $state();
 
   // Sync when title prop changes (on initial load and after save)
   $effect(() => {
@@ -35,10 +36,23 @@
     originalTitle = title;
   });
 
+  // Auto-resize textarea when value changes
+  $effect(() => {
+    // Track titleValue to trigger on changes
+    void titleValue;
+    requestAnimationFrame(() => autoResize());
+  });
+
   const statusClass = $derived(statusToClass(status));
   const statusInlineStyle = $derived(customStatusStyle(status));
   const priorityClass = $derived(priority ? `priority-${priority}` : '');
   const priorities = ['high', 'medium', 'low'];
+
+  function autoResize() {
+    if (!titleEl) return;
+    titleEl.style.height = 'auto';
+    titleEl.style.height = titleEl.scrollHeight + 'px';
+  }
 
   function handleTitleBlur() {
     const newTitle = titleValue.trim();
@@ -50,10 +64,11 @@
 
   function handleTitleKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter') {
-      (e.target as HTMLInputElement).blur();
+      e.preventDefault();
+      (e.target as HTMLTextAreaElement).blur();
     } else if (e.key === 'Escape') {
       titleValue = originalTitle;
-      (e.target as HTMLInputElement).blur();
+      (e.target as HTMLTextAreaElement).blur();
     }
   }
 
@@ -70,14 +85,16 @@
 
 <div class="task-header">
   <div class="task-id" data-testid="task-id">{taskId}</div>
-  <input
-    type="text"
+  <textarea
     class="editable-title"
     data-testid="title-input"
     bind:value={titleValue}
+    bind:this={titleEl}
     onblur={handleTitleBlur}
     onkeydown={handleTitleKeydown}
-  />
+    oninput={autoResize}
+    rows="1"
+  ></textarea>
   <div class="task-badges">
     <select
       class="dropdown-select status-select status-{statusClass}"

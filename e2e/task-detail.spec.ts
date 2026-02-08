@@ -109,6 +109,27 @@ test.describe('Task Detail', () => {
     test('shows blocked badge when task is blocked', async ({ page }) => {
       await expect(page.locator('[data-testid="blocked-badge"]')).toBeVisible();
     });
+
+    test('long title wraps to multiple lines in textarea', async ({ page }) => {
+      const longTitle =
+        'This is a very long task title that should wrap to multiple lines in the textarea element instead of being truncated';
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          task: { ...sampleTask, title: longTitle },
+        },
+      });
+      await page.waitForTimeout(100);
+
+      const titleEl = page.locator('[data-testid="title-input"]');
+      await expect(titleEl).toHaveValue(longTitle);
+
+      // Textarea should be taller than a single line (single line ~25px, wrapped should be more)
+      const box = await titleEl.boundingBox();
+      expect(box).toBeTruthy();
+      expect(box!.height).toBeGreaterThan(30);
+    });
   });
 
   test.describe('Status Dropdown', () => {
