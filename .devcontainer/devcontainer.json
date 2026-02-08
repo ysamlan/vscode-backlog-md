@@ -41,6 +41,7 @@
   "mounts": [
     "source=vscode-backlog-md-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
     "source=vscode-backlog-md-claude-config-${devcontainerId},target=/home/node/.claude,type=volume",
+    "source=vscode-backlog-md-codex-config-${devcontainerId},target=/home/node/.codex,type=volume",
     "source=vscode-backlog-md-node-modules-cache-${devcontainerId},target=${containerWorkspaceFolder}/node_modules,type=volume"
   ],
   "containerEnv": {

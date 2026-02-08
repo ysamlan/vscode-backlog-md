@@ -1,0 +1,3 @@
+[mcp_servers.backlog]
+command = "backlog"
+args = ["mcp", "start"]
