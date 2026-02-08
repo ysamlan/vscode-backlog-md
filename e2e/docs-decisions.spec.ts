@@ -399,25 +399,38 @@ test.describe('Tab Switching', () => {
     await expect(page.locator('#decisions-view')).not.toBeVisible();
   });
 
-  test('tab bar shows docs and decisions tabs', async ({ page }) => {
-    // Check that docs and decisions tabs exist in the tab bar
-    const docsTab = page.locator('[data-testid="tab-docs"]');
-    const decisionsTab = page.locator('[data-testid="tab-decisions"]');
+  test('docs and decisions tabs are in the overflow menu', async ({ page }) => {
+    // Tabs should not be visible until overflow menu is opened
+    await expect(page.locator('[data-testid="tab-docs"]')).not.toBeVisible();
+    await expect(page.locator('[data-testid="tab-decisions"]')).not.toBeVisible();
 
-    await expect(docsTab).toBeVisible();
-    await expect(decisionsTab).toBeVisible();
+    // Open overflow menu
+    await page.locator('[data-testid="overflow-menu-btn"]').click();
+    await page.waitForTimeout(50);
+
+    // Now they should be visible
+    await expect(page.locator('[data-testid="tab-docs"]')).toBeVisible();
+    await expect(page.locator('[data-testid="tab-decisions"]')).toBeVisible();
   });
 
-  test('clicking docs tab switches to docs view', async ({ page }) => {
+  test('clicking docs tab in overflow menu switches to docs view', async ({ page }) => {
     await clearPostedMessages(page);
+
+    // Open overflow menu first
+    await page.locator('[data-testid="overflow-menu-btn"]').click();
+    await page.waitForTimeout(50);
     await page.locator('[data-testid="tab-docs"]').click();
     await page.waitForTimeout(50);
 
     await expect(page.locator('#docs-view')).toBeVisible();
   });
 
-  test('clicking decisions tab switches to decisions view', async ({ page }) => {
+  test('clicking decisions tab in overflow menu switches to decisions view', async ({ page }) => {
     await clearPostedMessages(page);
+
+    // Open overflow menu first
+    await page.locator('[data-testid="overflow-menu-btn"]').click();
+    await page.waitForTimeout(50);
     await page.locator('[data-testid="tab-decisions"]').click();
     await page.waitForTimeout(50);
 

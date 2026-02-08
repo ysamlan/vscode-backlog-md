@@ -387,23 +387,32 @@ test.describe('Tasks View', () => {
       await setupTasksView(page);
     });
 
-    test('shows draft count badge when draftCountUpdated message has count > 0', async ({
-      page,
-    }) => {
+    test('shows draft count badge on overflow trigger when count > 0', async ({ page }) => {
       await postMessageToWebview(page, { type: 'draftCountUpdated', count: 3 });
       await page.waitForTimeout(50);
 
-      // &nbsp; renders as \u00a0 in the DOM
-      const draftsTab = page.locator('[data-testid="tab-drafts"] .tab-label');
-      await expect(draftsTab).toHaveText('Drafts\u00a0(3)');
+      const badge = page.locator('[data-testid="overflow-draft-badge"]');
+      await expect(badge).toBeVisible();
+      await expect(badge).toHaveText('3');
     });
 
-    test('shows just "Drafts" without badge when count is 0', async ({ page }) => {
+    test('hides badge on overflow trigger when count is 0', async ({ page }) => {
       await postMessageToWebview(page, { type: 'draftCountUpdated', count: 0 });
       await page.waitForTimeout(50);
 
-      const draftsTab = page.locator('[data-testid="tab-drafts"] .tab-label');
-      await expect(draftsTab).toHaveText('Drafts');
+      await expect(page.locator('[data-testid="overflow-draft-badge"]')).toHaveCount(0);
+    });
+
+    test('shows draft count in overflow menu item', async ({ page }) => {
+      await postMessageToWebview(page, { type: 'draftCountUpdated', count: 5 });
+      await page.waitForTimeout(50);
+
+      // Open overflow menu
+      await page.locator('[data-testid="overflow-menu-btn"]').click();
+      await page.waitForTimeout(50);
+
+      const draftsItem = page.locator('[data-testid="tab-drafts"]');
+      await expect(draftsItem).toContainText('(5)');
     });
 
     test('updates badge when count changes', async ({ page }) => {
@@ -411,14 +420,14 @@ test.describe('Tasks View', () => {
       await postMessageToWebview(page, { type: 'draftCountUpdated', count: 5 });
       await page.waitForTimeout(50);
 
-      const draftsTab = page.locator('[data-testid="tab-drafts"] .tab-label');
-      await expect(draftsTab).toHaveText('Drafts\u00a0(5)');
+      const badge = page.locator('[data-testid="overflow-draft-badge"]');
+      await expect(badge).toHaveText('5');
 
       // Now update to 2
       await postMessageToWebview(page, { type: 'draftCountUpdated', count: 2 });
       await page.waitForTimeout(50);
 
-      await expect(draftsTab).toHaveText('Drafts\u00a0(2)');
+      await expect(badge).toHaveText('2');
     });
 
     test('removes badge when count drops to 0', async ({ page }) => {
@@ -426,14 +435,79 @@ test.describe('Tasks View', () => {
       await postMessageToWebview(page, { type: 'draftCountUpdated', count: 4 });
       await page.waitForTimeout(50);
 
-      const draftsTab = page.locator('[data-testid="tab-drafts"] .tab-label');
-      await expect(draftsTab).toHaveText('Drafts\u00a0(4)');
+      await expect(page.locator('[data-testid="overflow-draft-badge"]')).toBeVisible();
 
       // Drop to zero
       await postMessageToWebview(page, { type: 'draftCountUpdated', count: 0 });
       await page.waitForTimeout(50);
 
-      await expect(draftsTab).toHaveText('Drafts');
+      await expect(page.locator('[data-testid="overflow-draft-badge"]')).toHaveCount(0);
+    });
+  });
+
+  test.describe('Overflow Menu', () => {
+    test.beforeEach(async ({ page }) => {
+      await setupTasksView(page);
+    });
+
+    test('only 3 primary tabs visible plus overflow trigger', async ({ page }) => {
+      await expect(page.locator('[data-testid="tab-kanban"]')).toBeVisible();
+      await expect(page.locator('[data-testid="tab-list"]')).toBeVisible();
+      await expect(page.locator('[data-testid="tab-dashboard"]')).toBeVisible();
+      await expect(page.locator('[data-testid="overflow-menu-btn"]')).toBeVisible();
+
+      // Overflow tabs should NOT be visible before opening menu
+      await expect(page.locator('[data-testid="tab-drafts"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="tab-archived"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="tab-docs"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="tab-decisions"]')).not.toBeVisible();
+    });
+
+    test('opens and closes on click', async ({ page }) => {
+      // Click to open
+      await page.locator('[data-testid="overflow-menu-btn"]').click();
+      await page.waitForTimeout(50);
+      await expect(page.locator('[data-testid="tab-drafts"]')).toBeVisible();
+      await expect(page.locator('[data-testid="tab-archived"]')).toBeVisible();
+      await expect(page.locator('[data-testid="tab-docs"]')).toBeVisible();
+      await expect(page.locator('[data-testid="tab-decisions"]')).toBeVisible();
+
+      // Click again to close
+      await page.locator('[data-testid="overflow-menu-btn"]').click();
+      await page.waitForTimeout(50);
+      await expect(page.locator('[data-testid="tab-drafts"]')).not.toBeVisible();
+    });
+
+    test('closes on click outside', async ({ page }) => {
+      await page.locator('[data-testid="overflow-menu-btn"]').click();
+      await page.waitForTimeout(50);
+      await expect(page.locator('[data-testid="tab-drafts"]')).toBeVisible();
+
+      // Click outside
+      await page.locator('.tab-bar').click({ position: { x: 5, y: 5 } });
+      await page.waitForTimeout(50);
+      await expect(page.locator('[data-testid="tab-drafts"]')).not.toBeVisible();
+    });
+
+    test('closes on Escape', async ({ page }) => {
+      await page.locator('[data-testid="overflow-menu-btn"]').click();
+      await page.waitForTimeout(50);
+      await expect(page.locator('[data-testid="tab-drafts"]')).toBeVisible();
+
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(50);
+      await expect(page.locator('[data-testid="tab-drafts"]')).not.toBeVisible();
+    });
+
+    test('overflow trigger shows active state when overflow tab is selected', async ({ page }) => {
+      // Select an overflow tab
+      await page.locator('[data-testid="overflow-menu-btn"]').click();
+      await page.waitForTimeout(50);
+      await page.locator('[data-testid="tab-drafts"]').click();
+      await page.waitForTimeout(50);
+
+      // Overflow trigger should have active class
+      await expect(page.locator('[data-testid="overflow-menu-btn"]')).toHaveClass(/active/);
     });
   });
 

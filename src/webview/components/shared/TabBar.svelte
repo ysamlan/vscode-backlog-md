@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { TabMode } from '../../lib/types';
 
   interface Tab {
@@ -6,15 +7,20 @@
     label: string;
   }
 
-  const tabs: Tab[] = [
+  const primaryTabs: Tab[] = [
     { mode: 'kanban', label: 'Kanban' },
     { mode: 'list', label: 'List' },
+    { mode: 'dashboard', label: 'Dashboard' },
+  ];
+
+  const overflowTabs: Tab[] = [
     { mode: 'drafts', label: 'Drafts' },
     { mode: 'archived', label: 'Archived' },
-    { mode: 'dashboard', label: 'Dashboard' },
     { mode: 'docs', label: 'Docs' },
     { mode: 'decisions', label: 'Decisions' },
   ];
+
+  const overflowModes = new Set(overflowTabs.map((t) => t.mode));
 
   let {
     activeTab,
@@ -29,10 +35,81 @@
     onCreateTask: () => void;
     onRefresh: () => void;
   } = $props();
+
+  let overflowOpen = $state(false);
+  let overflowContainerEl: HTMLDivElement | undefined = $state();
+  let overflowMenuEl: HTMLDivElement | undefined = $state();
+  let triggerEl: HTMLButtonElement | undefined = $state();
+
+  const isOverflowTabActive = $derived(overflowModes.has(activeTab));
+
+  // Label for the overflow trigger: show active tab name when an overflow tab is selected
+  const overflowLabel = $derived(
+    isOverflowTabActive
+      ? overflowTabs.find((t) => t.mode === activeTab)?.label ?? 'More'
+      : 'More'
+  );
+
+  function toggleOverflow() {
+    overflowOpen = !overflowOpen;
+    if (overflowOpen) {
+      // Focus the active item or first item when menu opens
+      requestAnimationFrame(() => {
+        if (!overflowMenuEl) return;
+        const activeItem = overflowMenuEl.querySelector<HTMLButtonElement>(
+          '.overflow-item.active'
+        );
+        const firstItem = overflowMenuEl.querySelector<HTMLButtonElement>('.overflow-item');
+        (activeItem ?? firstItem)?.focus();
+      });
+    }
+  }
+
+  function selectOverflowTab(mode: TabMode) {
+    onTabChange(mode);
+    overflowOpen = false;
+    triggerEl?.focus();
+  }
+
+  function handleOverflowKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      overflowOpen = false;
+      triggerEl?.focus();
+      return;
+    }
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!overflowMenuEl) return;
+      const items = Array.from(
+        overflowMenuEl.querySelectorAll<HTMLButtonElement>('.overflow-item')
+      );
+      const currentIndex = items.findIndex((item) => item === document.activeElement);
+      let nextIndex: number;
+      if (e.key === 'ArrowDown') {
+        nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+      } else {
+        nextIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+      }
+      items[nextIndex]?.focus();
+    }
+  }
+
+  onMount(() => {
+    function handleClickOutside(e: PointerEvent) {
+      if (overflowOpen && overflowContainerEl && !overflowContainerEl.contains(e.target as Node)) {
+        overflowOpen = false;
+      }
+    }
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
+  });
+
 </script>
 
 <div class="tab-bar" role="tablist">
-  {#each tabs as tab (tab.mode)}
+  {#each primaryTabs as tab (tab.mode)}
     <button
       class="tab"
       class:active={activeTab === tab.mode}
@@ -49,30 +126,86 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/>
         </svg>
-      {:else if tab.mode === 'drafts'}
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m18 5-2.414-2.414A2 2 0 0 0 14.172 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/><path d="M21.378 12.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
-        </svg>
-      {:else if tab.mode === 'archived'}
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>
-        </svg>
       {:else if tab.mode === 'dashboard'}
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 3v18h18"/><path d="M13 17V9"/><path d="M18 17V5"/><path d="M8 17v-3"/>
         </svg>
-      {:else if tab.mode === 'docs'}
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>
-        </svg>
-      {:else if tab.mode === 'decisions'}
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m20 16-4-4 4-4"/><path d="M4 20V4"/><path d="m20 16H8a4 4 0 0 1 0-8h12"/>
-        </svg>
       {/if}
-      <span class="tab-label">{tab.label}{#if tab.mode === 'drafts' && draftCount > 0}&nbsp;({draftCount}){/if}</span>
+      <span class="tab-label">{tab.label}</span>
     </button>
   {/each}
+
+  <!-- Overflow menu -->
+  <div class="overflow-container" bind:this={overflowContainerEl}>
+    <button
+      class="tab overflow-trigger"
+      class:active={isOverflowTabActive}
+      data-testid="overflow-menu-btn"
+      onclick={toggleOverflow}
+      bind:this={triggerEl}
+      aria-expanded={overflowOpen}
+      aria-haspopup="true"
+    >
+      <!-- Ellipsis icon -->
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>
+      </svg>
+      <span class="tab-label">
+        {overflowLabel}
+        {#if draftCount > 0 && !isOverflowTabActive}
+          <span class="overflow-draft-badge" data-testid="overflow-draft-badge">{draftCount}</span>
+        {/if}
+      </span>
+    </button>
+
+    {#if overflowOpen}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_interactive_supports_focus -->
+      <div
+        class="overflow-menu"
+        role="menu"
+        bind:this={overflowMenuEl}
+        onkeydown={handleOverflowKeydown}
+      >
+        {#each overflowTabs as tab (tab.mode)}
+          <button
+            class="overflow-item"
+            class:active={activeTab === tab.mode}
+            role="menuitem"
+            data-testid="tab-{tab.mode}"
+            onclick={() => selectOverflowTab(tab.mode)}
+          >
+            {#if tab.mode === 'drafts'}
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m18 5-2.414-2.414A2 2 0 0 0 14.172 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2"/><path d="M21.378 12.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
+              </svg>
+              <span class="overflow-item-label">
+                Drafts
+                {#if draftCount > 0}
+                  <span class="overflow-item-count">({draftCount})</span>
+                {/if}
+              </span>
+            {:else if tab.mode === 'archived'}
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>
+              </svg>
+              <span class="overflow-item-label">Archived</span>
+            {:else if tab.mode === 'docs'}
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>
+              </svg>
+              <span class="overflow-item-label">Docs</span>
+            {:else if tab.mode === 'decisions'}
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m20 16-4-4 4-4"/><path d="M4 20V4"/><path d="m20 16H8a4 4 0 0 1 0-8h12"/>
+              </svg>
+              <span class="overflow-item-label">Decisions</span>
+            {/if}
+          </button>
+        {/each}
+      </div>
+    {/if}
+  </div>
 
   <div class="tab-spacer"></div>
 
@@ -126,6 +259,9 @@
   .tab .tab-label {
     font-size: 10px;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
   .tab:hover {
@@ -140,6 +276,76 @@
   .tab.active {
     opacity: 1;
     border-bottom-color: var(--vscode-focusBorder);
+  }
+
+  .overflow-container {
+    position: relative;
+  }
+
+  .overflow-trigger {
+    position: relative;
+  }
+
+  .overflow-draft-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 4px;
+    border-radius: 7px;
+    font-size: 9px;
+    font-weight: 600;
+    background: var(--vscode-badge-background, #4d4d4d);
+    color: var(--vscode-badge-foreground, #ffffff);
+    line-height: 1;
+  }
+
+  .overflow-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 200;
+    min-width: 160px;
+    background: var(--vscode-menu-background, var(--vscode-dropdown-background, #3c3c3c));
+    border: 1px solid var(--vscode-menu-border, var(--vscode-dropdown-border, #555));
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    padding: 4px 0;
+  }
+
+  .overflow-item {
+    all: unset;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--vscode-menu-foreground, var(--vscode-dropdown-foreground, #ccc));
+    box-sizing: border-box;
+  }
+
+  .overflow-item:hover,
+  .overflow-item:focus-visible {
+    background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground, #094771));
+    color: var(--vscode-menu-selectionForeground, var(--vscode-list-hoverForeground, #fff));
+    outline: none;
+  }
+
+  .overflow-item.active {
+    background: var(--vscode-list-activeSelectionBackground, rgba(255, 255, 255, 0.08));
+  }
+
+  .overflow-item-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .overflow-item-count {
+    opacity: 0.7;
   }
 
   .tab-spacer {
