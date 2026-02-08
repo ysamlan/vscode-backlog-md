@@ -175,6 +175,27 @@ bun run lint
 bun run typecheck
 ```
 
+### Cross-Branch Demo Workspace
+
+Use this script to create a local demo repository with deterministic branch-divergent tasks:
+
+```bash
+bun run demo:cross-branch-setup
+```
+
+Optional:
+
+```bash
+# Create at a custom path and overwrite if it already exists
+bash scripts/setup-cross-branch-demo.sh /tmp/my-cross-branch-demo --reset
+```
+
+What to verify in the UI:
+
+1. Open the generated workspace in VS Code and open the Backlog view.
+2. `TASK-900` appears from `feature/cross-branch-demo` and is read-only.
+3. `TASK-1` on `main` remains editable.
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
 ## Contributing

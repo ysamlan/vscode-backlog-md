@@ -134,6 +134,7 @@
     "test:e2e": "bun run build && tsc -p tsconfig.e2e.json && bash scripts/run-e2e.sh",
     "test:playwright": "playwright test",
     "test:playwright:ui": "playwright test --ui",
+    "demo:cross-branch-setup": "bash scripts/setup-cross-branch-demo.sh",
     "webview:serve": "vite",
     "lint": "eslint src e2e",
     "format": "prettier --write .",
