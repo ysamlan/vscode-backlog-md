@@ -286,6 +286,14 @@ test.describe('Tasks View', () => {
         taskId: 'TASK-1',
       });
     });
+
+    test('list view does not overflow at sidebar width', async ({ page }) => {
+      await page.setViewportSize({ width: 350, height: 600 });
+      const container = page.locator('.task-list-container');
+      const scrollWidth = await container.evaluate((el) => el.scrollWidth);
+      const clientWidth = await container.evaluate((el) => el.clientWidth);
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    });
   });
 
   test.describe('List View - Ordinal Ordering', () => {
