@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Task } from '../../lib/types';
+  import PriorityIcon from './PriorityIcon.svelte';
 
   interface Props {
     task: Task & { blocksTaskIds?: string[]; subtaskProgress?: { total: number; done: number } };
@@ -82,7 +83,7 @@
   <div class="task-card-title">{task.title}</div>
   <div class="task-card-meta">
     {#if task.priority}
-      <span class="priority-badge priority-{task.priority}">{task.priority}</span>
+      <PriorityIcon priority={task.priority} size={14} />
     {/if}
     {#each displayLabels as label (label)}
       <span class="task-label">{label}</span>

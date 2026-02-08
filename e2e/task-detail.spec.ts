@@ -156,6 +156,47 @@ test.describe('Task Detail', () => {
       await expect(page.locator('[data-testid="priority-select"]')).toHaveValue('medium');
     });
 
+    test('shows priority icon next to select', async ({ page }) => {
+      const icon = page.locator('[data-testid="priority-icon-medium"]');
+      await expect(icon).toBeVisible();
+      await expect(icon).toHaveAttribute('title', 'Medium');
+    });
+
+    test('priority icon updates when priority changes', async ({ page }) => {
+      // Initially medium
+      await expect(page.locator('[data-testid="priority-icon-medium"]')).toBeVisible();
+
+      // Simulate priority change to high by re-sending task data
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          task: { ...sampleTask, priority: 'high' },
+        },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="priority-icon-high"]')).toBeVisible();
+      await expect(page.locator('[data-testid="priority-icon-medium"]')).toHaveCount(0);
+    });
+
+    test('priority icon disappears when priority is cleared', async ({ page }) => {
+      // Initially has a priority icon
+      await expect(page.locator('[data-testid="priority-icon-medium"]')).toBeVisible();
+
+      // Simulate priority cleared
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          task: { ...sampleTask, priority: undefined },
+        },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('.priority-icon')).toHaveCount(0);
+    });
+
     test('sends message when priority changes', async ({ page }) => {
       await clearPostedMessages(page);
 

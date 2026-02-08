@@ -691,6 +691,122 @@ test.describe('Tasks View', () => {
     });
   });
 
+  test.describe('Priority Icons', () => {
+    const priorityTasks: (Task & { blocksTaskIds?: string[] })[] = [
+      {
+        id: 'TASK-P1',
+        title: 'High priority task',
+        status: 'To Do',
+        priority: 'high',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-p1.md',
+      },
+      {
+        id: 'TASK-P2',
+        title: 'Medium priority task',
+        status: 'To Do',
+        priority: 'medium',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-p2.md',
+      },
+      {
+        id: 'TASK-P3',
+        title: 'Low priority task',
+        status: 'In Progress',
+        priority: 'low',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-p3.md',
+      },
+      {
+        id: 'TASK-P4',
+        title: 'No priority task',
+        status: 'In Progress',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-p4.md',
+      },
+    ];
+
+    async function setupPriorityView(page: ReturnType<typeof test.info>['page']) {
+      await installVsCodeMock(page);
+      await page.goto('/tasks.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'kanban' });
+      await postMessageToWebview(page, {
+        type: 'statusesUpdated',
+        statuses: ['To Do', 'In Progress', 'Done'],
+      });
+      await postMessageToWebview(page, { type: 'milestonesUpdated', milestones: [] });
+      await postMessageToWebview(page, { type: 'tasksUpdated', tasks: priorityTasks });
+      await page.waitForTimeout(100);
+    }
+
+    test('kanban cards show priority icons with correct SVGs', async ({ page }) => {
+      await setupPriorityView(page);
+
+      // High priority icon should be present with title tooltip
+      const highIcon = page.locator('[data-testid="priority-icon-high"]');
+      await expect(highIcon).toBeVisible();
+      await expect(highIcon).toHaveAttribute('title', 'High');
+      await expect(highIcon.locator('svg')).toBeVisible();
+
+      // Medium priority icon
+      const mediumIcon = page.locator('[data-testid="priority-icon-medium"]');
+      await expect(mediumIcon).toBeVisible();
+      await expect(mediumIcon).toHaveAttribute('title', 'Medium');
+
+      // Low priority icon
+      const lowIcon = page.locator('[data-testid="priority-icon-low"]');
+      await expect(lowIcon).toBeVisible();
+      await expect(lowIcon).toHaveAttribute('title', 'Low');
+    });
+
+    test('no priority icon for tasks without priority', async ({ page }) => {
+      await setupPriorityView(page);
+
+      // TASK-P4 has no priority - should not have any priority icon
+      const card = page.locator('[data-testid="task-TASK-P4"]');
+      await expect(card).toBeVisible();
+      await expect(card.locator('.priority-icon')).toHaveCount(0);
+    });
+
+    test('list view shows priority icons instead of text badges', async ({ page }) => {
+      await setupPriorityView(page);
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'list' });
+      await page.waitForTimeout(50);
+
+      // High priority row shows icon
+      const highIcon = page.locator(
+        '[data-testid="task-row-TASK-P1"] [data-testid="priority-icon-high"]'
+      );
+      await expect(highIcon).toBeVisible();
+      await expect(highIcon).toHaveAttribute('title', 'High');
+
+      // No text content like "HIGH" or "high" in the icon
+      await expect(highIcon).not.toContainText('high');
+
+      // No priority task shows dash (4th td due to drag-handle column when sorted by status)
+      const noPriorityCell = page.locator('[data-testid="task-row-TASK-P4"] td:nth-child(4)');
+      await expect(noPriorityCell).toHaveText('-');
+    });
+  });
+
   test.describe('No Backlog State', () => {
     test('shows no backlog message', async ({ page }) => {
       await installVsCodeMock(page);

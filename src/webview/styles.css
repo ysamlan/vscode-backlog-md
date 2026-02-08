@@ -70,32 +70,23 @@ body {
   background: var(--vscode-scrollbarSlider-activeBackground, rgba(191, 191, 191, 0.4));
 }
 
-/* Priority badge styles - theme-aware colors */
-.priority-badge {
-  display: inline-block;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  font-weight: 600;
+/* Priority icon styles - compact chevron indicators */
+.priority-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
 }
 
 .priority-high {
-  background-color: var(--vscode-inputValidation-errorBackground, rgba(220, 38, 38, 0.15));
   color: var(--vscode-errorForeground, #dc2626);
-  border: 1px solid var(--vscode-inputValidation-errorBorder, transparent);
 }
 
 .priority-medium {
-  background-color: var(--vscode-inputValidation-warningBackground, rgba(245, 158, 11, 0.15));
   color: var(--vscode-editorWarning-foreground, #f59e0b);
-  border: 1px solid var(--vscode-inputValidation-warningBorder, transparent);
 }
 
 .priority-low {
-  background-color: var(--vscode-inputValidation-infoBackground, rgba(16, 185, 129, 0.15));
   color: var(--vscode-testing-iconPassed, #10b981);
-  border: 1px solid var(--vscode-inputValidation-infoBorder, transparent);
 }
 
 /* Status badge styles - theme-aware colors */
@@ -934,10 +925,16 @@ body {
 }
 
 /* Task detail badges use larger padding */
-.task-detail-page .status-badge,
-.task-detail-page .priority-badge {
+.task-detail-page .status-badge {
   padding: 4px 12px;
   font-size: 12px;
+}
+
+/* Priority icon + select wrapper for task detail */
+.priority-select-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .blocked-badge {

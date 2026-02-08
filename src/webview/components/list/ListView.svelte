@@ -2,6 +2,7 @@
   import type { Task, Milestone } from '../../lib/types';
   import { statusToClass, customStatusStyle } from '../../lib/statusColors';
   import { compareByOrdinal, calculateOrdinalsForDrop, type CardData } from '../../../core/ordinalUtils';
+  import PriorityIcon from '../shared/PriorityIcon.svelte';
 
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
 
@@ -601,7 +602,7 @@
               </td>
               <td>
                 {#if task.priority}
-                  <span class="priority-badge priority-{task.priority}">{task.priority}</span>
+                  <PriorityIcon priority={task.priority} size={14} />
                 {:else}
                   -
                 {/if}

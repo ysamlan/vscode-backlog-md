@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TaskStatus, TaskPriority } from '../../lib/types';
   import { statusToClass, customStatusStyle } from '../../lib/statusColors';
+  import PriorityIcon from '../shared/PriorityIcon.svelte';
 
   interface Props {
     taskId: string;
@@ -107,17 +108,22 @@
         <option value={s}>{s}</option>
       {/each}
     </select>
-    <select
-      class="dropdown-select priority-select {priorityClass}"
-      data-testid="priority-select"
-      value={priority || ''}
-      onchange={handlePriorityChange}
-    >
-      <option value="">No Priority</option>
-      {#each priorities as p (p)}
-        <option value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-      {/each}
-    </select>
+    <span class="priority-select-wrapper">
+      {#if priority}
+        <PriorityIcon priority={priority} size={16} />
+      {/if}
+      <select
+        class="dropdown-select priority-select {priorityClass}"
+        data-testid="priority-select"
+        value={priority || ''}
+        onchange={handlePriorityChange}
+      >
+        <option value="">No Priority</option>
+        {#each priorities as p (p)}
+          <option value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+        {/each}
+      </select>
+    </span>
     {#if isBlocked}
       <span class="blocked-badge" data-testid="blocked-badge">Blocked</span>
     {/if}
