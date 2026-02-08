@@ -9,9 +9,14 @@ node_modules/**
 .mocharc.json
 tsconfig.json
 tsconfig.e2e.json
+tsconfig.e2e-playwright.json
+tsconfig.eslint.json
+tsconfig.webview.json
 eslint.config.mjs
 scripts/**
 vitest.config.ts
+vite.webview.config.ts
+svelte.config.mjs
 *.vsix
 
 # Backlog (development task tracking)
@@ -21,9 +26,11 @@ backlog/**
 docs/**
 CLAUDE.md
 .claude/**
+.agents/**
 
-# Test fixtures
+# Test fixtures and results
 src/test/**
+test-results/**
 
 # E2E test artifacts
 core
@@ -36,3 +43,14 @@ vite.config.ts
 
 # Devcontainer
 .devcontainer/**
+
+# Temp / build artifacts
+tmp/**
+.husky/**
+.dockerignore
+.node-version
+mise.toml
+bun.lock
+
+# Source maps (not needed in production)
+dist/**/*.map

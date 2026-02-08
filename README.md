@@ -142,6 +142,13 @@ bun run watch
 
 Press **F5** to launch the Extension Development Host and test the extension.
 
+### Packaging
+
+```bash
+# Build a .vsix file for local installation
+bun run build && npx @vscode/vsce package --no-dependencies
+```
+
 ### Pre-commit Hooks
 
 This project uses [husky](https://typicode.github.io/husky/) and [lint-staged](https://github.com/lint-staged/lint-staged) to run linting and formatting on staged files before each commit.
