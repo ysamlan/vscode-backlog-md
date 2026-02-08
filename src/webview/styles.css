@@ -1263,9 +1263,13 @@ body {
 
 /* Action buttons */
 .actions {
+  position: sticky;
+  bottom: 0;
   margin-top: 24px;
-  padding-top: 16px;
+  padding: 12px 0;
   border-top: 1px solid var(--vscode-widget-border, #303031);
+  background: var(--vscode-editor-background, #1e1e1e);
+  z-index: 10;
 }
 
 .open-file-btn,

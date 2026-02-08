@@ -36,7 +36,8 @@
 
   <div class="stat-card">
     <div class="stat-value">{stats.totalTasks}</div>
-    <div class="stat-label">Total ({completionPct}%)</div>
+    <div class="stat-label">Total</div>
+    <div class="stat-sublabel">{completionPct}% complete</div>
     {#if stats.completedCount > 0}
       <div class="stat-sublabel">+{stats.completedCount} completed</div>
     {/if}

@@ -89,7 +89,7 @@ test.describe('Dashboard Tab', () => {
 
     // Verify total and completion percentage (30% = 3/10)
     await expect(page.locator('.stat-card:not(.clickable) .stat-value')).toHaveText('10');
-    await expect(page.locator('.stat-card:not(.clickable) .stat-label')).toContainText('30%');
+    await expect(page.locator('.stat-card:not(.clickable) .stat-sublabel')).toContainText('30%');
   });
 
   test('displays status breakdown bars', async ({ page }) => {
