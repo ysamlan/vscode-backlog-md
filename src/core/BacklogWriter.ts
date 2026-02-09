@@ -97,6 +97,7 @@ export class BacklogWriter {
       throw new Error(`Task ${taskId} not found`);
     }
     fs.unlinkSync(task.filePath);
+    parser.invalidateTaskCache(task.filePath);
   }
 
   /**
@@ -119,6 +120,7 @@ export class BacklogWriter {
     }
 
     fs.renameSync(task.filePath, destPath);
+    parser.invalidateTaskCache(task.filePath);
 
     // Update status from Draft to config default or 'To Do'
     const config = await parser.getConfig();
@@ -128,6 +130,7 @@ export class BacklogWriter {
     frontmatter.updated_date = new Date().toISOString().split('T')[0];
     const updatedContent = this.reconstructFile(frontmatter, body);
     fs.writeFileSync(destPath, updatedContent, 'utf-8');
+    parser.invalidateTaskCache(destPath);
 
     return destPath;
   }
@@ -162,6 +165,8 @@ export class BacklogWriter {
 
     // Move the file
     fs.renameSync(task.filePath, destPath);
+    parser.invalidateTaskCache(task.filePath);
+    parser.invalidateTaskCache(destPath);
 
     return destPath;
   }
@@ -259,6 +264,7 @@ export class BacklogWriter {
     // Reconstruct the file
     const updatedContent = this.reconstructFile(frontmatter, updatedBody);
     fs.writeFileSync(task.filePath, updatedContent, 'utf-8');
+    parser.invalidateTaskCache(task.filePath);
   }
 
   /**
@@ -582,6 +588,7 @@ export class BacklogWriter {
     });
 
     fs.writeFileSync(task.filePath, content, 'utf-8');
+    parser.invalidateTaskCache(task.filePath);
   }
 
   /**

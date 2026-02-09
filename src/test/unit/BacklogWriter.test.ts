@@ -12,6 +12,7 @@ vi.mock('fs', async () => {
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
     readdirSync: vi.fn(() => []),
+    statSync: vi.fn().mockReturnValue({ mtimeMs: 1000 }),
     mkdirSync: vi.fn(),
     renameSync: vi.fn(),
     unlinkSync: vi.fn(),
@@ -734,6 +735,7 @@ Old description
           definitionOfDone: [],
         }),
         getConfig: vi.fn().mockResolvedValue({ default_status: 'Backlog' }),
+        invalidateTaskCache: vi.fn(),
       } as unknown as BacklogParser;
 
       vi.mocked(fs.readFileSync).mockReturnValue(`---
@@ -2187,6 +2189,125 @@ Summary text.
       expect(roundTripped.finalSummary).toBe(original.finalSummary);
       expect(roundTripped.acceptanceCriteria).toEqual(original.acceptanceCriteria);
       expect(roundTripped.definitionOfDone).toEqual(original.definitionOfDone);
+    });
+  });
+
+  describe('cache invalidation', () => {
+    it('should invalidate cache after updateTask', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      const invalidateSpy = vi.spyOn(mockParser, 'invalidateTaskCache');
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      expect(invalidateSpy).toHaveBeenCalledWith(expect.stringContaining('task-1.md'));
+    });
+
+    it('should invalidate cache after deleteTask', async () => {
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test',
+        status: 'Done',
+        filePath: '/fake/backlog/tasks/task-1.md',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      const invalidateSpy = vi.spyOn(mockParser, 'invalidateTaskCache');
+
+      await writer.deleteTask('TASK-1', mockParser);
+
+      expect(invalidateSpy).toHaveBeenCalledWith('/fake/backlog/tasks/task-1.md');
+    });
+
+    it('should invalidate cache for both old and new paths after completeTask', async () => {
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test',
+        status: 'Done',
+        filePath: '/fake/backlog/tasks/task-1.md',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      const invalidateSpy = vi.spyOn(mockParser, 'invalidateTaskCache');
+
+      await writer.completeTask('TASK-1', mockParser);
+
+      expect(invalidateSpy).toHaveBeenCalledWith('/fake/backlog/tasks/task-1.md');
+      expect(invalidateSpy).toHaveBeenCalledWith('/fake/backlog/completed/task-1.md');
+    });
+
+    it('should invalidate cache for both old and new paths after promoteDraft', async () => {
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'DRAFT-1',
+        title: 'My Draft',
+        status: 'Draft',
+        folder: 'drafts',
+        filePath: '/fake/backlog/drafts/draft-1 - My-Draft.md',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: DRAFT-1
+title: My Draft
+status: Draft
+---
+`);
+
+      const invalidateSpy = vi.spyOn(mockParser, 'invalidateTaskCache');
+
+      await writer.promoteDraft('DRAFT-1', mockParser);
+
+      expect(invalidateSpy).toHaveBeenCalledWith('/fake/backlog/drafts/draft-1 - My-Draft.md');
+      expect(invalidateSpy).toHaveBeenCalledWith('/fake/backlog/tasks/draft-1 - My-Draft.md');
+    });
+
+    it('should invalidate cache after toggleChecklistItem', async () => {
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test',
+        status: 'To Do',
+        filePath: '/fake/backlog/tasks/task-1.md',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [{ id: 1, text: 'Test criterion', checked: false }],
+        definitionOfDone: [],
+      });
+
+      vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Acceptance Criteria
+- [ ] #1 Test criterion
+`);
+
+      const invalidateSpy = vi.spyOn(mockParser, 'invalidateTaskCache');
+
+      await writer.toggleChecklistItem('TASK-1', 'acceptanceCriteria', 1, mockParser);
+
+      expect(invalidateSpy).toHaveBeenCalledWith('/fake/backlog/tasks/task-1.md');
     });
   });
 

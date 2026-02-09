@@ -121,6 +121,7 @@ export function computeSubtasks(tasks: Task[]): void {
 export class BacklogParser {
   private cachedConfig: BacklogConfig | undefined;
   private cachedConfigMtime: number | undefined;
+  private taskCache = new Map<string, { mtimeMs: number; task: Task }>();
 
   constructor(private backlogPath: string) {}
 
@@ -130,6 +131,19 @@ export class BacklogParser {
   invalidateConfigCache(): void {
     this.cachedConfig = undefined;
     this.cachedConfigMtime = undefined;
+  }
+
+  /**
+   * Invalidate the task cache, forcing subsequent reads to re-parse from disk.
+   * @param filePath - If provided, only invalidate the cache for that specific file.
+   *                   Otherwise, clear the entire task cache.
+   */
+  invalidateTaskCache(filePath?: string): void {
+    if (filePath) {
+      this.taskCache.delete(filePath);
+    } else {
+      this.taskCache.clear();
+    }
   }
 
   /**
@@ -154,17 +168,39 @@ export class BacklogParser {
     const files = fs.readdirSync(folderPath).filter((f) => f.endsWith('.md'));
     console.log(`[Backlog.md Parser] Found ${files.length} .md files:`, files.slice(0, 5));
     const tasks: Task[] = [];
+    const currentPaths = new Set<string>();
 
     for (const file of files) {
       const filePath = path.join(folderPath, file);
+      currentPaths.add(filePath);
       try {
-        const task = await this.parseTaskFile(filePath);
+        const stat = fs.statSync(filePath);
+        const cached = this.taskCache.get(filePath);
+        let task: Task | undefined;
+
+        if (cached && cached.mtimeMs === stat.mtimeMs) {
+          task = cached.task;
+        } else {
+          task = await this.parseTaskFile(filePath);
+          if (task) {
+            this.taskCache.set(filePath, { mtimeMs: stat.mtimeMs, task });
+          }
+        }
+
         if (task) {
           task.folder = folderName as TaskFolder;
           tasks.push(task);
         }
       } catch (error) {
         console.error(`[Backlog.md Parser] Error parsing task file ${file}:`, error);
+      }
+    }
+
+    // Evict cache entries for files that no longer exist in this folder
+    const folderPrefix = folderPath + path.sep;
+    for (const cachedPath of this.taskCache.keys()) {
+      if (cachedPath.startsWith(folderPrefix) && !currentPaths.has(cachedPath)) {
+        this.taskCache.delete(cachedPath);
       }
     }
 

@@ -1,9 +1,10 @@
 ---
 id: TASK-109
 title: Cache parsed tasks by file mtime to skip redundant re-reads
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-08 19:50'
+updated_date: '2026-02-09 03:10'
 labels:
   - performance
   - backend
@@ -39,9 +40,15 @@ Apply the same mtime-based caching strategy used for config.yml to task file par
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Second getTasks() call with unchanged files does zero readFileSync calls
-- [ ] #2 Changed file mtime triggers re-read of only that file
-- [ ] #3 Deleted files are evicted from cache
-- [ ] #4 BacklogWriter invalidates cache after mutations
-- [ ] #5 All existing tests pass
+- [x] #1 Second getTasks() call with unchanged files does zero readFileSync calls
+- [x] #2 Changed file mtime triggers re-read of only that file
+- [x] #3 Deleted files are evicted from cache
+- [x] #4 BacklogWriter invalidates cache after mutations
+- [x] #5 All existing tests pass
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added mtime-based caching to `BacklogParser.getTasksFromFolder()`, mirroring the existing config cache pattern. On each call, files are stat'd and only re-parsed when their mtime has changed. Deleted files are evicted from cache. An `invalidateTaskCache(filePath?)` method allows targeted or full cache clearing. `BacklogWriter` calls this after all mutation operations (updateTask, deleteTask, moveTaskToFolder, promoteDraft, toggleChecklistItem). 6 new caching tests and 5 new writer invalidation tests added.
+<!-- SECTION:FINAL_SUMMARY:END -->
