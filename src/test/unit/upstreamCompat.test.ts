@@ -19,6 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { BacklogParser } from '../../core/BacklogParser';
 import { hasOrdinal, calculateOrdinalsForDrop, sortCardsByOrdinal } from '../../core/ordinalUtils';
+import type { Task, ChecklistItem } from '../../core/types';
 
 // Helper: create a parser and parse task content without needing the filesystem
 function parseTask(content: string, filePath = '/fake/path/task-1 - Test.md'): Task | undefined {
@@ -74,7 +75,7 @@ Fix the login bug that prevents users from signing in.
       expect(task!.dependencies).toEqual(['task-0']);
       expect(task!.parentTaskId).toBe('task-parent');
       expect(task!.subtasks).toEqual(['task-1.1', 'task-1.2']);
-      expect(task!.acceptanceCriteria.map((item) => item.text)).toEqual([
+      expect(task!.acceptanceCriteria.map((item: ChecklistItem) => item.text)).toEqual([
         'Login form validates correctly',
         'Error messages are displayed properly',
       ]);
@@ -119,22 +120,18 @@ created_date: 2025-06-08
       expect(task!.createdAt).toBe('2025-06-08');
     });
 
-    // FIX-115.3: Local normalizeDateValue truncates to YYYY-MM-DD, doesn't handle legacy formats
-    it.todo(
-      'should parse created_date in short format DD-MM-YY (FIX-115.3: legacy date format)',
-      () => {
-        const content = `---
+    it('should parse created_date in short format DD-MM-YY (legacy date format)', () => {
+      const content = `---
 id: TASK-6
 title: "Short"
 created_date: 08-06-25
 ---`;
 
-        const task = parseTask(content, '/fake/path/task-6 - Short.md');
+      const task = parseTask(content, '/fake/path/task-6 - Short.md');
 
-        expect(task).toBeDefined();
-        expect(task!.createdAt).toBe('2025-06-08');
-      }
-    );
+      expect(task).toBeDefined();
+      expect(task!.createdAt).toBe('2025-06-08');
+    });
 
     it('should extract acceptance criteria with checked items', () => {
       const content = `---
@@ -152,7 +149,7 @@ title: "Test with mixed criteria"
       const task = parseTask(content, '/fake/path/task-4 - Test.md');
 
       expect(task).toBeDefined();
-      expect(task!.acceptanceCriteria.map((item) => item.text)).toEqual([
+      expect(task!.acceptanceCriteria.map((item: ChecklistItem) => item.text)).toEqual([
         'Todo item',
         'Done item',
         'Another todo',
@@ -223,8 +220,7 @@ created_date: "2025-06-03"
       expect(task!.createdAt).toBe('2025-06-03');
     });
 
-    // FIX-115.3: Local normalizeDateValue drops time component
-    it.todo('should preserve datetime with HH:mm (FIX-115.3: date time preservation)', () => {
+    it('should preserve datetime with HH:mm', () => {
       const content = `---
 id: TASK-11
 title: "Datetime test"
@@ -234,8 +230,7 @@ created_date: "2025-06-03 14:30"
       expect(task!.createdAt).toBe('2025-06-03 14:30');
     });
 
-    // FIX-115.3: Local doesn't handle ISO datetime format
-    it.todo('should convert ISO datetime to space-separated (FIX-115.3: ISO date handling)', () => {
+    it('should convert ISO datetime to space-separated', () => {
       const content = `---
 id: TASK-12
 title: "ISO datetime test"
@@ -245,8 +240,7 @@ created_date: "2025-06-03T14:30"
       expect(task!.createdAt).toBe('2025-06-03 14:30');
     });
 
-    // FIX-115.3: Local doesn't handle DD/MM/YY format
-    it.todo('should parse DD/MM/YY legacy format (FIX-115.3: legacy date format)', () => {
+    it('should parse DD/MM/YY legacy format', () => {
       const content = `---
 id: TASK-13
 title: "Slash date"
@@ -256,8 +250,7 @@ created_date: 08/06/25
       expect(task!.createdAt).toBe('2025-06-08');
     });
 
-    // FIX-115.3: Local doesn't handle DD.MM.YY format
-    it.todo('should parse DD.MM.YY legacy format (FIX-115.3: legacy date format)', () => {
+    it('should parse DD.MM.YY legacy format', () => {
       const content = `---
 id: TASK-14
 title: "Dot date"

@@ -619,13 +619,47 @@ export class BacklogParser {
 
   /**
    * Normalize a date value that may be a Date object (from yaml.load)
-   * or a string into a YYYY-MM-DD format string.
+   * or a string. Preserves HH:mm time when present. Handles legacy formats
+   * (DD-MM-YY, DD/MM/YY, DD.MM.YY) for upstream compatibility.
    */
   private normalizeDateValue(value: unknown): string {
+    if (!value) return '';
     if (value instanceof Date) {
-      return value.toISOString().split('T')[0];
+      const hours = value.getUTCHours();
+      const minutes = value.getUTCMinutes();
+      const seconds = value.getUTCSeconds();
+      if (hours === 0 && minutes === 0 && seconds === 0) {
+        return value.toISOString().slice(0, 10);
+      }
+      return value.toISOString().slice(0, 16).replace('T', ' ');
     }
-    return String(value);
+    const str = String(value)
+      .trim()
+      .replace(/^['"]|['"]$/g, '');
+    if (!str) return '';
+
+    // YYYY-MM-DD HH:mm (already correct)
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(str)) return str;
+
+    // YYYY-MM-DDTHH:mm → convert T to space
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(str)) return str.replace('T', ' ');
+
+    // YYYY-MM-DD (standard)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+    // Legacy: DD-MM-YY
+    let match = str.match(/^(\d{2})-(\d{2})-(\d{2})$/);
+    if (match) return `20${match[3]}-${match[2]}-${match[1]}`;
+
+    // Legacy: DD/MM/YY
+    match = str.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+    if (match) return `20${match[3]}-${match[2]}-${match[1]}`;
+
+    // Legacy: DD.MM.YY
+    match = str.match(/^(\d{2})\.(\d{2})\.(\d{2})$/);
+    if (match) return `20${match[3]}-${match[2]}-${match[1]}`;
+
+    return str;
   }
 
   private parseStatus(value: string): TaskStatus {
