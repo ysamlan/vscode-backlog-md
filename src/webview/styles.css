@@ -726,6 +726,26 @@ body {
   color: var(--vscode-button-foreground, #ffffff);
 }
 
+.status-filter {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.status-filter:hover {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.status-filter:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
 .milestone-filter {
   padding: 4px 8px;
   font-size: 11px;

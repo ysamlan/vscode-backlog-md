@@ -434,7 +434,15 @@ test.describe('Tasks View', () => {
       await expect(table).toBeVisible();
     });
 
-    test('displays all tasks in list view', async ({ page }) => {
+    test('displays not-done tasks by default in list view', async ({ page }) => {
+      // Default filter is "not-done" which hides the last status (Done)
+      const rows = page.locator('tbody tr');
+      await expect(rows).toHaveCount(5);
+    });
+
+    test('displays all tasks when "All" filter is selected', async ({ page }) => {
+      await page.locator('[data-testid="status-filter"]').selectOption('all');
+      await page.waitForTimeout(50);
       const rows = page.locator('tbody tr');
       await expect(rows).toHaveCount(7);
     });
@@ -473,14 +481,16 @@ test.describe('Tasks View', () => {
       await expect(page.locator('[data-testid="task-row-id-TASK-1"]')).toHaveCount(0);
     });
 
-    test('filter by status works', async ({ page }) => {
-      await page.locator('button[data-filter="status:To Do"]').click();
+    test('filter by status works via dropdown', async ({ page }) => {
+      await page.locator('[data-testid="status-filter"]').selectOption('status:To Do');
+      await page.waitForTimeout(50);
       const rows = page.locator('tbody tr');
       await expect(rows).toHaveCount(3);
     });
 
-    test('filter by In Progress status works', async ({ page }) => {
-      await page.locator('button[data-filter="status:In Progress"]').click();
+    test('filter by In Progress status works via dropdown', async ({ page }) => {
+      await page.locator('[data-testid="status-filter"]').selectOption('status:In Progress');
+      await page.waitForTimeout(50);
       const rows = page.locator('tbody tr');
       await expect(rows).toHaveCount(2);
     });
@@ -497,14 +507,16 @@ test.describe('Tasks View', () => {
     }) => {
       await setupListViewWithTasks(page, crossBranchLikeTasks);
 
-      await expect(page.locator('tbody tr')).toHaveCount(4);
+      // Default "not-done" filter hides the Done task, so 3 visible
+      await expect(page.locator('tbody tr')).toHaveCount(3);
 
       await page.locator('[data-testid="search-input"]').fill('unique searchable text');
       await expect(page.locator('tbody tr')).toHaveCount(1);
       await expect(page.locator('tbody tr')).toContainText('Search target task');
 
       await page.locator('[data-testid="search-input"]').fill('');
-      await page.locator('button[data-filter="status:Done"]').click();
+      await page.locator('[data-testid="status-filter"]').selectOption('status:Done');
+      await page.waitForTimeout(50);
       await expect(page.locator('tbody tr')).toHaveCount(1);
       await expect(page.locator('tbody tr')).toContainText('Feature task from other branch');
     });
@@ -602,6 +614,10 @@ test.describe('Tasks View', () => {
     });
 
     test('tasks within same status group are ordered by ordinal', async ({ page }) => {
+      // Select "all" so Done tasks are visible too
+      await page.locator('[data-testid="status-filter"]').selectOption('all');
+      await page.waitForTimeout(50);
+
       // Default sort is by status ascending
       // "To Do" group: TASK-1 (ordinal: 1000) should come before TASK-2 and TASK-3 (no ordinal)
       const rows = page.locator('tbody tr');
@@ -1013,8 +1029,8 @@ test.describe('Tasks View', () => {
     test('selecting a label filters tasks correctly', async ({ page }) => {
       await setupLabelView(page);
 
-      // All 4 tasks visible initially
-      await expect(page.locator('tbody tr')).toHaveCount(4);
+      // Default "not-done" filter hides Done tasks, so 3 visible initially
+      await expect(page.locator('tbody tr')).toHaveCount(3);
 
       // Filter by "ui" label - should show TASK-L2 and TASK-L3
       await page.locator('[data-testid="label-filter"]').selectOption('ui');
@@ -1034,10 +1050,10 @@ test.describe('Tasks View', () => {
       await page.waitForTimeout(50);
       await expect(page.locator('tbody tr')).toHaveCount(1);
 
-      // Reset to all
+      // Reset to all labels (still under "not-done" status filter, so 3 tasks)
       await page.locator('[data-testid="label-filter"]').selectOption('');
       await page.waitForTimeout(50);
-      await expect(page.locator('tbody tr')).toHaveCount(4);
+      await expect(page.locator('tbody tr')).toHaveCount(3);
     });
 
     test('label pills are visible on rows with labels', async ({ page }) => {

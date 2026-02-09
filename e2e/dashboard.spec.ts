@@ -187,15 +187,4 @@ test.describe('Dashboard Tab', () => {
     await dashboardTab.click();
     await expect(dashboardTab).toHaveAttribute('aria-selected', 'true');
   });
-
-  test('d key switches to dashboard view', async ({ page }) => {
-    await clearPostedMessages(page);
-    await page.keyboard.press('d');
-    await page.waitForTimeout(50);
-
-    // Dashboard tab should now be active
-    const dashboardTab = page.locator('[data-testid="tab-dashboard"]');
-    await expect(dashboardTab).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('#dashboard-view')).toBeVisible();
-  });
 });

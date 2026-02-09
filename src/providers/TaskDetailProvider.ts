@@ -532,13 +532,12 @@ export class TaskDetailProvider {
         if (this.blockReadOnlyMutation(task, 'promote this draft')) break;
 
         try {
-          await this.writer.promoteDraft(TaskDetailProvider.currentTaskId, this.parser);
-          vscode.window.showInformationMessage(
-            `Draft promoted to task: ${TaskDetailProvider.currentTaskId}`
+          const newTaskId = await this.writer.promoteDraft(
+            TaskDetailProvider.currentTaskId,
+            this.parser
           );
-          await this.openTask(
-            TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId }
-          );
+          vscode.window.showInformationMessage(`Draft promoted to task: ${newTaskId}`);
+          await this.openTask(newTaskId);
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to promote draft: ${error}`);
         }

@@ -188,7 +188,7 @@ export class BacklogParser {
         }
 
         if (task) {
-          task.folder = folderName as TaskFolder;
+          task.folder = (folderName === 'archive/tasks' ? 'archive' : folderName) as TaskFolder;
           tasks.push(task);
         }
       } catch (error) {
@@ -231,8 +231,7 @@ export class BacklogParser {
    * Sets folder: 'archive' on all returned tasks.
    */
   async getArchivedTasks(): Promise<Task[]> {
-    const tasks = await this.getTasksFromFolder('archive/tasks');
-    return tasks.map((t) => ({ ...t, folder: 'archive' as TaskFolder }));
+    return this.getTasksFromFolder('archive/tasks');
   }
 
   /**

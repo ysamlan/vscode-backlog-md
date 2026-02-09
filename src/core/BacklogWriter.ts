@@ -82,10 +82,11 @@ export class BacklogWriter {
   }
 
   /**
-   * Restore an archived task: moves from archive/tasks/ back to tasks/
+   * Restore an archived task: moves from archive/tasks/ back to tasks/ (or drafts/ for DRAFT- IDs)
    */
   async restoreArchivedTask(taskId: string, parser: BacklogParser): Promise<string> {
-    return this.moveTaskToFolder(taskId, 'tasks', parser);
+    const destFolder = taskId.startsWith('DRAFT-') ? 'drafts' : 'tasks';
+    return this.moveTaskToFolder(taskId, destFolder, parser);
   }
 
   /**
@@ -101,7 +102,8 @@ export class BacklogWriter {
   }
 
   /**
-   * Promote a draft to a regular task: moves from drafts/ to tasks/, updates status to 'To Do'
+   * Promote a draft to a regular task: assigns new TASK-N ID, moves from drafts/ to tasks/,
+   * and updates status to the config default (or 'To Do').
    */
   async promoteDraft(taskId: string, parser: BacklogParser): Promise<string> {
     const task = await parser.getTask(taskId);
@@ -109,30 +111,45 @@ export class BacklogWriter {
       throw new Error(`Task ${taskId} not found`);
     }
 
-    // Move file from drafts/ to tasks/
     const backlogPath = path.dirname(path.dirname(task.filePath));
     const destDir = path.join(backlogPath, 'tasks');
-    const fileName = path.basename(task.filePath);
-    const destPath = path.join(destDir, fileName);
 
     if (!fs.existsSync(destDir)) {
       fs.mkdirSync(destDir, { recursive: true });
     }
 
+    // Generate a new task ID
+    const config = await parser.getConfig();
+    const taskPrefix = config.task_prefix || 'TASK';
+    const zeroPadding = config.zero_padded_ids || 0;
+    const nextId = this.getNextTaskId(destDir, taskPrefix);
+    const paddedId = zeroPadding > 0 ? String(nextId).padStart(zeroPadding, '0') : String(nextId);
+    const newTaskId = `${taskPrefix}-${paddedId}`.toUpperCase();
+    const lowerPrefix = taskPrefix.toLowerCase();
+
+    // Build new filename from task title
+    const sanitizedTitle = (task.title || 'Untitled')
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50);
+    const newFileName = `${lowerPrefix}-${paddedId} - ${sanitizedTitle}.md`;
+    const destPath = path.join(destDir, newFileName);
+
+    // Move draft file to tasks/ with new name
     fs.renameSync(task.filePath, destPath);
     parser.invalidateTaskCache(task.filePath);
 
-    // Update status from Draft to config default or 'To Do'
-    const config = await parser.getConfig();
+    // Update frontmatter: new ID, status, and updated_date
     const content = fs.readFileSync(destPath, 'utf-8');
     const { frontmatter, body } = this.extractFrontmatter(content);
+    frontmatter.id = newTaskId;
     frontmatter.status = config.default_status || 'To Do';
     frontmatter.updated_date = new Date().toISOString().split('T')[0];
     const updatedContent = this.reconstructFile(frontmatter, body);
     fs.writeFileSync(destPath, updatedContent, 'utf-8');
     parser.invalidateTaskCache(destPath);
 
-    return destPath;
+    return newTaskId;
   }
 
   /**

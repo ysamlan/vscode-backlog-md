@@ -2430,6 +2430,32 @@ status: Done
       expect(task?.folder).toBe('tasks');
       expect(task?.title).toBe('Active Task');
     });
+
+    it('should set folder to archive (not archive/tasks) when found via getTask', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        const s = String(p);
+        return s.includes('archive/tasks') || s === '/fake/backlog';
+      });
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockImplementation((p) => {
+        if (String(p).includes('archive/tasks')) {
+          return ['task-10 - Archived.md'];
+        }
+        return [];
+      });
+      vi.mocked(fs.statSync).mockReturnValue({ mtimeMs: 1 } as ReturnType<typeof fs.statSync>);
+      vi.mocked(fs.readFileSync).mockReturnValue(`---
+id: TASK-10
+title: Archived
+status: Done
+---
+`);
+
+      const parser = new BacklogParser('/fake/backlog');
+      const task = await parser.getTask('TASK-10');
+
+      expect(task).toBeDefined();
+      expect(task?.folder).toBe('archive');
+    });
   });
 
   describe('parseDocumentContent', () => {

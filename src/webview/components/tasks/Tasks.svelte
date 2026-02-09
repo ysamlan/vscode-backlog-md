@@ -20,7 +20,6 @@
   // State
   let activeTab = $state<TabMode>('kanban');
   let tasks = $state<TaskWithBlocks[]>([]);
-  let completedTasks = $state<TaskWithBlocks[]>([]);
   let columns = $state<StatusColumn[]>([
     { status: 'To Do', label: 'To Do' },
     { status: 'In Progress', label: 'In Progress' },
@@ -44,7 +43,7 @@
   let decisions = $state<BacklogDecision[]>([]);
 
   // List view state
-  let currentFilter = $state('all');
+  let currentFilter = $state('not-done');
   let currentMilestone = $state('');
   let currentLabel = $state('');
   let searchQuery = $state('');
@@ -144,12 +143,9 @@
 
       case 'setLabelFilter':
         currentLabel = message.label;
-        currentFilter = 'all';
+        currentFilter = 'not-done';
         break;
 
-      case 'completedTasksUpdated':
-        completedTasks = message.tasks;
-        break;
 
       case 'draftCountUpdated':
         draftCount = message.count;
@@ -211,8 +207,7 @@
     if (!taskElement?.dataset.taskId) return null;
 
     const taskId = taskElement.dataset.taskId;
-    const task = tasks.find((candidate) => candidate.id === taskId)
-      ?? completedTasks.find((candidate) => candidate.id === taskId);
+    const task = tasks.find((candidate) => candidate.id === taskId);
     if (!task) return { taskId };
 
     return {
@@ -412,9 +407,6 @@
     currentLabel = label;
   }
 
-  function handleRequestCompletedTasks() {
-    vscode.postMessage({ type: 'requestCompletedTasks' });
-  }
 
   function handleReadOnlyDragAttempt(task: TaskWithBlocks) {
     showToast(`Cannot reorder task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`);
@@ -496,7 +488,6 @@
       {currentLabel}
       {searchQuery}
       isDraftsView={activeTab === 'drafts'}
-      {completedTasks}
       onSelectTask={handleSelectTask}
       onOpenTask={handleOpenTask}
       onFilterChange={handleFilterChange}
@@ -505,7 +496,6 @@
       onSearchChange={handleSearchChange}
       onReorderTasks={handleReorderTasks}
       onReadOnlyDragAttempt={handleReadOnlyDragAttempt}
-      onRequestCompletedTasks={handleRequestCompletedTasks}
     />
   </div>
 {:else if activeTab === 'archived'}

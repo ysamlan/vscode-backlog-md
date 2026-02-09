@@ -138,12 +138,24 @@ test.describe('Custom Statuses - List View', () => {
     await page.waitForTimeout(50);
   });
 
-  test('displays all tasks with custom status badges', async ({ page }) => {
+  test('displays not-done tasks by default with custom status badges', async ({ page }) => {
+    // Default "not-done" hides last status (Deployed), so 4 visible
+    const rows = page.locator('tbody tr');
+    await expect(rows).toHaveCount(sampleTasks.length - 1);
+  });
+
+  test('displays all tasks when "All" filter selected', async ({ page }) => {
+    await page.locator('[data-testid="status-filter"]').selectOption('all');
+    await page.waitForTimeout(50);
     const rows = page.locator('tbody tr');
     await expect(rows).toHaveCount(sampleTasks.length);
   });
 
   test('status badges show custom status text', async ({ page }) => {
+    // Select "all" to see all tasks including Deployed
+    await page.locator('[data-testid="status-filter"]').selectOption('all');
+    await page.waitForTimeout(50);
+
     // Check that each task's status badge displays the correct custom status
     for (const task of sampleTasks) {
       const row = page.locator(`[data-testid="task-row-${task.id}"]`);
@@ -168,23 +180,29 @@ test.describe('Custom Statuses - List View', () => {
     await expect(page.locator('[data-testid^="delete-btn-"]')).toHaveCount(0);
   });
 
-  test('renders status filter buttons from configured statuses', async ({ page }) => {
-    const filterButtons = page.locator('.filter-buttons button.filter-btn[data-filter^="status:"]');
-    await expect(filterButtons).toHaveCount(customStatuses.length);
+  test('renders status filter dropdown with all configured statuses', async ({ page }) => {
+    const statusFilter = page.locator('[data-testid="status-filter"]');
+    await expect(statusFilter).toBeVisible();
+
+    // Should have "Not Done" + each custom status + "All"
+    const options = statusFilter.locator('option');
+    await expect(options).toHaveCount(customStatuses.length + 2);
+    await expect(options.first()).toHaveText('Not Done');
+    await expect(options.last()).toHaveText('All');
 
     for (const status of customStatuses) {
-      const button = page.locator(`button[data-filter="status:${status}"]`);
-      await expect(button).toBeVisible();
-      await expect(button).toHaveText(status);
+      await expect(statusFilter.locator(`option[value="status:${status}"]`)).toHaveText(status);
     }
   });
 
-  test('status filter buttons work with custom statuses', async ({ page }) => {
-    await page.locator('button[data-filter="status:Review"]').click();
+  test('status filter dropdown works with custom statuses', async ({ page }) => {
+    await page.locator('[data-testid="status-filter"]').selectOption('status:Review');
+    await page.waitForTimeout(50);
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('[data-testid="task-row-TASK-3"]')).toBeVisible();
 
-    await page.locator('button[data-filter="status:Backlog"]').click();
+    await page.locator('[data-testid="status-filter"]').selectOption('status:Backlog');
+    await page.waitForTimeout(50);
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('[data-testid="task-row-TASK-1"]')).toBeVisible();
   });

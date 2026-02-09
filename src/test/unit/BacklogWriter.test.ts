@@ -1426,8 +1426,9 @@ milestone: "v1.0-beta.1"
   });
 
   describe('promoteDraft', () => {
-    it('should move file from drafts/ to tasks/', async () => {
+    it('should move file from drafts/ to tasks/ with new task ID', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
 
       vi.spyOn(mockParser, 'getTask').mockResolvedValue({
         id: 'DRAFT-1',
@@ -1442,6 +1443,8 @@ milestone: "v1.0-beta.1"
         acceptanceCriteria: [],
         definitionOfDone: [],
       });
+
+      vi.spyOn(mockParser, 'getConfig').mockResolvedValue({});
 
       vi.mocked(fs.readFileSync).mockReturnValue(`---
 id: DRAFT-1
@@ -1454,13 +1457,14 @@ status: Draft
 
       expect(fs.renameSync).toHaveBeenCalledWith(
         '/fake/backlog/drafts/draft-1 - My-Draft.md',
-        '/fake/backlog/tasks/draft-1 - My-Draft.md'
+        '/fake/backlog/tasks/task-1 - My-Draft.md'
       );
-      expect(result).toBe('/fake/backlog/tasks/draft-1 - My-Draft.md');
+      expect(result).toBe('TASK-1');
     });
 
-    it('should update status from Draft to To Do', async () => {
+    it('should update status from Draft to To Do and assign new task ID', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
+      mockReaddirSync([]);
 
       vi.spyOn(mockParser, 'getTask').mockResolvedValue({
         id: 'DRAFT-1',
@@ -1475,6 +1479,8 @@ status: Draft
         acceptanceCriteria: [],
         definitionOfDone: [],
       });
+
+      vi.spyOn(mockParser, 'getConfig').mockResolvedValue({});
 
       vi.mocked(fs.readFileSync).mockReturnValue(`---
 id: DRAFT-1
@@ -1489,6 +1495,7 @@ status: Draft
       const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
       const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
       expect(frontmatter.status).toBe('To Do');
+      expect(frontmatter.id).toBe('TASK-1');
     });
 
     it('should throw error when task not found', async () => {
@@ -1501,6 +1508,7 @@ status: Draft
 
     it('should create tasks directory if it does not exist', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
+      mockReaddirSync([]);
 
       vi.spyOn(mockParser, 'getTask').mockResolvedValue({
         id: 'DRAFT-1',
@@ -1515,6 +1523,8 @@ status: Draft
         acceptanceCriteria: [],
         definitionOfDone: [],
       });
+
+      vi.spyOn(mockParser, 'getConfig').mockResolvedValue({});
 
       vi.mocked(fs.readFileSync).mockReturnValue(`---
 id: DRAFT-1
@@ -2252,6 +2262,8 @@ status: To Do
     });
 
     it('should invalidate cache for both old and new paths after promoteDraft', async () => {
+      mockReaddirSync([]);
+
       vi.spyOn(mockParser, 'getTask').mockResolvedValue({
         id: 'DRAFT-1',
         title: 'My Draft',
@@ -2265,6 +2277,8 @@ status: To Do
         definitionOfDone: [],
       });
 
+      vi.spyOn(mockParser, 'getConfig').mockResolvedValue({});
+
       vi.mocked(fs.readFileSync).mockReturnValue(`---
 id: DRAFT-1
 title: My Draft
@@ -2277,7 +2291,7 @@ status: Draft
       await writer.promoteDraft('DRAFT-1', mockParser);
 
       expect(invalidateSpy).toHaveBeenCalledWith('/fake/backlog/drafts/draft-1 - My-Draft.md');
-      expect(invalidateSpy).toHaveBeenCalledWith('/fake/backlog/tasks/draft-1 - My-Draft.md');
+      expect(invalidateSpy).toHaveBeenCalledWith('/fake/backlog/tasks/task-1 - My-Draft.md');
     });
 
     it('should invalidate cache after toggleChecklistItem', async () => {

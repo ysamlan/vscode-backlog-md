@@ -24,7 +24,6 @@
     searchQuery: string;
     isDraftsView?: boolean;
     isArchivedView?: boolean;
-    completedTasks?: TaskWithBlocks[];
     onSelectTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onFilterChange: (filter: string) => void;
@@ -33,7 +32,6 @@
     onSearchChange: (query: string) => void;
     onReorderTasks?: (updates: Array<{ taskId: string; ordinal: number }>) => void;
     onReadOnlyDragAttempt?: (task: TaskWithBlocks) => void;
-    onRequestCompletedTasks?: () => void;
   }
 
   let {
@@ -47,7 +45,6 @@
     searchQuery,
     isDraftsView = false,
     isArchivedView = false,
-    completedTasks = [],
     onSelectTask,
     onOpenTask,
     onFilterChange,
@@ -56,7 +53,6 @@
     onSearchChange,
     onReorderTasks,
     onReadOnlyDragAttempt,
-    onRequestCompletedTasks,
   }: Props = $props();
 
   let statusOrder = $derived(
@@ -67,24 +63,12 @@
     field: 'status',
     direction: 'asc',
   });
-  let showingCompleted = $state(false);
-  let completedRequested = $state(false);
-
-  const LEGACY_FILTER_TO_STATUS: Record<string, string> = {
-    todo: 'To Do',
-    'in-progress': 'In Progress',
-    done: 'Done',
-  };
 
   function getFilterStatus(filter: string): string | null {
     if (filter.startsWith('status:')) {
       return filter.slice('status:'.length);
     }
-    return LEGACY_FILTER_TO_STATUS[filter] ?? null;
-  }
-
-  function isStatusFilterActive(status: string): boolean {
-    return getFilterStatus(currentFilter) === status && !showingCompleted;
+    return null;
   }
 
   function taskRowKey(task: TaskWithBlocks): string {
@@ -105,20 +89,6 @@
 
   // Filter tasks
   let filteredTasks = $derived.by(() => {
-    // When showing completed tasks, use that list instead
-    if (showingCompleted) {
-      let filtered: TaskWithBlocks[] = completedTasks;
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          (t) =>
-            t.title.toLowerCase().includes(query) ||
-            (t.description && t.description.toLowerCase().includes(query))
-        );
-      }
-      return filtered;
-    }
-
     let filtered = tasks;
 
     // In drafts/archived view, show all tasks (no status filtering)
@@ -126,8 +96,11 @@
       const filterStatus = getFilterStatus(currentFilter);
       if (filterStatus) {
         filtered = filtered.filter((t) => t.status === filterStatus);
-      } else if (currentFilter === 'high-priority') {
-        filtered = filtered.filter((t) => t.priority === 'high');
+      } else if (currentFilter === 'not-done') {
+        const lastStatus = statuses[statuses.length - 1];
+        if (lastStatus) {
+          filtered = filtered.filter((t) => t.status !== lastStatus);
+        }
       }
     }
 
@@ -379,13 +352,6 @@
     onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
   }
 
-  function handleCompletedFilter() {
-    showingCompleted = !showingCompleted;
-    if (showingCompleted && !completedRequested && onRequestCompletedTasks) {
-      completedRequested = true;
-      onRequestCompletedTasks();
-    }
-  }
 
 </script>
 
@@ -421,41 +387,18 @@
     </div>
   {:else}
     <div class="filter-buttons">
-      <button
-        class="filter-btn"
-        class:active={currentFilter === 'all' && !showingCompleted}
-        data-filter="all"
-        onclick={() => { showingCompleted = false; onFilterChange('all'); }}
+      <select
+        class="status-filter"
+        value={currentFilter}
+        onchange={(e) => onFilterChange((e.target as HTMLSelectElement).value)}
+        data-testid="status-filter"
       >
-        All
-      </button>
-      {#each statuses as status (status)}
-        <button
-          class="filter-btn"
-          class:active={isStatusFilterActive(status)}
-          data-filter={"status:" + status}
-          onclick={() => { showingCompleted = false; onFilterChange(`status:${status}`); }}
-        >
-          {status}
-        </button>
-      {/each}
-      <button
-        class="filter-btn"
-        class:active={currentFilter === 'high-priority' && !showingCompleted}
-        data-filter="high-priority"
-        onclick={() => { showingCompleted = false; onFilterChange('high-priority'); }}
-      >
-        High Priority
-      </button>
-      <button
-        class="filter-btn"
-        class:active={showingCompleted}
-        data-filter="completed"
-        data-testid="completed-filter"
-        onclick={handleCompletedFilter}
-      >
-        Completed
-      </button>
+        <option value="not-done">Not Done</option>
+        {#each statuses as status (status)}
+          <option value={"status:" + status}>{status}</option>
+        {/each}
+        <option value="all">All</option>
+      </select>
       <select
         class="milestone-filter"
         value={currentMilestone}
@@ -540,11 +483,11 @@
               data-task-id={task.id}
               data-testid="task-row-{task.id}"
               tabindex="0"
-              draggable={isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted && !isSubtask ? 'true' : undefined}
+              draggable={isDragEnabled && !isDraftsView && !isArchivedView && !isSubtask ? 'true' : undefined}
               class:dragging={draggedTaskId === task.id}
               class:drop-before={dropTargetTaskId === task.id && dropPosition === 'before'}
               class:drop-after={dropTargetTaskId === task.id && dropPosition === 'after'}
-              class:completed-row={showingCompleted || task.source === 'completed'}
+              class:completed-row={task.source === 'completed'}
               class:draft-row={isDraftsView}
               class:archived-row={isArchivedView}
               class:subtask-row={isSubtask}
@@ -557,7 +500,7 @@
               ondragend={handleDragEnd}
               ondragover={(e) => handleDragOver(e, task.id)}
             >
-              {#if isDragEnabled && !isDraftsView && !isArchivedView && !showingCompleted}
+              {#if isDragEnabled && !isDraftsView && !isArchivedView}
                 {#if isSubtask}
                   <td class="drag-handle drag-handle-blank"></td>
                 {:else}

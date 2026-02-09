@@ -165,6 +165,7 @@ export class TaskCreatePanel {
     }
 
     try {
+      let newTaskId: string;
       if (this.draftId) {
         // Save final content to the draft, then promote it
         await this.writer.updateTask(
@@ -172,7 +173,7 @@ export class TaskCreatePanel {
           { title: trimmedTitle, description: description.trim() || undefined },
           this.parser
         );
-        await this.writer.promoteDraft(this.draftId, this.parser);
+        newTaskId = await this.writer.promoteDraft(this.draftId, this.parser);
       } else {
         // Fallback: no draft was created (init failed), create+promote inline
         const result = await this.writer.createDraft(this.backlogPath, this.parser);
@@ -181,7 +182,7 @@ export class TaskCreatePanel {
           { title: trimmedTitle, description: description.trim() || undefined },
           this.parser
         );
-        await this.writer.promoteDraft(result.id, this.parser);
+        newTaskId = await this.writer.promoteDraft(result.id, this.parser);
       }
 
       vscode.window.showInformationMessage(`Created task "${trimmedTitle}"`);
@@ -191,9 +192,7 @@ export class TaskCreatePanel {
       this.closedIntentionally = true;
       this.panel.dispose();
 
-      if (this.draftId) {
-        this.providers.taskDetailProvider.openTask(this.draftId);
-      }
+      this.providers.taskDetailProvider.openTask(newTaskId);
     } catch (error) {
       await this.panel.webview.postMessage({
         type: 'error',

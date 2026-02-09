@@ -61,39 +61,39 @@ describe('TasksViewProvider', () => {
   }
 
   describe('setFilter', () => {
-    it('should post setFilter message with the filter value', () => {
+    it('should post setFilter message with status:To Do filter', () => {
       const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
       resolveView(provider);
 
-      provider.setFilter('todo');
+      provider.setFilter('status:To Do');
 
       expect(mockWebview.postMessage).toHaveBeenCalledWith({
         type: 'setFilter',
-        filter: 'todo',
+        filter: 'status:To Do',
       });
     });
 
-    it('should post setFilter message for in-progress filter', () => {
+    it('should post setFilter message for not-done filter', () => {
       const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
       resolveView(provider);
 
-      provider.setFilter('in-progress');
+      provider.setFilter('not-done');
 
       expect(mockWebview.postMessage).toHaveBeenCalledWith({
         type: 'setFilter',
-        filter: 'in-progress',
+        filter: 'not-done',
       });
     });
 
-    it('should post setFilter message for done filter', () => {
+    it('should post setFilter message for status:In Progress filter', () => {
       const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
       resolveView(provider);
 
-      provider.setFilter('done');
+      provider.setFilter('status:In Progress');
 
       expect(mockWebview.postMessage).toHaveBeenCalledWith({
         type: 'setFilter',
-        filter: 'done',
+        filter: 'status:In Progress',
       });
     });
 

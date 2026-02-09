@@ -61,7 +61,7 @@ describe('TaskCreatePanel', () => {
         .fn()
         .mockResolvedValue({ id: 'DRAFT-1', filePath: '/test/backlog/drafts/draft-1.md' }),
       updateTask: vi.fn().mockResolvedValue(undefined),
-      promoteDraft: vi.fn().mockResolvedValue('/test/backlog/tasks/task-1.md'),
+      promoteDraft: vi.fn().mockResolvedValue('TASK-1'),
     } as unknown as BacklogWriter;
 
     mockTaskDetailProvider = {
@@ -288,7 +288,7 @@ describe('TaskCreatePanel', () => {
       });
 
       expect(mockPanel.dispose).toHaveBeenCalled();
-      expect(mockTaskDetailProvider.openTask).toHaveBeenCalledWith('DRAFT-1');
+      expect(mockTaskDetailProvider.openTask).toHaveBeenCalledWith('TASK-1');
     });
 
     it('should refresh views on success', async () => {
