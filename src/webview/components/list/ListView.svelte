@@ -243,7 +243,7 @@
   }
 
   function handleRowKeydown(e: KeyboardEvent, task: TaskWithBlocks) {
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === ' ') {
       e.preventDefault();
       onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
     } else if (e.key === 'ArrowDown') {
@@ -550,6 +550,8 @@
               class:subtask-row={isSubtask}
               class:readonly-row={isReadOnly}
               onclick={() => handleRowClickGuarded(task)}
+              onfocus={() =>
+                onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch })}
               onkeydown={(e) => handleRowKeydown(e, task)}
               ondragstart={(e) => handleDragStart(e, task.id)}
               ondragend={handleDragEnd}

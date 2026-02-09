@@ -8,6 +8,7 @@ import { test, expect } from '@playwright/test';
 import {
   installVsCodeMock,
   postMessageToWebview,
+  getPostedMessages,
   getLastPostedMessage,
   clearPostedMessages,
 } from './fixtures/vscode-mock';
@@ -349,13 +350,10 @@ test.describe('Tasks View', () => {
       });
     });
 
-    test('keyboard Enter sends selectTask message from card for preview navigation', async ({
-      page,
-    }) => {
+    test('focusing a card sends selectTask message for preview navigation', async ({ page }) => {
       await clearPostedMessages(page);
       const card = page.locator('[data-testid="task-TASK-1"]');
       await card.focus();
-      await page.keyboard.press('Enter');
 
       const message = await getLastPostedMessage(page);
       expect(message).toEqual({
@@ -363,6 +361,16 @@ test.describe('Tasks View', () => {
         taskId: 'TASK-1',
         filePath: '/test/tasks/task-1.md',
       });
+    });
+
+    test('keyboard Enter on focused card sends focusTaskPreview message', async ({ page }) => {
+      await clearPostedMessages(page);
+      const card = page.locator('[data-testid="task-TASK-1"]');
+      await card.focus();
+      await page.keyboard.press('Enter');
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({ type: 'focusTaskPreview' });
     });
 
     test('shows blocked icon on card when task has active blockers', async ({ page }) => {
@@ -513,11 +521,10 @@ test.describe('Tasks View', () => {
       });
     });
 
-    test('keyboard Enter on row sends selectTask message', async ({ page }) => {
+    test('focusing a row sends selectTask message', async ({ page }) => {
       await clearPostedMessages(page);
       const row = page.locator('[data-testid="task-row-TASK-1"]');
       await row.focus();
-      await page.keyboard.press('Enter');
 
       const message = await getLastPostedMessage(page);
       expect(message).toEqual({
@@ -525,6 +532,16 @@ test.describe('Tasks View', () => {
         taskId: 'TASK-1',
         filePath: '/test/tasks/task-1.md',
       });
+    });
+
+    test('keyboard Enter on focused row sends focusTaskPreview message', async ({ page }) => {
+      await clearPostedMessages(page);
+      const row = page.locator('[data-testid="task-row-TASK-1"]');
+      await row.focus();
+      await page.keyboard.press('Enter');
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({ type: 'focusTaskPreview' });
     });
 
     test('shows blocked icon in list row when task has active blockers', async ({ page }) => {
@@ -571,8 +588,9 @@ test.describe('Tasks View', () => {
 
       await expect(page.locator('.toast')).toContainText('Cannot reorder task: TASK-REMOTE-1');
 
-      const message = await getLastPostedMessage(page);
-      expect(message).toBeUndefined();
+      const messages = await getPostedMessages(page);
+      expect(messages.some((message) => message.type === 'reorderTasks')).toBe(false);
+      expect(messages.some((message) => message.type === 'updateTaskStatus')).toBe(false);
     });
   });
 
@@ -773,8 +791,9 @@ test.describe('Tasks View', () => {
 
       await expect(page.locator('.toast')).toContainText('Cannot reorder task: TASK-REMOTE-1');
 
-      const message = await getLastPostedMessage(page);
-      expect(message).toBeUndefined();
+      const messages = await getPostedMessages(page);
+      expect(messages.some((message) => message.type === 'reorderTasks')).toBe(false);
+      expect(messages.some((message) => message.type === 'updateTaskStatus')).toBe(false);
     });
   });
 

@@ -474,6 +474,19 @@ describe('TasksViewProvider', () => {
     });
   });
 
+  describe('handleMessage focusTaskPreview', () => {
+    it('should focus the task preview panel', async () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({ type: 'focusTaskPreview' });
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith('backlog.taskPreview.focus');
+    });
+  });
+
   describe('handleMessage restoreTask', () => {
     it('should call restoreArchivedTask and refresh on restore', async () => {
       const mockWriter = {

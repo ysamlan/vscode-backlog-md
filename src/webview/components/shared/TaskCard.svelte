@@ -38,8 +38,12 @@
     onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
   }
 
+  function handleFocus() {
+    onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
+  }
+
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === ' ') {
       e.preventDefault();
       onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
     }
@@ -90,6 +94,7 @@
   data-ordinal={task.ordinal !== undefined ? task.ordinal : ''}
   data-testid="task-{task.id}"
   onclick={handleClick}
+  onfocus={handleFocus}
   onkeydown={handleKeydown}
   ondragstart={handleDragStart}
   ondragend={handleDragEnd}

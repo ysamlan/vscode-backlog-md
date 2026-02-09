@@ -2,13 +2,16 @@
 id: TASK-94
 title: Add customizable keyboard shortcuts with settings screen
 status: To Do
-assignee: []
+assignee:
+  - '@openai-5.3-codex'
 created_date: '2026-02-06'
+updated_date: '2026-02-09 21:47'
 labels:
   - ui
   - ux
   - settings
-dependencies: [TASK-84]
+dependencies:
+  - TASK-84
 priority: medium
 ---
 
@@ -72,3 +75,20 @@ Add the ability for users to customize keyboard shortcuts via a settings screen 
 - [ ] #6 Shortcuts popup reflects customized bindings
 - [ ] #7 Unit tests for keybinding configuration loading and saving
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Design keybinding configuration model and default map for all supported actions.
+2. Add settings UI to view/edit bindings, including record mode and duplicate-key conflict warnings.
+3. Persist keybindings through extension state and load them in Tasks webview on initialization.
+4. Refactor global keydown handling to consume configured bindings instead of hardcoded keys.
+5. Update shortcuts help popup to render current configured bindings.
+6. Add/adjust unit tests for load/save behavior and conflict detection, then run full validation (`bun run test && bun run lint && bun run typecheck`).
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Scope correction on 2026-02-09: default shortcut/nav behavior changes were split out to a separate task; TASK-94 remains focused on configurable/customizable keyboard shortcuts via settings UI and persistence.
+<!-- SECTION:NOTES:END -->

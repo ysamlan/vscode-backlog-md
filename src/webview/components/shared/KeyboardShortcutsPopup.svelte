@@ -58,18 +58,6 @@
               <kbd>v</kbd>
               <span>Archived view</span>
             </div>
-            <div class="shortcut-row">
-              <kbd>d</kbd>
-              <span>Dashboard view</span>
-            </div>
-            <div class="shortcut-row">
-              <kbd>b</kbd>
-              <span>Documents view</span>
-            </div>
-            <div class="shortcut-row">
-              <kbd>m</kbd>
-              <span>Decisions view</span>
-            </div>
           </div>
         </div>
 
@@ -86,7 +74,7 @@
             </div>
             <div class="shortcut-row">
               <kbd>Enter</kbd>
-              <span>Open focused task</span>
+              <span>Move keyboard focus to details panel</span>
             </div>
             <div class="shortcut-row">
               <kbd>/</kbd>
@@ -101,6 +89,10 @@
             <div class="shortcut-row">
               <kbd>n</kbd>
               <span>Create new task</span>
+            </div>
+            <div class="shortcut-row">
+              <kbd>e</kbd>
+              <span>Open edit view for focused task</span>
             </div>
             <div class="shortcut-row">
               <kbd>r</kbd>

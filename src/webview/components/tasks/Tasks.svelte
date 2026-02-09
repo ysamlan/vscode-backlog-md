@@ -203,6 +203,26 @@
     firstCard?.focus();
   }
 
+  function getFocusedTaskRef():
+    | { taskId: string; filePath?: string; source?: Task['source']; branch?: string }
+    | null {
+    const focusedElement = document.activeElement as HTMLElement | null;
+    const taskElement = focusedElement?.closest?.('[data-task-id]') as HTMLElement | null;
+    if (!taskElement?.dataset.taskId) return null;
+
+    const taskId = taskElement.dataset.taskId;
+    const task = tasks.find((candidate) => candidate.id === taskId)
+      ?? completedTasks.find((candidate) => candidate.id === taskId);
+    if (!task) return { taskId };
+
+    return {
+      taskId,
+      filePath: task.filePath,
+      source: task.source,
+      branch: task.branch,
+    };
+  }
+
   onMount(() => {
     vscode.postMessage({ type: 'refresh' });
 
@@ -225,18 +245,31 @@
       // All other shortcuts are suppressed while the popup is open
       if (showShortcuts) return;
 
+      if (e.key === 'Enter') {
+        const focusedTask = getFocusedTaskRef();
+        if (focusedTask) {
+          e.preventDefault();
+          vscode.postMessage({ type: 'focusTaskPreview' });
+        }
+        return;
+      }
+
       switch (e.key) {
         case 'z': handleTabChange('kanban'); break;
         case 'x': handleTabChange('list'); break;
         case 'c': handleTabChange('drafts'); break;
         case 'v': handleTabChange('archived'); break;
-        case 'd': handleTabChange('dashboard'); break;
-        case 'b': handleTabChange('docs'); break;
-        case 'm': handleTabChange('decisions'); break;
         case 'j': focusSibling('[data-task-id]', 1); break;
         case 'k': focusSibling('[data-task-id]', -1); break;
         case 'h': focusAdjacentColumn(-1); break;
         case 'l': focusAdjacentColumn(1); break;
+        case 'e': {
+          const focusedTask = getFocusedTaskRef();
+          if (focusedTask) {
+            handleOpenTask(focusedTask.taskId, focusedTask);
+          }
+          break;
+        }
         case 'n': vscode.postMessage({ type: 'requestCreateTask' }); break;
         case 'r': vscode.postMessage({ type: 'refresh' }); break;
         case '/': {

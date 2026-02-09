@@ -239,6 +239,7 @@ export type WebviewMessage =
       type: 'setViewMode';
       mode: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' | 'docs' | 'decisions';
     }
+  | { type: 'focusTaskPreview' }
   | { type: 'requestCreateTask' }
   | { type: 'openDocument'; documentId: string }
   | { type: 'openDecision'; decisionId: string };

@@ -107,7 +107,7 @@ test.describe('Keyboard Shortcuts', () => {
       await setupTasksView(page);
     });
 
-    test('z/x/c/v/d keys switch views', async ({ page }) => {
+    test('z/x/c/v keys switch views', async ({ page }) => {
       // Start in kanban view (default)
       await expect(page.locator('#kanban-view')).toBeVisible();
 
@@ -138,13 +138,21 @@ test.describe('Keyboard Shortcuts', () => {
       await expect(page.locator('#archived-view')).toBeVisible();
       const archivedMsg = await getLastSetViewModeMessage(page);
       expect(archivedMsg).toMatchObject({ type: 'setViewMode', mode: 'archived' });
+    });
 
-      // Press d - switch to dashboard view
+    test('d/b/m keys no longer switch views', async ({ page }) => {
+      await expect(page.locator('#kanban-view')).toBeVisible();
+
       await clearPostedMessages(page);
       await page.keyboard.press('d');
-      await expect(page.locator('#dashboard-view')).toBeVisible();
-      const dashboardMsg = await getLastSetViewModeMessage(page);
-      expect(dashboardMsg).toMatchObject({ type: 'setViewMode', mode: 'dashboard' });
+      await page.keyboard.press('b');
+      await page.keyboard.press('m');
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('#kanban-view')).toBeVisible();
+      const messages = await getPostedMessages(page);
+      const viewModeMessages = messages.filter((m) => m.type === 'setViewMode');
+      expect(viewModeMessages).toHaveLength(0);
     });
   });
 
@@ -197,6 +205,20 @@ test.describe('Keyboard Shortcuts', () => {
 
       const messages = await getPostedMessages(page);
       expect(messages).toContainEqual({ type: 'refresh' });
+    });
+
+    test('e key opens full edit view for focused task', async ({ page }) => {
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="task-TASK-1"]').focus();
+      await page.keyboard.press('e');
+      await page.waitForTimeout(50);
+
+      const messages = await getPostedMessages(page);
+      expect(messages).toContainEqual({
+        type: 'openTask',
+        taskId: 'TASK-1',
+        filePath: '/test/tasks/task-1.md',
+      });
     });
   });
 

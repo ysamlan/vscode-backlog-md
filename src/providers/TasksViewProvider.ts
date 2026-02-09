@@ -290,6 +290,11 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
       }
 
+      case 'focusTaskPreview': {
+        await vscode.commands.executeCommand('backlog.taskPreview.focus');
+        break;
+      }
+
       case 'updateTaskStatus': {
         if (!this.parser) break;
         const taskId = message.taskId;

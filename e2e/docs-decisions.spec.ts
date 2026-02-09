@@ -87,15 +87,28 @@ async function setupTasksView(page: ReturnType<typeof test.info>['page']) {
   await page.waitForTimeout(100);
 }
 
+async function switchToDocsView(page: ReturnType<typeof test.info>['page']) {
+  await page.locator('[data-testid="overflow-menu-btn"]').click();
+  await page.waitForTimeout(50);
+  await page.locator('[data-testid="tab-docs"]').click();
+  await page.waitForTimeout(50);
+}
+
+async function switchToDecisionsView(page: ReturnType<typeof test.info>['page']) {
+  await page.locator('[data-testid="overflow-menu-btn"]').click();
+  await page.waitForTimeout(50);
+  await page.locator('[data-testid="tab-decisions"]').click();
+  await page.waitForTimeout(50);
+}
+
 test.describe('Documents List View', () => {
   test.beforeEach(async ({ page }) => {
     await setupTasksView(page);
   });
 
-  test('b key switches to docs view and shows empty state', async ({ page }) => {
+  test('docs tab switches to docs view and shows empty state', async ({ page }) => {
     await clearPostedMessages(page);
-    await page.keyboard.press('b');
-    await page.waitForTimeout(100);
+    await switchToDocsView(page);
 
     await expect(page.locator('#docs-view')).toBeVisible();
 
@@ -105,9 +118,7 @@ test.describe('Documents List View', () => {
   });
 
   test('renders document list after data injection', async ({ page }) => {
-    // Switch to docs view
-    await page.keyboard.press('b');
-    await page.waitForTimeout(50);
+    await switchToDocsView(page);
 
     // Inject documents data
     await postMessageToWebview(page, {
@@ -128,8 +139,7 @@ test.describe('Documents List View', () => {
   });
 
   test('shows type badges on documents', async ({ page }) => {
-    await page.keyboard.press('b');
-    await page.waitForTimeout(50);
+    await switchToDocsView(page);
 
     await postMessageToWebview(page, {
       type: 'documentsUpdated',
@@ -148,8 +158,7 @@ test.describe('Documents List View', () => {
   });
 
   test('shows tag badges on documents', async ({ page }) => {
-    await page.keyboard.press('b');
-    await page.waitForTimeout(50);
+    await switchToDocsView(page);
 
     await postMessageToWebview(page, {
       type: 'documentsUpdated',
@@ -165,8 +174,7 @@ test.describe('Documents List View', () => {
   });
 
   test('clicking a document sends openDocument message', async ({ page }) => {
-    await page.keyboard.press('b');
-    await page.waitForTimeout(50);
+    await switchToDocsView(page);
 
     await postMessageToWebview(page, {
       type: 'documentsUpdated',
@@ -185,8 +193,7 @@ test.describe('Documents List View', () => {
   });
 
   test('search filters documents by title', async ({ page }) => {
-    await page.keyboard.press('b');
-    await page.waitForTimeout(50);
+    await switchToDocsView(page);
 
     await postMessageToWebview(page, {
       type: 'documentsUpdated',
@@ -204,8 +211,7 @@ test.describe('Documents List View', () => {
   });
 
   test('search filters documents by tag', async ({ page }) => {
-    await page.keyboard.press('b');
-    await page.waitForTimeout(50);
+    await switchToDocsView(page);
 
     await postMessageToWebview(page, {
       type: 'documentsUpdated',
@@ -222,8 +228,7 @@ test.describe('Documents List View', () => {
   });
 
   test('shows empty state when no documents match search', async ({ page }) => {
-    await page.keyboard.press('b');
-    await page.waitForTimeout(50);
+    await switchToDocsView(page);
 
     await postMessageToWebview(page, {
       type: 'documentsUpdated',
@@ -244,10 +249,9 @@ test.describe('Decisions List View', () => {
     await setupTasksView(page);
   });
 
-  test('m key switches to decisions view and shows empty state', async ({ page }) => {
+  test('decisions tab switches to decisions view and shows empty state', async ({ page }) => {
     await clearPostedMessages(page);
-    await page.keyboard.press('m');
-    await page.waitForTimeout(100);
+    await switchToDecisionsView(page);
 
     await expect(page.locator('#decisions-view')).toBeVisible();
 
@@ -257,8 +261,7 @@ test.describe('Decisions List View', () => {
   });
 
   test('renders decision list after data injection', async ({ page }) => {
-    await page.keyboard.press('m');
-    await page.waitForTimeout(50);
+    await switchToDecisionsView(page);
 
     await postMessageToWebview(page, {
       type: 'decisionsUpdated',
@@ -278,8 +281,7 @@ test.describe('Decisions List View', () => {
   });
 
   test('shows status badges with correct classes', async ({ page }) => {
-    await page.keyboard.press('m');
-    await page.waitForTimeout(50);
+    await switchToDecisionsView(page);
 
     await postMessageToWebview(page, {
       type: 'decisionsUpdated',
@@ -302,8 +304,7 @@ test.describe('Decisions List View', () => {
   });
 
   test('shows date on decisions', async ({ page }) => {
-    await page.keyboard.press('m');
-    await page.waitForTimeout(50);
+    await switchToDecisionsView(page);
 
     await postMessageToWebview(page, {
       type: 'decisionsUpdated',
@@ -317,8 +318,7 @@ test.describe('Decisions List View', () => {
   });
 
   test('clicking a decision sends openDecision message', async ({ page }) => {
-    await page.keyboard.press('m');
-    await page.waitForTimeout(50);
+    await switchToDecisionsView(page);
 
     await postMessageToWebview(page, {
       type: 'decisionsUpdated',
@@ -337,8 +337,7 @@ test.describe('Decisions List View', () => {
   });
 
   test('search filters decisions by title', async ({ page }) => {
-    await page.keyboard.press('m');
-    await page.waitForTimeout(50);
+    await switchToDecisionsView(page);
 
     await postMessageToWebview(page, {
       type: 'decisionsUpdated',
@@ -354,8 +353,7 @@ test.describe('Decisions List View', () => {
   });
 
   test('search filters decisions by status', async ({ page }) => {
-    await page.keyboard.press('m');
-    await page.waitForTimeout(50);
+    await switchToDecisionsView(page);
 
     await postMessageToWebview(page, {
       type: 'decisionsUpdated',
@@ -381,14 +379,12 @@ test.describe('Tab Switching', () => {
     await expect(page.locator('#kanban-view')).toBeVisible();
 
     // Switch to docs
-    await page.keyboard.press('b');
-    await page.waitForTimeout(50);
+    await switchToDocsView(page);
     await expect(page.locator('#docs-view')).toBeVisible();
     await expect(page.locator('#kanban-view')).not.toBeVisible();
 
     // Switch to decisions
-    await page.keyboard.press('m');
-    await page.waitForTimeout(50);
+    await switchToDecisionsView(page);
     await expect(page.locator('#decisions-view')).toBeVisible();
     await expect(page.locator('#docs-view')).not.toBeVisible();
 
