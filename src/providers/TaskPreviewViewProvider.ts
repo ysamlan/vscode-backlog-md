@@ -89,15 +89,22 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
       return;
     }
 
-    const subtaskSummaries = await this.resolveSubtaskSummaries(task, this.selectedTaskRef);
+    const contextTasks = await this.getContextTasks(this.selectedTaskRef);
+    const taskInContext =
+      this.resolveTaskFromCollection(contextTasks, this.selectedTaskRef) ?? task;
+    const taskWithBlocks = this.enrichTaskWithBlocks(taskInContext, contextTasks);
+    const subtaskSummaries = await this.resolveSubtaskSummaries(
+      taskWithBlocks,
+      this.selectedTaskRef
+    );
     const statuses = await this.parser.getStatuses();
     this.postMessage({
       type: 'taskPreviewData',
-      task,
+      task: taskWithBlocks,
       statuses,
-      isReadOnly: isReadOnlyTask(task),
-      readOnlyReason: isReadOnlyTask(task)
-        ? `Task is from ${getReadOnlyTaskContext(task)} and is read-only.`
+      isReadOnly: isReadOnlyTask(taskWithBlocks),
+      readOnlyReason: isReadOnlyTask(taskWithBlocks)
+        ? `Task is from ${getReadOnlyTaskContext(taskWithBlocks)} and is read-only.`
         : undefined,
       subtaskSummaries,
     });
@@ -199,10 +206,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
 
     // Preserve explicit frontmatter subtasks before computeSubtasks() derives parent links.
     const explicitSubtasksByTaskId = new Map<string, string[]>();
-    const contextTasks =
-      taskRef.source === 'remote' || taskRef.source === 'local-branch'
-        ? await this.parser.getTasksWithCrossBranch()
-        : await this.parser.getTasks();
+    const contextTasks = await this.getContextTasks(taskRef);
 
     for (const contextTask of contextTasks) {
       if (contextTask.subtasks && contextTask.subtasks.length > 0) {
@@ -253,5 +257,21 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
     if (bySource) return bySource;
 
     return tasks.find((task) => task.id === taskRef.taskId);
+  }
+
+  private async getContextTasks(taskRef: TaskSelectionRef): Promise<Task[]> {
+    if (!this.parser) return [];
+    if (taskRef.source === 'remote' || taskRef.source === 'local-branch') {
+      return this.parser.getTasksWithCrossBranch();
+    }
+    return this.parser.getTasks();
+  }
+
+  private enrichTaskWithBlocks(task: Task, contextTasks: Task[]): Task {
+    const blocksTaskIds = contextTasks
+      .filter((candidateTask) => candidateTask.dependencies.includes(task.id))
+      .map((candidateTask) => candidateTask.id);
+    if (blocksTaskIds.length === 0) return task;
+    return { ...task, blocksTaskIds };
   }
 }

@@ -270,4 +270,64 @@ describe('TaskPreviewViewProvider', () => {
       })
     );
   });
+
+  it('includes reverse dependency blocksTaskIds in preview task payload', async () => {
+    (parser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'TASK-1',
+      title: 'Root',
+      status: 'To Do',
+      assignee: [],
+      labels: [],
+      dependencies: [],
+      filePath: '/repo/backlog/tasks/task-1.md',
+    });
+    (parser.getTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: 'TASK-1',
+        title: 'Root',
+        status: 'To Do',
+        assignee: [],
+        labels: [],
+        dependencies: [],
+        filePath: '/repo/backlog/tasks/task-1.md',
+      },
+      {
+        id: 'TASK-2',
+        title: 'Blocked child',
+        status: 'In Progress',
+        assignee: [],
+        labels: [],
+        dependencies: ['TASK-1'],
+        filePath: '/repo/backlog/tasks/task-2.md',
+      },
+    ]);
+
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    webview.postMessage.mockClear();
+    await provider.selectTask({ taskId: 'TASK-1', filePath: '/repo/backlog/tasks/task-1.md' });
+
+    expect(webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'taskPreviewData',
+        task: expect.objectContaining({
+          id: 'TASK-1',
+          blocksTaskIds: ['TASK-2'],
+        }),
+      })
+    );
+  });
 });

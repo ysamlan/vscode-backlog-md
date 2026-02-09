@@ -47,6 +47,7 @@
   };
   let hasMeta = $derived(
     Boolean(
+      task?.parentTaskId ||
       task?.labels.length ||
         task?.assignee.length ||
         task?.dependencies.length ||
@@ -142,6 +143,20 @@
           <div class="compact-meta-line">
             <span class="compact-meta-key">Assignees</span>
             <span class="compact-meta-value">{task.assignee.join(', ')}</span>
+          </div>
+        {/if}
+        {#if task.parentTaskId}
+          <div class="compact-meta-line">
+            <span class="compact-meta-key">Subtask of</span>
+            <span class="compact-meta-value">
+              <button
+                type="button"
+                class="compact-related-link"
+                onclick={() => onOpenRelatedTask(task.parentTaskId!)}
+              >
+                {task.parentTaskId}
+              </button>
+            </span>
           </div>
         {/if}
         {#if task.dependencies.length > 0}

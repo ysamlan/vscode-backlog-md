@@ -71,6 +71,7 @@ export interface Task {
   lastModified?: Date; // Last modification timestamp for conflict resolution
   reporter?: string; // Task reporter (upstream field)
   subtasks?: string[]; // IDs of subtask children
+  blocksTaskIds?: string[]; // Reverse dependencies: tasks that depend on this task
   blockingDependencyIds?: string[]; // Dependency IDs currently blocking this task in views
 }
 
