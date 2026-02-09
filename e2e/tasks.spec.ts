@@ -260,6 +260,48 @@ test.describe('Tasks View', () => {
       }
     });
 
+    test('kanban card title wraps long words and clamps to 3 lines at narrow width', async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 350, height: 600 });
+
+      const longTitleTask: (Task & { blocksTaskIds?: string[] })[] = [
+        {
+          id: 'TASK-LONG',
+          title:
+            'SuperLongUnbrokenWordThatWouldNormallyOverflowInANarrowKanbanColumnAndNeedsBreaking plus additional text to force more than three lines in the card title area',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/test/tasks/task-long.md',
+        },
+      ];
+
+      await postMessageToWebview(page, { type: 'tasksUpdated', tasks: longTitleTask });
+      await page.waitForTimeout(50);
+
+      const title = page.locator('[data-testid="task-TASK-LONG"] .task-card-title');
+      await expect(title).toBeVisible();
+
+      const metrics = await title.evaluate((el) => {
+        const style = window.getComputedStyle(el);
+        return {
+          scrollWidth: el.scrollWidth,
+          clientWidth: el.clientWidth,
+          clientHeight: el.clientHeight,
+          lineHeight: parseFloat(style.lineHeight),
+          webkitLineClamp: style.webkitLineClamp,
+        };
+      });
+
+      expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+      expect(metrics.webkitLineClamp).toBe('3');
+      expect(metrics.clientHeight).toBeLessThanOrEqual(metrics.lineHeight * 3 + 2);
+    });
+
     test('displays correct ordinal data attributes', async ({ page }) => {
       await expect(page.locator('[data-testid="task-TASK-1"]')).toHaveAttribute(
         'data-ordinal',
