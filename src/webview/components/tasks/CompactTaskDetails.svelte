@@ -15,12 +15,24 @@
 
   let isReadOnly = $derived(task ? isReadOnlyTask(task) : false);
   let readOnlyContext = $derived(task ? getReadOnlyTaskContext(task) : '');
+  const priorityLabel: Record<TaskPriority, string> = {
+    high: 'P1',
+    medium: 'P2',
+    low: 'P3',
+  };
+  const priorityTitle: Record<TaskPriority, string> = {
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low',
+  };
+  let hasMeta = $derived(Boolean(task?.labels.length || task?.assignee.length || task?.dependencies.length));
 </script>
 
 <div class="compact-details-pane" data-testid="compact-details-pane">
   {#if !task}
     <div class="compact-empty">Select a task to view details.</div>
   {:else}
+    <div class="compact-section-title">Details</div>
     <div class="compact-header">
       <div class="compact-identity">
         <span class="compact-id" data-testid="compact-details-task-id">{task.id}</span>
@@ -31,8 +43,9 @@
         class="compact-open-full-btn"
         data-testid="open-full-detail-btn"
         onclick={() => onOpenFull(task)}
+        title="Open full task details"
       >
-        Open Full Details
+        Edit
       </button>
     </div>
 
@@ -41,6 +54,18 @@
         Read-only task from {readOnlyContext}.
       </div>
     {/if}
+
+    <div class="compact-chip-row">
+      <span class="compact-status-chip">{task.status}</span>
+      {#if task.priority}
+        <span class={`compact-priority-chip priority-${task.priority}`} title={priorityTitle[task.priority]}>
+          {priorityLabel[task.priority]}
+        </span>
+      {/if}
+      {#if task.updatedAt}
+        <span class="compact-updated-chip">Updated {task.updatedAt}</span>
+      {/if}
+    </div>
 
     <div class="compact-meta-grid">
       <label class="compact-field">
@@ -78,6 +103,30 @@
       </label>
     </div>
 
+    {#if hasMeta}
+      <div class="compact-meta-lines">
+        {#if task.labels.length > 0}
+          <div class="compact-meta-line">
+            <span class="compact-meta-key">Labels</span>
+            <span class="compact-meta-value">{task.labels.join(', ')}</span>
+          </div>
+        {/if}
+        {#if task.assignee.length > 0}
+          <div class="compact-meta-line">
+            <span class="compact-meta-key">Assignees</span>
+            <span class="compact-meta-value">{task.assignee.join(', ')}</span>
+          </div>
+        {/if}
+        {#if task.dependencies.length > 0}
+          <div class="compact-meta-line">
+            <span class="compact-meta-key">Dependencies</span>
+            <span class="compact-meta-value">{task.dependencies.join(', ')}</span>
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    <div class="compact-description-heading">Description</div>
     <div class="compact-description">
       {#if task.description}
         {task.description}
@@ -91,11 +140,19 @@
 <style>
   .compact-details-pane {
     border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
-    padding: 8px 10px 10px;
+    padding: 8px 10px 12px;
     background: var(--vscode-editor-background);
-    min-height: 168px;
-    max-height: 44%;
+    min-height: 220px;
     overflow: auto;
+  }
+
+  .compact-section-title {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+    font-weight: 700;
+    margin-bottom: 8px;
   }
 
   .compact-empty {
@@ -116,15 +173,17 @@
   }
 
   .compact-id {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--vscode-descriptionForeground);
     display: block;
-    margin-bottom: 2px;
+    margin-bottom: 3px;
+    letter-spacing: 0.04em;
+    font-weight: 600;
   }
 
   .compact-title {
     margin: 0;
-    font-size: 13px;
+    font-size: 16px;
     line-height: 1.25;
     font-weight: 600;
     word-break: break-word;
@@ -132,17 +191,18 @@
 
   .compact-open-full-btn {
     border: 1px solid var(--vscode-button-border, transparent);
-    background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
-    color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
     border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 11px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
   }
 
   .compact-open-full-btn:hover {
-    background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
+    background: var(--vscode-button-hoverBackground);
   }
 
   .compact-readonly {
@@ -155,11 +215,61 @@
     font-size: 11px;
   }
 
+  .compact-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .compact-status-chip,
+  .compact-priority-chip,
+  .compact-updated-chip {
+    border-radius: 999px;
+    font-size: 10px;
+    line-height: 1;
+    padding: 5px 8px;
+    font-weight: 600;
+  }
+
+  .compact-status-chip {
+    background: color-mix(in oklab, var(--vscode-badge-background) 88%, transparent);
+    color: var(--vscode-badge-foreground);
+  }
+
+  .compact-priority-chip {
+    color: #111;
+    background: var(--vscode-editorWarning-foreground, #cca700);
+  }
+
+  .compact-priority-chip.priority-high {
+    background: #ea4a5a;
+    color: #fff;
+  }
+
+  .compact-priority-chip.priority-medium {
+    background: #f9a826;
+    color: #111;
+  }
+
+  .compact-priority-chip.priority-low {
+    background: #32a852;
+    color: #fff;
+  }
+
+  .compact-updated-chip {
+    background: var(--vscode-editorWidget-background);
+    color: var(--vscode-descriptionForeground);
+    border: 1px solid var(--vscode-widget-border, transparent);
+    font-weight: 500;
+  }
+
   .compact-meta-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
   }
 
   .compact-field {
@@ -180,9 +290,41 @@
     min-height: 26px;
   }
 
+  .compact-meta-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+    font-size: 11px;
+  }
+
+  .compact-meta-line {
+    display: flex;
+    gap: 6px;
+    color: var(--vscode-foreground);
+  }
+
+  .compact-meta-key {
+    min-width: 74px;
+    color: var(--vscode-descriptionForeground);
+  }
+
+  .compact-meta-value {
+    overflow-wrap: anywhere;
+  }
+
+  .compact-description-heading {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 5px;
+  }
+
   .compact-description {
     font-size: 12px;
-    line-height: 1.35;
+    line-height: 1.45;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     color: var(--vscode-foreground);

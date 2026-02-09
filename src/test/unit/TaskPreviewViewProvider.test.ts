@@ -1,0 +1,145 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as vscode from 'vscode';
+import { TaskPreviewViewProvider } from '../../providers/TaskPreviewViewProvider';
+import { BacklogParser } from '../../core/BacklogParser';
+import { createMockExtensionContext } from '../mocks/vscode';
+
+describe('TaskPreviewViewProvider', () => {
+  const extensionUri = vscode.Uri.file('/test/extension');
+
+  let parser: BacklogParser;
+  let webview: {
+    html: string;
+    options?: vscode.WebviewOptions;
+    cspSource: string;
+    asWebviewUri: ReturnType<typeof vi.fn>;
+    onDidReceiveMessage: ReturnType<typeof vi.fn>;
+    postMessage: ReturnType<typeof vi.fn>;
+  };
+  let webviewView: {
+    webview: vscode.Webview;
+    show: ReturnType<typeof vi.fn>;
+    onDidChangeVisibility: ReturnType<typeof vi.fn>;
+    onDidDispose: ReturnType<typeof vi.fn>;
+  };
+
+  beforeEach(() => {
+    parser = {
+      getTask: vi.fn().mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test task',
+        status: 'To Do',
+        assignee: [],
+        labels: [],
+        milestone: '',
+        dependencies: [],
+      }),
+      getTasksWithCrossBranch: vi.fn().mockResolvedValue([]),
+      getStatuses: vi.fn().mockResolvedValue(['To Do', 'In Progress', 'Done']),
+    } as unknown as BacklogParser;
+
+    webview = {
+      html: '',
+      cspSource: 'test-csp',
+      asWebviewUri: vi.fn((uri) => uri),
+      onDidReceiveMessage: vi.fn(() => ({ dispose: vi.fn() })),
+      postMessage: vi.fn().mockResolvedValue(true),
+    };
+
+    webviewView = {
+      webview: webview as unknown as vscode.Webview,
+      show: vi.fn(),
+      onDidChangeVisibility: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidDispose: vi.fn(() => ({ dispose: vi.fn() })),
+    };
+
+    vi.clearAllMocks();
+  });
+
+  it('includes the task-preview css bundle in HTML', () => {
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    const asWebviewUriCalls = webview.asWebviewUri.mock.calls.map((call) => call[0]);
+    const calledPaths = asWebviewUriCalls.map((uri) => String((uri as { fsPath?: string }).fsPath));
+
+    expect(calledPaths.some((path) => path.endsWith('/task-preview.css'))).toBe(true);
+    expect(calledPaths.some((path) => path.endsWith('/task-preview.js'))).toBe(true);
+  });
+
+  it('forwards openTask messages from preview to backlog.openTaskDetail command', async () => {
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    const handler = webview.onDidReceiveMessage.mock.calls[0]?.[0];
+    expect(typeof handler).toBe('function');
+
+    await handler({
+      type: 'openTask',
+      taskId: 'TASK-2',
+      filePath: '/repo/backlog/tasks/TASK-2 - Example.md',
+      source: 'local',
+      branch: 'main',
+    });
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith('backlog.openTaskDetail', {
+      taskId: 'TASK-2',
+      filePath: '/repo/backlog/tasks/TASK-2 - Example.md',
+      source: 'local',
+      branch: 'main',
+    });
+  });
+
+  it('shows the preview view when selecting a task and posts data', async () => {
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    webview.postMessage.mockClear();
+
+    await provider.selectTask({ taskId: 'TASK-1' });
+
+    expect(webviewView.show).toHaveBeenCalledWith(true);
+    expect(webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'taskPreviewData',
+        task: expect.objectContaining({ id: 'TASK-1' }),
+      })
+    );
+  });
+});

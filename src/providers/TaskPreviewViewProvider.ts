@@ -35,6 +35,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
 
   protected getHtmlContent(webview: vscode.Webview): string {
     const styleUri = this.getResourceUri(webview, 'styles.css');
+    const componentStyleUri = this.getResourceUri(webview, 'task-preview.css');
     const scriptUri = this.getResourceUri(webview, 'task-preview.js');
 
     return `<!DOCTYPE html>
@@ -44,6 +45,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src ${webview.cspSource};">
     <link href="${styleUri}" rel="stylesheet">
+    <link href="${componentStyleUri}" rel="stylesheet">
     <title>Task Preview</title>
 </head>
 <body class="task-preview-page">
