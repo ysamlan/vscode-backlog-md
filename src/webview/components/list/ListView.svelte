@@ -17,7 +17,7 @@
     isDraftsView?: boolean;
     isArchivedView?: boolean;
     completedTasks?: TaskWithBlocks[];
-    onOpenTask: (taskId: string) => void;
+    onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onFilterChange: (filter: string) => void;
     onMilestoneChange: (milestone: string) => void;
     onLabelChange: (label: string) => void;
@@ -241,10 +241,10 @@
     }
   }
 
-  function handleRowKeydown(e: KeyboardEvent, taskId: string) {
+  function handleRowKeydown(e: KeyboardEvent, task: TaskWithBlocks) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onOpenTask(taskId);
+      onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       const next = (e.target as HTMLElement).nextElementSibling as HTMLElement;
@@ -373,9 +373,9 @@
     handleDragEnd();
   }
 
-  function handleRowClickGuarded(taskId: string) {
+  function handleRowClickGuarded(task: TaskWithBlocks) {
     if (justDragged) return;
-    onOpenTask(taskId);
+    onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
   }
 
   function handleCompletedFilter() {
@@ -571,8 +571,8 @@
               class:archived-row={isArchivedView}
               class:subtask-row={isSubtask}
               class:readonly-row={isReadOnly}
-              onclick={() => handleRowClickGuarded(task.id)}
-              onkeydown={(e) => handleRowKeydown(e, task.id)}
+              onclick={() => handleRowClickGuarded(task)}
+              onkeydown={(e) => handleRowKeydown(e, task)}
               ondragstart={(e) => handleDragStart(e, task.id)}
               ondragend={handleDragEnd}
               ondragover={(e) => handleDragOver(e, task.id)}

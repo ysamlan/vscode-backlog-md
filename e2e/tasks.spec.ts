@@ -302,6 +302,7 @@ test.describe('Tasks View', () => {
       expect(message).toEqual({
         type: 'openTask',
         taskId: 'TASK-1',
+        filePath: '/test/tasks/task-1.md',
       });
     });
   });
@@ -409,6 +410,7 @@ test.describe('Tasks View', () => {
       expect(message).toEqual({
         type: 'openTask',
         taskId: 'TASK-1',
+        filePath: '/test/tasks/task-1.md',
       });
     });
 

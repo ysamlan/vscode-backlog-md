@@ -9,6 +9,7 @@ import { TaskCreatePanel } from './providers/TaskCreatePanel';
 import { FileWatcher } from './core/FileWatcher';
 import { BacklogCli } from './core/BacklogCli';
 import { createDebouncedHandler } from './core/debounce';
+import type { TaskSource } from './core/types';
 
 let fileWatcher: FileWatcher | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
@@ -172,9 +173,14 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('backlog.openTaskDetail', (taskId: string) => {
-      taskDetailProvider.openTask(taskId);
-    })
+    vscode.commands.registerCommand(
+      'backlog.openTaskDetail',
+      (
+        task: string | { taskId: string; filePath?: string; source?: TaskSource; branch?: string }
+      ) => {
+        taskDetailProvider.openTask(task);
+      }
+    )
   );
 
   // Register open raw markdown command

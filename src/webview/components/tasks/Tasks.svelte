@@ -261,8 +261,29 @@
   }
 
   // Kanban handlers
-  function handleOpenTask(taskId: string) {
-    vscode.postMessage({ type: 'openTask', taskId });
+  function handleOpenTask(
+    taskId: string,
+    taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>
+  ) {
+    const message: {
+      type: 'openTask';
+      taskId: string;
+      filePath?: string;
+      source?: Task['source'];
+      branch?: string;
+    } = { type: 'openTask', taskId };
+
+    if (taskMeta?.filePath) {
+      message.filePath = taskMeta.filePath;
+    }
+    if (taskMeta?.source) {
+      message.source = taskMeta.source;
+    }
+    if (taskMeta?.branch) {
+      message.branch = taskMeta.branch;
+    }
+
+    vscode.postMessage(message);
   }
 
   function handleToggleColumnCollapse(status: string) {

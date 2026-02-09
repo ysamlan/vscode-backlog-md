@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { BacklogParser, computeSubtasks } from '../core/BacklogParser';
 import { BacklogWriter, computeContentHash, FileConflictError } from '../core/BacklogWriter';
-import { isReadOnlyTask, getReadOnlyTaskContext, type Task } from '../core/types';
+import { isReadOnlyTask, getReadOnlyTaskContext, type Task, type TaskSource } from '../core/types';
 
 // Dynamic import for marked (ESM module)
 let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
@@ -38,6 +38,13 @@ interface TaskDetailData {
   subtaskSummaries?: Array<{ id: string; title: string; status: string }>;
 }
 
+interface OpenTaskRequest {
+  taskId: string;
+  filePath?: string;
+  source?: TaskSource;
+  branch?: string;
+}
+
 /**
  * Provides a webview panel for displaying task details
  *
@@ -51,6 +58,7 @@ interface TaskDetailData {
 export class TaskDetailProvider {
   private static currentPanel: vscode.WebviewPanel | undefined;
   private static currentTaskId: string | undefined;
+  private static currentTaskRef: OpenTaskRequest | undefined;
   private static currentFileHash: string | undefined;
   private static currentFilePath: string | undefined;
   private readonly writer = new BacklogWriter();
@@ -85,22 +93,23 @@ export class TaskDetailProvider {
         return;
       }
 
-      provider.openTask(this.currentTaskId);
+      provider.openTask(this.currentTaskRef ?? this.currentTaskId);
     }
   }
 
   /**
    * Open or update the task detail panel for a specific task
    */
-  async openTask(taskId: string): Promise<void> {
+  async openTask(taskRef: string | OpenTaskRequest): Promise<void> {
     if (!this.parser) {
       vscode.window.showErrorMessage('No backlog folder found');
       return;
     }
 
-    const task = await this.parser.getTask(taskId);
+    const requestedTask = typeof taskRef === 'string' ? { taskId: taskRef } : taskRef;
+    const task = await this.resolveTaskForOpen(requestedTask);
     if (!task) {
-      vscode.window.showErrorMessage(`Task ${taskId} not found`);
+      vscode.window.showErrorMessage(`Task ${requestedTask.taskId} not found`);
       return;
     }
 
@@ -120,7 +129,13 @@ export class TaskDetailProvider {
     if (TaskDetailProvider.currentPanel) {
       TaskDetailProvider.currentPanel.reveal(column);
       TaskDetailProvider.currentPanel.title = `${task.id}: ${task.title}`;
-      TaskDetailProvider.currentTaskId = taskId;
+      TaskDetailProvider.currentTaskId = task.id;
+      TaskDetailProvider.currentTaskRef = {
+        taskId: task.id,
+        filePath: task.filePath,
+        source: task.source,
+        branch: task.branch,
+      };
       await this.sendTaskData(TaskDetailProvider.currentPanel.webview, task);
       return;
     }
@@ -138,7 +153,13 @@ export class TaskDetailProvider {
     );
 
     TaskDetailProvider.currentPanel = panel;
-    TaskDetailProvider.currentTaskId = taskId;
+    TaskDetailProvider.currentTaskId = task.id;
+    TaskDetailProvider.currentTaskRef = {
+      taskId: task.id,
+      filePath: task.filePath,
+      source: task.source,
+      branch: task.branch,
+    };
     panel.webview.html = this.getHtmlContent(panel.webview, task.title);
 
     // Send task data after a short delay to ensure component is mounted
@@ -153,9 +174,48 @@ export class TaskDetailProvider {
     panel.onDidDispose(() => {
       TaskDetailProvider.currentPanel = undefined;
       TaskDetailProvider.currentTaskId = undefined;
+      TaskDetailProvider.currentTaskRef = undefined;
       TaskDetailProvider.currentFileHash = undefined;
       TaskDetailProvider.currentFilePath = undefined;
     });
+  }
+
+  /**
+   * Resolve a task by identity for detail-open actions.
+   * Prefers exact filePath matches from cross-branch task loading when provided,
+   * while preserving local getTask behavior for legacy ID-only callers.
+   */
+  private async resolveTaskForOpen(taskRef: OpenTaskRequest): Promise<Task | undefined> {
+    if (!this.parser) return undefined;
+
+    const localTask = await this.parser.getTask(taskRef.taskId);
+    const hasExtendedIdentity = Boolean(taskRef.filePath || taskRef.source || taskRef.branch);
+    if (!hasExtendedIdentity) {
+      return localTask;
+    }
+
+    if (localTask?.filePath && taskRef.filePath && localTask.filePath === taskRef.filePath) {
+      return localTask;
+    }
+
+    const crossBranchTasks = await this.parser.getTasksWithCrossBranch();
+
+    if (taskRef.filePath) {
+      const exactByPath = crossBranchTasks.find(
+        (task) => task.id === taskRef.taskId && task.filePath === taskRef.filePath
+      );
+      if (exactByPath) return exactByPath;
+    }
+
+    const bySource = crossBranchTasks.find(
+      (task) =>
+        task.id === taskRef.taskId &&
+        task.source === taskRef.source &&
+        task.branch === taskRef.branch
+    );
+    if (bySource) return bySource;
+
+    return localTask ?? crossBranchTasks.find((task) => task.id === taskRef.taskId);
   }
 
   /**
@@ -297,13 +357,15 @@ export class TaskDetailProvider {
     switch (message.type) {
       case 'refresh':
         if (TaskDetailProvider.currentTaskId) {
-          await this.openTask(TaskDetailProvider.currentTaskId);
+          await this.openTask(
+            TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId }
+          );
         }
         break;
 
       case 'openFile':
         if (TaskDetailProvider.currentTaskId && this.parser) {
-          const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+          const task = await this.getCurrentTaskFromContext();
           if (task?.filePath) {
             vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
           }
@@ -329,7 +391,7 @@ export class TaskDetailProvider {
           message.listType &&
           message.itemId !== undefined
         ) {
-          const currentTask = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+          const currentTask = await this.getCurrentTaskFromContext();
           if (this.blockReadOnlyMutation(currentTask, 'update checklist items')) break;
           try {
             await this.writer.toggleChecklistItem(
@@ -338,7 +400,9 @@ export class TaskDetailProvider {
               message.itemId,
               this.parser
             );
-            await this.openTask(TaskDetailProvider.currentTaskId);
+            await this.openTask(
+              TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId }
+            );
           } catch (error) {
             vscode.window.showErrorMessage(`Failed to toggle checklist item: ${error}`);
           }
@@ -347,7 +411,7 @@ export class TaskDetailProvider {
 
       case 'updateField':
         if (TaskDetailProvider.currentTaskId && this.parser && message.field) {
-          const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+          const task = await this.getCurrentTaskFromContext();
           if (this.blockReadOnlyMutation(task, `update ${message.field}`)) break;
           if (!task?.filePath || !fs.existsSync(task.filePath)) {
             const choice = await vscode.window.showErrorMessage(
@@ -372,7 +436,9 @@ export class TaskDetailProvider {
             // Update stored hash after successful write
             const newContent = fs.readFileSync(task.filePath, 'utf-8');
             TaskDetailProvider.currentFileHash = computeContentHash(newContent);
-            await this.openTask(TaskDetailProvider.currentTaskId);
+            await this.openTask(
+              TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId }
+            );
           } catch (error) {
             if (error instanceof FileConflictError) {
               await this.handleConflict(message.field, message.value);
@@ -385,7 +451,7 @@ export class TaskDetailProvider {
 
       case 'promoteDraft': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
-        const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        const task = await this.getCurrentTaskFromContext();
         if (this.blockReadOnlyMutation(task, 'promote this draft')) break;
 
         try {
@@ -393,7 +459,9 @@ export class TaskDetailProvider {
           vscode.window.showInformationMessage(
             `Draft promoted to task: ${TaskDetailProvider.currentTaskId}`
           );
-          await this.openTask(TaskDetailProvider.currentTaskId);
+          await this.openTask(
+            TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId }
+          );
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to promote draft: ${error}`);
         }
@@ -403,7 +471,7 @@ export class TaskDetailProvider {
       case 'discardDraft': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
 
-        const draftTask = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        const draftTask = await this.getCurrentTaskFromContext();
         if (this.blockReadOnlyMutation(draftTask, 'discard this draft')) break;
         if (!draftTask) break;
 
@@ -429,7 +497,7 @@ export class TaskDetailProvider {
 
       case 'archiveTask': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
-        const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        const task = await this.getCurrentTaskFromContext();
         if (this.blockReadOnlyMutation(task, 'archive this task')) break;
 
         try {
@@ -444,7 +512,7 @@ export class TaskDetailProvider {
 
       case 'restoreTask': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
-        const task = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        const task = await this.getCurrentTaskFromContext();
         if (this.blockReadOnlyMutation(task, 'restore this task')) break;
 
         try {
@@ -462,7 +530,7 @@ export class TaskDetailProvider {
       case 'deleteTask': {
         if (!TaskDetailProvider.currentTaskId || !this.parser) break;
 
-        const deleteTarget = await this.parser.getTask(TaskDetailProvider.currentTaskId);
+        const deleteTarget = await this.getCurrentTaskFromContext();
         if (this.blockReadOnlyMutation(deleteTarget, 'delete this task')) break;
         if (!deleteTarget) break;
 
@@ -488,13 +556,15 @@ export class TaskDetailProvider {
 
       case 'createSubtask': {
         if (!message.parentTaskId || !this.parser) break;
-        const parentTask = await this.parser.getTask(message.parentTaskId);
+        const parentTask =
+          TaskDetailProvider.currentTaskRef &&
+          TaskDetailProvider.currentTaskRef.taskId === message.parentTaskId
+            ? await this.resolveTaskForOpen(TaskDetailProvider.currentTaskRef)
+            : await this.parser.getTask(message.parentTaskId);
         if (this.blockReadOnlyMutation(parentTask, 'create a subtask')) break;
 
         try {
-          const backlogPath = path.dirname(
-            path.dirname((await this.parser.getTask(message.parentTaskId))?.filePath || '')
-          );
+          const backlogPath = path.dirname(path.dirname(parentTask?.filePath || ''));
           if (!backlogPath) break;
 
           const result = await this.writer.createSubtask(
@@ -574,5 +644,15 @@ export class TaskDetailProvider {
       `Cannot ${action}: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
     );
     return true;
+  }
+
+  private async getCurrentTaskFromContext(): Promise<Task | undefined> {
+    if (!this.parser || !TaskDetailProvider.currentTaskId) {
+      return undefined;
+    }
+    if (TaskDetailProvider.currentTaskRef) {
+      return this.resolveTaskForOpen(TaskDetailProvider.currentTaskRef);
+    }
+    return this.parser.getTask(TaskDetailProvider.currentTaskId);
   }
 }

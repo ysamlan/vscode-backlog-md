@@ -179,7 +179,13 @@ export interface BacklogConfig {
  */
 export type WebviewMessage =
   | { type: 'refresh' }
-  | { type: 'openTask'; taskId: string }
+  | {
+      type: 'openTask';
+      taskId: string;
+      filePath?: string;
+      source?: TaskSource;
+      branch?: string;
+    }
   | {
       type: 'updateTaskStatus';
       taskId: string;

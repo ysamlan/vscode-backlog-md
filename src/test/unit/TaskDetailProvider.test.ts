@@ -74,6 +74,7 @@ describe('TaskDetailProvider', () => {
 
     mockParser = {
       getTask: vi.fn(),
+      getTasksWithCrossBranch: vi.fn().mockResolvedValue([]),
       getStatuses: vi.fn().mockResolvedValue(['To Do', 'In Progress', 'Done']),
       getUniqueLabels: vi.fn().mockResolvedValue([]),
       getUniqueAssignees: vi.fn().mockResolvedValue([]),
@@ -101,6 +102,7 @@ describe('TaskDetailProvider', () => {
     // Clear static state between tests
     TaskDetailProvider['currentPanel'] = undefined;
     TaskDetailProvider['currentTaskId'] = undefined;
+    TaskDetailProvider['currentTaskRef'] = undefined;
     TaskDetailProvider['currentFileHash'] = undefined;
     TaskDetailProvider['currentFilePath'] = undefined;
   });
@@ -291,6 +293,94 @@ describe('TaskDetailProvider', () => {
       }
 
       expect(TaskDetailProvider['currentFilePath']).toBeUndefined();
+    });
+
+    it('should resolve cross-branch task by filePath when opening with source metadata', async () => {
+      const localPath = '/test/backlog/tasks/task-1.md';
+      const branchPath = '/test/.backlog/branches/feature-x/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Local Task',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: localPath,
+        source: 'local',
+      });
+      (mockParser.getTasksWithCrossBranch as Mock).mockResolvedValue([
+        {
+          id: 'TASK-1',
+          title: 'Local Task',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: localPath,
+          source: 'local',
+        },
+        {
+          id: 'TASK-1',
+          title: 'Branch Task',
+          status: 'In Progress',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: branchPath,
+          source: 'local-branch',
+          branch: 'feature/x',
+        },
+      ]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask({
+        taskId: 'TASK-1',
+        filePath: branchPath,
+        source: 'local-branch',
+        branch: 'feature/x',
+      });
+
+      expect(TaskDetailProvider['currentFilePath']).toBe(branchPath);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.task.title).toBe('Branch Task');
+    });
+
+    it('should keep local resolution when metadata matches the local file', async () => {
+      const localPath = '/test/backlog/tasks/task-1.md';
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Local Task',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: localPath,
+        source: 'local',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask({
+        taskId: 'TASK-1',
+        filePath: localPath,
+        source: 'local',
+      });
+
+      expect(mockParser.getTasksWithCrossBranch).not.toHaveBeenCalled();
+      expect(TaskDetailProvider['currentFilePath']).toBe(localPath);
     });
   });
 

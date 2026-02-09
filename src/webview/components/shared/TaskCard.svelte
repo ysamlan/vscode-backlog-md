@@ -4,7 +4,7 @@
 
   interface Props {
     task: Task & { blocksTaskIds?: string[]; subtaskProgress?: { total: number; done: number } };
-    onOpenTask: (taskId: string) => void;
+    onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onReadOnlyDragAttempt?: (task: Task) => void;
     ondragstart?: (e: DragEvent) => void;
     ondragend?: (e: DragEvent) => void;
@@ -25,13 +25,13 @@
     if (target.closest('.dep-link')) {
       return; // Let the dep link handler deal with it
     }
-    onOpenTask(task.id);
+    onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
   }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onOpenTask(task.id);
+      onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
     }
   }
 

@@ -18,7 +18,7 @@
     configMilestones: Milestone[];
     collapsedColumns: Set<string>;
     collapsedMilestones: Set<string>;
-    onOpenTask: (taskId: string) => void;
+    onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onToggleColumnCollapse: (status: string) => void;
     onToggleMilestoneCollapse: (milestone: string) => void;
     onReadOnlyDragAttempt?: (task: Task) => void;

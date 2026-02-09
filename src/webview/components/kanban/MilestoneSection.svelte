@@ -15,7 +15,7 @@
     columns: StatusColumn[];
     collapsed: boolean;
     onToggleCollapse: (milestone: string) => void;
-    onOpenTask: (taskId: string) => void;
+    onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onReadOnlyDragAttempt?: (task: Task) => void;
     onDrop: (taskId: string, newStatus: string, dropIndex: number, taskListElement: HTMLElement) => void;
   }

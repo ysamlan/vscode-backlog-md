@@ -224,7 +224,12 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
 
       case 'openTask': {
-        vscode.commands.executeCommand('backlog.openTaskDetail', message.taskId);
+        vscode.commands.executeCommand('backlog.openTaskDetail', {
+          taskId: message.taskId,
+          filePath: message.filePath,
+          source: message.source,
+          branch: message.branch,
+        });
         break;
       }
 
