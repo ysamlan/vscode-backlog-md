@@ -506,6 +506,75 @@ describe('TaskDetailProvider', () => {
       });
     });
 
+    it('should resolve parentTask from cross-branch context for read-only subtasks', async () => {
+      const childPath = '/test/.backlog/branches/feature/backlog/tasks/task-2.1.md';
+      const parentPath = '/test/.backlog/branches/feature/backlog/tasks/task-2.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-2.1',
+        title: 'Remote Subtask',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: childPath,
+        source: 'local-branch',
+        branch: 'feature/x',
+        parentTaskId: 'TASK-2',
+      });
+      (mockParser.getTasks as Mock).mockResolvedValue([]);
+      (mockParser.getTasksWithCrossBranch as Mock).mockResolvedValue([
+        {
+          id: 'TASK-2',
+          title: 'Remote Parent',
+          status: 'In Progress',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: parentPath,
+          source: 'local-branch',
+          branch: 'feature/x',
+        },
+        {
+          id: 'TASK-2.1',
+          title: 'Remote Subtask',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: childPath,
+          source: 'local-branch',
+          branch: 'feature/x',
+          parentTaskId: 'TASK-2',
+        },
+      ]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask({
+        taskId: 'TASK-2.1',
+        filePath: childPath,
+        source: 'local-branch',
+        branch: 'feature/x',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.parentTask).toEqual({
+        id: 'TASK-2',
+        title: 'Remote Parent',
+      });
+    });
+
     it('should include subtaskSummaries when task has subtask children', async () => {
       const filePath = '/test/backlog/tasks/task-3.md';
 
@@ -654,6 +723,70 @@ describe('TaskDetailProvider', () => {
       expect(taskDataCall).toBeTruthy();
       expect(taskDataCall![0].data.isBlocked).toBe(true);
       expect(taskDataCall![0].data.missingDependencyIds).toEqual(['TASK-404']);
+    });
+
+    it('should compute blocksTaskIds from cross-branch context for read-only tasks', async () => {
+      const depPath = '/test/.backlog/branches/feature/backlog/tasks/task-10.md';
+      const blockerPath = '/test/.backlog/branches/feature/backlog/tasks/task-11.md';
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-10',
+        title: 'Dependency Task',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: depPath,
+        source: 'local-branch',
+        branch: 'feature/x',
+      });
+      (mockParser.getTasks as Mock).mockResolvedValue([]);
+      (mockParser.getBlockedByThisTask as Mock).mockResolvedValue([]);
+      (mockParser.getTasksWithCrossBranch as Mock).mockResolvedValue([
+        {
+          id: 'TASK-10',
+          title: 'Dependency Task',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: depPath,
+          source: 'local-branch',
+          branch: 'feature/x',
+        },
+        {
+          id: 'TASK-11',
+          title: 'Blocked Task',
+          status: 'In Progress',
+          labels: [],
+          assignee: [],
+          dependencies: ['TASK-10'],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: blockerPath,
+          source: 'local-branch',
+          branch: 'feature/x',
+        },
+      ]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask({
+        taskId: 'TASK-10',
+        filePath: depPath,
+        source: 'local-branch',
+        branch: 'feature/x',
+      });
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.blocksTaskIds).toEqual(['TASK-11']);
     });
   });
 

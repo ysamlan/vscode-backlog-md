@@ -258,14 +258,15 @@ export class TaskDetailProvider {
     if (!this.parser) return;
 
     try {
+      const contextTasks = await this.getContextTasks(task);
+      const contextTask = this.resolveTaskFromCollection(contextTasks, task) ?? task;
+
       // Fetch all supporting data
       const [
         statuses,
         uniqueLabels,
         uniqueAssignees,
         configMilestones,
-        allTasks,
-        blocksTaskIds,
         completedTasks,
         archivedTasks,
       ] = await Promise.all([
@@ -273,27 +274,29 @@ export class TaskDetailProvider {
         this.parser.getUniqueLabels(),
         this.parser.getUniqueAssignees(),
         this.parser.getMilestones(),
-        this.parser.getTasks(),
-        this.parser.getBlockedByThisTask(task.id),
         this.parser.getCompletedTasks(),
         this.parser.getArchivedTasks(),
       ]);
 
       // Combine config milestones with unique milestones from tasks
       const configMilestoneNames = configMilestones.map((m) => m.name);
-      const taskMilestones = [...new Set(allTasks.map((t) => t.milestone).filter(Boolean))];
+      const taskMilestones = [...new Set(contextTasks.map((t) => t.milestone).filter(Boolean))];
       const milestones = [
         ...configMilestoneNames,
         ...taskMilestones.filter((m) => !configMilestoneNames.includes(m!)),
       ] as string[];
 
+      const blocksTaskIds = contextTasks
+        .filter((candidateTask) => candidateTask.dependencies.includes(contextTask.id))
+        .map((candidateTask) => candidateTask.id);
+
       // Check if task is blocked by active dependencies and track unresolved links
       const doneStatus = statuses.length > 0 ? statuses[statuses.length - 1] : 'Done';
-      const activeTaskById = new Map(allTasks.map((activeTask) => [activeTask.id, activeTask]));
+      const activeTaskById = new Map(contextTasks.map((activeTask) => [activeTask.id, activeTask]));
       const completedTaskIds = new Set(completedTasks.map((completedTask) => completedTask.id));
       const archivedTaskIds = new Set(archivedTasks.map((archivedTask) => archivedTask.id));
       const missingDependencyIds: string[] = [];
-      const blockingDependencyIds = task.dependencies.filter((depId) => {
+      const blockingDependencyIds = contextTask.dependencies.filter((depId) => {
         if (completedTaskIds.has(depId) || archivedTaskIds.has(depId)) {
           return false;
         }
@@ -311,21 +314,27 @@ export class TaskDetailProvider {
 
       // Compute parent task info
       let parentTask: { id: string; title: string } | undefined;
-      if (task.parentTaskId) {
-        const parent = await this.parser!.getTask(task.parentTaskId);
+      if (contextTask.parentTaskId) {
+        let parent = this.findPreferredTaskById(
+          contextTasks,
+          contextTask.parentTaskId,
+          contextTask
+        );
+        if (!parent) {
+          parent = await this.parser!.getTask(contextTask.parentTaskId);
+        }
         if (parent) {
           parentTask = { id: parent.id, title: parent.title };
         }
       }
 
       // Compute subtask summaries
-      computeSubtasks(allTasks);
+      computeSubtasks(contextTasks);
       let subtaskSummaries: Array<{ id: string; title: string; status: string }> | undefined;
-      const thisTask = allTasks.find((t) => t.id === task.id);
-      if (thisTask?.subtasks && thisTask.subtasks.length > 0) {
+      if (contextTask.subtasks && contextTask.subtasks.length > 0) {
         const summaries: Array<{ id: string; title: string; status: string }> = [];
-        for (const childId of thisTask.subtasks) {
-          const child = allTasks.find((t) => t.id === childId);
+        for (const childId of contextTask.subtasks) {
+          const child = this.findPreferredTaskById(contextTasks, childId, contextTask);
           if (child) {
             summaries.push({ id: child.id, title: child.title, status: child.status });
           }
@@ -336,7 +345,7 @@ export class TaskDetailProvider {
       }
 
       const data: TaskDetailData = {
-        task,
+        task: contextTask,
         statuses,
         priorities: ['high', 'medium', 'low'],
         uniqueLabels,
@@ -361,6 +370,52 @@ export class TaskDetailProvider {
       console.error('[Backlog.md] Error sending task data:', error);
       webview.postMessage({ type: 'error', message: 'Failed to load task data' });
     }
+  }
+
+  private async getContextTasks(task: Task): Promise<Task[]> {
+    if (!this.parser) return [];
+    if (task.source === 'remote' || task.source === 'local-branch') {
+      return this.parser.getTasksWithCrossBranch();
+    }
+    return this.parser.getTasks();
+  }
+
+  private resolveTaskFromCollection(tasks: Task[], task: Task): Task | undefined {
+    if (task.filePath) {
+      const byPath = tasks.find(
+        (candidate) => candidate.id === task.id && candidate.filePath === task.filePath
+      );
+      if (byPath) return byPath;
+    }
+    const bySource = tasks.find(
+      (candidate) =>
+        candidate.id === task.id &&
+        candidate.source === task.source &&
+        candidate.branch === task.branch
+    );
+    if (bySource) return bySource;
+    return tasks.find((candidate) => candidate.id === task.id);
+  }
+
+  private findPreferredTaskById(
+    tasks: Task[],
+    taskId: string,
+    contextTask: Task
+  ): Task | undefined {
+    const sameSourceAndBranch = tasks.find(
+      (candidate) =>
+        candidate.id === taskId &&
+        candidate.source === contextTask.source &&
+        candidate.branch === contextTask.branch
+    );
+    if (sameSourceAndBranch) return sameSourceAndBranch;
+
+    const sameSource = tasks.find(
+      (candidate) => candidate.id === taskId && candidate.source === contextTask.source
+    );
+    if (sameSource) return sameSource;
+
+    return tasks.find((candidate) => candidate.id === taskId);
   }
 
   /**
