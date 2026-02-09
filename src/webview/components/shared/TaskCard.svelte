@@ -11,14 +11,22 @@
   interface Props {
     task: Task & { blocksTaskIds?: string[]; subtaskProgress?: { total: number; done: number } };
     taskIdDisplay: TaskIdDisplayMode;
+    onSelectTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onReadOnlyDragAttempt?: (task: Task) => void;
     ondragstart?: (e: DragEvent) => void;
     ondragend?: (e: DragEvent) => void;
   }
 
-  let { task, taskIdDisplay, onOpenTask, onReadOnlyDragAttempt, ondragstart, ondragend }: Props =
-    $props();
+  let {
+    task,
+    taskIdDisplay,
+    onSelectTask,
+    onOpenTask,
+    onReadOnlyDragAttempt,
+    ondragstart,
+    ondragend,
+  }: Props = $props();
 
   let isSaving = $state(false);
 
@@ -33,7 +41,7 @@
     if (target.closest('.dep-link')) {
       return; // Let the dep link handler deal with it
     }
-    onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
+    onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
   }
 
   function handleKeydown(e: KeyboardEvent) {

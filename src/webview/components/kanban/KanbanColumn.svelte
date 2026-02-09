@@ -14,6 +14,7 @@
     milestone?: string;
     mini?: boolean;
     onToggleCollapse: (status: string) => void;
+    onSelectTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onReadOnlyDragAttempt?: (task: Task) => void;
     onDrop: (taskId: string, newStatus: string, dropIndex: number, taskListElement: HTMLElement) => void;
@@ -28,6 +29,7 @@
     milestone,
     mini = false,
     onToggleCollapse,
+    onSelectTask,
     onOpenTask,
     onReadOnlyDragAttempt,
     onDrop,
@@ -165,7 +167,7 @@
       {#if dropIndicatorIndex === index}
         <div class="drop-indicator"></div>
       {/if}
-      <TaskCard {task} {taskIdDisplay} {onOpenTask} {onReadOnlyDragAttempt} />
+      <TaskCard {task} {taskIdDisplay} {onSelectTask} {onOpenTask} {onReadOnlyDragAttempt} />
     {/each}
     {#if dropIndicatorIndex === sortedTasks.length}
       <div class="drop-indicator"></div>

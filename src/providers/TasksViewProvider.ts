@@ -293,6 +293,60 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
       }
 
+      case 'updateTask': {
+        if (!this.parser) break;
+        const taskId = message.taskId;
+        const task = await this.parser.getTask(taskId);
+        if (!task) {
+          this.postMessage({
+            type: 'taskUpdateError',
+            taskId,
+            originalStatus: 'To Do',
+            message: `Task not found: ${taskId}`,
+          });
+          break;
+        }
+        if (isReadOnlyTask(task)) {
+          this.postMessage({
+            type: 'taskUpdateError',
+            taskId,
+            originalStatus: task.status,
+            message: `Cannot update task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`,
+          });
+          break;
+        }
+
+        const updates: Partial<Task> = {};
+        if (typeof message.updates.status === 'string') {
+          updates.status = message.updates.status;
+        }
+        if (
+          message.updates.priority === 'high' ||
+          message.updates.priority === 'medium' ||
+          message.updates.priority === 'low' ||
+          message.updates.priority === undefined
+        ) {
+          updates.priority = message.updates.priority;
+        }
+
+        if (Object.keys(updates).length === 0) break;
+
+        try {
+          const writer = new BacklogWriter();
+          await writer.updateTask(taskId, updates, this.parser);
+          this.postMessage({ type: 'taskUpdateSuccess', taskId });
+        } catch (error) {
+          console.error('Error updating task:', error);
+          this.postMessage({
+            type: 'taskUpdateError',
+            taskId,
+            originalStatus: task.status,
+            message: 'Failed to update task',
+          });
+        }
+        break;
+      }
+
       case 'reorderTask': {
         if (!this.parser) break;
         const taskId = message.taskId;

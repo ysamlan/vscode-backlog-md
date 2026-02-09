@@ -1,16 +1,18 @@
 <script lang="ts">
-  import { getReadOnlyTaskContext, type Task, type Milestone, type TaskStatus, type DashboardStats, type TabMode, type BacklogDocument, type BacklogDecision, type TaskIdDisplayMode } from '../../lib/types';
+  import { getReadOnlyTaskContext, isReadOnlyTask, type Task, type Milestone, type TaskStatus, type TaskPriority, type DashboardStats, type TabMode, type BacklogDocument, type BacklogDecision, type TaskIdDisplayMode } from '../../lib/types';
   import { vscode, onMessage } from '../../stores/vscode.svelte';
   import KanbanBoard from '../kanban/KanbanBoard.svelte';
   import ListView from '../list/ListView.svelte';
   import Dashboard from '../dashboard/Dashboard.svelte';
   import DocumentsList from '../docs/DocumentsList.svelte';
   import DecisionsList from '../decisions/DecisionsList.svelte';
+  import CompactTaskDetails from './CompactTaskDetails.svelte';
   import TabBar from '../shared/TabBar.svelte';
   import Toast from '../shared/Toast.svelte';
   import KeyboardShortcutsPopup from '../shared/KeyboardShortcutsPopup.svelte';
   import { onMount } from 'svelte';
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
+  type TaskRef = Pick<Task, 'id' | 'filePath' | 'source' | 'branch'>;
 
   interface StatusColumn {
     status: string;
@@ -48,6 +50,7 @@
   let currentMilestone = $state('');
   let currentLabel = $state('');
   let searchQuery = $state('');
+  let selectedTaskRef = $state<TaskRef | null>(null);
 
   // Toast state
   let toastMessage = $state<string | null>(null);
@@ -58,6 +61,7 @@
 
   // Keyboard shortcuts popup state
   let showShortcuts = $state(false);
+  let taskTabs = ['kanban', 'list', 'drafts', 'archived'] satisfies TabMode[];
 
   // Message handlers
   onMessage((message) => {
@@ -291,6 +295,70 @@
     vscode.postMessage(message);
   }
 
+  function isSameTaskRef(task: TaskWithBlocks, ref: TaskRef): boolean {
+    if (task.filePath && ref.filePath) {
+      return task.filePath === ref.filePath;
+    }
+    if (task.source && ref.source && task.branch && ref.branch) {
+      return task.id === ref.id && task.source === ref.source && task.branch === ref.branch;
+    }
+    return task.id === ref.id;
+  }
+
+  let selectedTask = $derived.by(() => {
+    if (!selectedTaskRef) return null;
+    return tasks.find((task) => isSameTaskRef(task, selectedTaskRef)) ?? null;
+  });
+
+  function handleSelectTask(taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) {
+    selectedTaskRef = {
+      id: taskId,
+      filePath: taskMeta?.filePath || '',
+      source: taskMeta?.source,
+      branch: taskMeta?.branch,
+    };
+  }
+
+  function updateSelectedTaskInLocalState(
+    task: TaskWithBlocks,
+    updates: Pick<TaskWithBlocks, 'status' | 'priority'>
+  ) {
+    tasks = tasks.map((candidate) =>
+      isSameTaskRef(candidate, task)
+        ? {
+            ...candidate,
+            ...updates,
+          }
+        : candidate
+    );
+  }
+
+  function handleCompactStatusUpdate(task: TaskWithBlocks, status: string) {
+    if (isReadOnlyTask(task)) {
+      showToast(`Cannot update status: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`);
+      return;
+    }
+    updateSelectedTaskInLocalState(task, { status, priority: task.priority });
+    vscode.postMessage({
+      type: 'updateTask',
+      taskId: task.id,
+      updates: { status: status as TaskStatus },
+    });
+  }
+
+  function handleCompactPriorityUpdate(task: TaskWithBlocks, priority: TaskPriority | undefined) {
+    if (isReadOnlyTask(task)) {
+      showToast(`Cannot update priority: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`);
+      return;
+    }
+    updateSelectedTaskInLocalState(task, { status: task.status, priority });
+    vscode.postMessage({
+      type: 'updateTask',
+      taskId: task.id,
+      updates: { priority },
+    });
+  }
+
   function handleToggleColumnCollapse(status: string) {
     vscode.postMessage({ type: 'toggleColumnCollapse', status });
   }
@@ -431,6 +499,7 @@
         {collapsedColumns}
         {collapsedMilestones}
         {taskIdDisplay}
+        onSelectTask={handleSelectTask}
         onOpenTask={handleOpenTask}
         onToggleColumnCollapse={handleToggleColumnCollapse}
         onToggleMilestoneCollapse={handleToggleMilestoneCollapse}
@@ -453,6 +522,7 @@
       {searchQuery}
       isDraftsView={activeTab === 'drafts'}
       {completedTasks}
+      onSelectTask={handleSelectTask}
       onOpenTask={handleOpenTask}
       onFilterChange={handleFilterChange}
       onMilestoneChange={handleMilestoneChange}
@@ -475,6 +545,7 @@
       {currentLabel}
       {searchQuery}
       isArchivedView={true}
+      onSelectTask={handleSelectTask}
       onOpenTask={handleOpenTask}
       onFilterChange={handleFilterChange}
       onMilestoneChange={handleMilestoneChange}
@@ -494,6 +565,17 @@
   <div id="decisions-view" class="view-content">
     <DecisionsList {decisions} />
   </div>
+{/if}
+
+{#if taskTabs.includes(activeTab)}
+  <CompactTaskDetails
+    task={selectedTask}
+    {statuses}
+    onOpenFull={(task) =>
+      handleOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch })}
+    onUpdateStatus={handleCompactStatusUpdate}
+    onUpdatePriority={handleCompactPriorityUpdate}
+  />
 {/if}
 
 {#if toastMessage}

@@ -25,6 +25,7 @@
     isDraftsView?: boolean;
     isArchivedView?: boolean;
     completedTasks?: TaskWithBlocks[];
+    onSelectTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onFilterChange: (filter: string) => void;
     onMilestoneChange: (milestone: string) => void;
@@ -47,6 +48,7 @@
     isDraftsView = false,
     isArchivedView = false,
     completedTasks = [],
+    onSelectTask,
     onOpenTask,
     onFilterChange,
     onMilestoneChange,
@@ -374,7 +376,7 @@
 
   function handleRowClickGuarded(task: TaskWithBlocks) {
     if (justDragged) return;
-    onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
+    onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
   }
 
   function handleCompletedFilter() {

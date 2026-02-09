@@ -16,6 +16,7 @@
     collapsed: boolean;
     taskIdDisplay: TaskIdDisplayMode;
     onToggleCollapse: (milestone: string) => void;
+    onSelectTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onReadOnlyDragAttempt?: (task: Task) => void;
     onDrop: (taskId: string, newStatus: string, dropIndex: number, taskListElement: HTMLElement) => void;
@@ -28,6 +29,7 @@
     collapsed,
     taskIdDisplay,
     onToggleCollapse,
+    onSelectTask,
     onOpenTask,
     onReadOnlyDragAttempt,
     onDrop,
@@ -96,6 +98,7 @@
           milestone={milestoneKey}
           mini={true}
           onToggleCollapse={noOpToggle}
+          {onSelectTask}
           {onOpenTask}
           {onReadOnlyDragAttempt}
           {onDrop}

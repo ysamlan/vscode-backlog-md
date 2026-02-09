@@ -336,15 +336,57 @@ test.describe('Tasks View', () => {
       await setupTasksView(page);
     });
 
-    test('sends openTask message when clicking a card', async ({ page }) => {
+    test('clicking a card selects it in compact details pane without opening full detail', async ({
+      page,
+    }) => {
       await clearPostedMessages(page);
       await page.locator('[data-testid="task-TASK-1"]').click();
+
+      await expect(page.locator('[data-testid="compact-details-pane"]')).toBeVisible();
+      await expect(page.locator('[data-testid="compact-details-task-id"]')).toHaveText('TASK-1');
+      await expect(page.locator('[data-testid="compact-details-title"]')).toContainText(
+        'Task 1 (ordinal: 1000)'
+      );
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toBeUndefined();
+    });
+
+    test('compact details open-full button sends openTask message', async ({ page }) => {
+      await page.locator('[data-testid="task-TASK-1"]').click();
+      await clearPostedMessages(page);
+
+      await page.locator('[data-testid="open-full-detail-btn"]').click();
 
       const message = await getLastPostedMessage(page);
       expect(message).toEqual({
         type: 'openTask',
         taskId: 'TASK-1',
         filePath: '/test/tasks/task-1.md',
+      });
+    });
+
+    test('compact details quick status and priority edits send updateTask messages', async ({
+      page,
+    }) => {
+      await page.locator('[data-testid="task-TASK-1"]').click();
+
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="compact-status-select"]').selectOption('In Progress');
+      let message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateTask',
+        taskId: 'TASK-1',
+        updates: { status: 'In Progress' },
+      });
+
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="compact-priority-select"]').selectOption('high');
+      message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateTask',
+        taskId: 'TASK-1',
+        updates: { priority: 'high' },
       });
     });
   });
@@ -478,16 +520,25 @@ test.describe('Tasks View', () => {
       await expect(page.locator('tbody tr')).toContainText('Feature task from other branch');
     });
 
-    test('clicking a row sends openTask message', async ({ page }) => {
+    test('clicking a row selects it in compact details pane', async ({ page }) => {
       await clearPostedMessages(page);
       await page.locator('[data-testid="task-row-TASK-1"]').click();
 
+      await expect(page.locator('[data-testid="compact-details-pane"]')).toBeVisible();
+      await expect(page.locator('[data-testid="compact-details-task-id"]')).toHaveText('TASK-1');
       const message = await getLastPostedMessage(page);
-      expect(message).toEqual({
-        type: 'openTask',
-        taskId: 'TASK-1',
-        filePath: '/test/tasks/task-1.md',
-      });
+      expect(message).toBeUndefined();
+    });
+
+    test('compact details shows read-only state and disables quick edits for read-only task', async ({
+      page,
+    }) => {
+      await setupListViewWithTasks(page, readOnlyIndicatorTasks);
+      await page.locator('[data-testid="task-row-TASK-REMOTE-1"]').click();
+
+      await expect(page.locator('[data-testid="compact-readonly-banner"]')).toBeVisible();
+      await expect(page.locator('[data-testid="compact-status-select"]')).toBeDisabled();
+      await expect(page.locator('[data-testid="compact-priority-select"]')).toBeDisabled();
     });
 
     test('list view does not overflow at sidebar width', async ({ page }) => {
