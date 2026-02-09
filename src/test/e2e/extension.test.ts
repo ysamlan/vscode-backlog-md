@@ -50,4 +50,29 @@ describe('Backlog.md Extension', function () {
     const sidebarContent = await sidebar.getContent();
     expect(sidebarContent).to.not.be.undefined;
   });
+
+  it('should have a Details section (task preview panel) in the Backlog sidebar', async function () {
+    const activityBar = new ActivityBar();
+    const controls = await activityBar.getViewControls();
+
+    // Open the Backlog view
+    for (const control of controls) {
+      const title = await control.getTitle();
+      if (title.includes('Backlog')) {
+        await control.openView();
+        break;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const sidebar = new SideBarView();
+    const sidebarContent = await sidebar.getContent();
+    const sections = await sidebarContent.getSections();
+    const sectionTitles = await Promise.all(sections.map((s) => s.getTitle()));
+
+    // The task preview panel view should be registered as "Details"
+    const hasDetails = sectionTitles.some((t) => t.includes('Details'));
+    expect(hasDetails).to.be.true;
+  });
 });
