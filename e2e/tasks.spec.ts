@@ -422,6 +422,14 @@ test.describe('Tasks View', () => {
       expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
     });
 
+    test('list view renders without actions column and row action buttons', async ({ page }) => {
+      await expect(page.locator('th.actions-header')).toHaveCount(0);
+      await expect(page.locator('[data-testid^="complete-btn-"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid^="promote-btn-"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid^="restore-btn-"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid^="delete-btn-"]')).toHaveCount(0);
+    });
+
     test('shows read-only branch indicator and keeps drag handle visible for soft-block feedback', async ({
       page,
     }) => {

@@ -364,24 +364,8 @@
     currentLabel = label;
   }
 
-  function handleCompleteTask(taskId: string) {
-    vscode.postMessage({ type: 'completeTask', taskId });
-  }
-
-  function handlePromoteDraft(taskId: string) {
-    vscode.postMessage({ type: 'promoteDraft', taskId });
-  }
-
   function handleRequestCompletedTasks() {
     vscode.postMessage({ type: 'requestCompletedTasks' });
-  }
-
-  function handleRestoreTask(taskId: string) {
-    vscode.postMessage({ type: 'restoreTask', taskId });
-  }
-
-  function handleDeleteTask(taskId: string) {
-    vscode.postMessage({ type: 'deleteTask', taskId });
   }
 
   function handleReadOnlyDragAttempt(task: TaskWithBlocks) {
@@ -469,8 +453,6 @@
       onSearchChange={handleSearchChange}
       onReorderTasks={handleReorderTasks}
       onReadOnlyDragAttempt={handleReadOnlyDragAttempt}
-      onCompleteTask={handleCompleteTask}
-      onPromoteDraft={handlePromoteDraft}
       onRequestCompletedTasks={handleRequestCompletedTasks}
     />
   </div>
@@ -490,8 +472,6 @@
       onMilestoneChange={handleMilestoneChange}
       onLabelChange={handleLabelChange}
       onSearchChange={handleSearchChange}
-      onRestoreTask={handleRestoreTask}
-      onDeleteTask={handleDeleteTask}
     />
   </div>
 {:else if activeTab === 'dashboard'}

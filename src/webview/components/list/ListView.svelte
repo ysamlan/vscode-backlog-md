@@ -24,10 +24,6 @@
     onSearchChange: (query: string) => void;
     onReorderTasks?: (updates: Array<{ taskId: string; ordinal: number }>) => void;
     onReadOnlyDragAttempt?: (task: TaskWithBlocks) => void;
-    onCompleteTask?: (taskId: string) => void;
-    onPromoteDraft?: (taskId: string) => void;
-    onRestoreTask?: (taskId: string) => void;
-    onDeleteTask?: (taskId: string) => void;
     onRequestCompletedTasks?: () => void;
   }
 
@@ -49,15 +45,9 @@
     onSearchChange,
     onReorderTasks,
     onReadOnlyDragAttempt,
-    onCompleteTask,
-    onPromoteDraft,
-    onRestoreTask,
-    onDeleteTask,
     onRequestCompletedTasks,
   }: Props = $props();
 
-  // The "done" status is the last one in the configured statuses list
-  let doneStatus = $derived(statuses.length > 0 ? statuses[statuses.length - 1] : 'Done');
   let statusOrder = $derived(
     Object.fromEntries(statuses.map((status, index) => [status, index])) as Record<string, number>
   );
@@ -386,25 +376,6 @@
     }
   }
 
-  function handleCompleteClick(e: Event, taskId: string) {
-    e.stopPropagation();
-    onCompleteTask?.(taskId);
-  }
-
-  function handlePromoteClick(e: Event, taskId: string) {
-    e.stopPropagation();
-    onPromoteDraft?.(taskId);
-  }
-
-  function handleRestoreClick(e: Event, taskId: string) {
-    e.stopPropagation();
-    onRestoreTask?.(taskId);
-  }
-
-  function handleDeleteClick(e: Event, taskId: string) {
-    e.stopPropagation();
-    onDeleteTask?.(taskId);
-  }
 </script>
 
 <div class="task-list-container">
@@ -544,9 +515,6 @@
             >
               Priority {getSortIndicator('priority')}
             </th>
-            {#if isDraftsView || isArchivedView || !showingCompleted}
-              <th class="actions-header">Actions</th>
-            {/if}
           </tr>
         </thead>
         <tbody
@@ -646,58 +614,6 @@
                   -
                 {/if}
               </td>
-              {#if isArchivedView}
-                <td class="actions-cell archived-actions">
-                  <button
-                    class="action-btn restore-btn"
-                    data-testid="restore-btn-{task.id}"
-                    title="Restore to Tasks"
-                    onclick={(e) => handleRestoreClick(e, task.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
-                    </svg>
-                  </button>
-                  <button
-                    class="action-btn delete-btn"
-                    data-testid="delete-btn-{task.id}"
-                    title="Delete Permanently"
-                    onclick={(e) => handleDeleteClick(e, task.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-                    </svg>
-                  </button>
-                </td>
-              {:else if isDraftsView}
-                <td class="actions-cell">
-                  <button
-                    class="action-btn promote-btn"
-                    data-testid="promote-btn-{task.id}"
-                    title="Promote to Task"
-                    onclick={(e) => handlePromoteClick(e, task.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>
-                    </svg>
-                  </button>
-                </td>
-              {:else if !showingCompleted && task.status === doneStatus}
-                <td class="actions-cell">
-                  <button
-                    class="action-btn complete-btn"
-                    data-testid="complete-btn-{task.id}"
-                    title="Move to Completed"
-                    onclick={(e) => handleCompleteClick(e, task.id)}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>
-                    </svg>
-                  </button>
-                </td>
-              {:else if !showingCompleted}
-                <td class="actions-cell"></td>
-              {/if}
             </tr>
           {/each}
         </tbody>

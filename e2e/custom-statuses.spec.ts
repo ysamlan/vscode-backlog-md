@@ -160,15 +160,12 @@ test.describe('Custom Statuses - List View', () => {
     expect(style).toContain('color');
   });
 
-  test('shows Complete button for tasks with the last status (Deployed)', async ({ page }) => {
-    // Deployed is the last status, so TASK-5 should show a Complete button
-    const completeBtn = page.locator('[data-testid="complete-btn-TASK-5"]');
-    await expect(completeBtn).toBeVisible();
-  });
-
-  test('does not show Complete button for non-final custom statuses', async ({ page }) => {
-    // TASK-3 (Review) is not the last status, should not have Complete button
-    await expect(page.locator('[data-testid="complete-btn-TASK-3"]')).toHaveCount(0);
+  test('does not render actions column or row action buttons', async ({ page }) => {
+    await expect(page.locator('th.actions-header')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="complete-btn-"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="promote-btn-"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="restore-btn-"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="delete-btn-"]')).toHaveCount(0);
   });
 
   test('renders status filter buttons from configured statuses', async ({ page }) => {
