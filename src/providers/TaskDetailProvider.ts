@@ -4,6 +4,7 @@ import * as path from 'path';
 import { BacklogParser, computeSubtasks } from '../core/BacklogParser';
 import { BacklogWriter, computeContentHash, FileConflictError } from '../core/BacklogWriter';
 import { isReadOnlyTask, getReadOnlyTaskContext, type Task, type TaskSource } from '../core/types';
+import { sanitizeMarkdownSource } from '../core/sanitizeMarkdown';
 
 // Dynamic import for marked (ESM module)
 let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
@@ -13,7 +14,8 @@ async function parseMarkdown(markdown: string): Promise<string> {
     marked.setOptions({ gfm: true, breaks: true });
     markedParse = marked.parse;
   }
-  const result = markedParse(markdown);
+  const safe = sanitizeMarkdownSource(markdown);
+  const result = markedParse(safe);
   return typeof result === 'string' ? result : await result;
 }
 

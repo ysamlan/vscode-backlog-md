@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getReadOnlyTaskContext, isReadOnlyTask, type Task, type TaskPriority } from '../../lib/types';
+  import { formatStoredUtcDateForDisplay } from '../../lib/date-display';
 
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
   type SubtaskSummary = {
@@ -91,7 +92,7 @@
         </span>
       {/if}
       {#if task.updatedAt}
-        <span class="compact-updated-chip">Updated {task.updatedAt}</span>
+        <span class="compact-updated-chip">Updated {formatStoredUtcDateForDisplay(task.updatedAt)}</span>
       {/if}
     </div>
 

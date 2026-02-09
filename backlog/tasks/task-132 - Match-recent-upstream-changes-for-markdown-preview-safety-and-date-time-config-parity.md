@@ -3,9 +3,10 @@ id: TASK-132
 title: >-
   Match recent upstream changes for markdown preview safety and date/time config
   parity
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-09 22:43'
+updated_date: '2026-02-09 23:59'
 labels:
   - upstream-compat
   - webview
@@ -28,9 +29,9 @@ This task tracks implementing extension-side parity and adding regression covera
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Task detail markdown rendering safely handles angle-bracket type strings (for example `Result<List<MenuItem>>`) without blank/error states and with expected visible output.
-- [ ] #2 A regression test is added for the angle-bracket markdown case in extension test suites (unit and/or Playwright as appropriate).
-- [ ] #3 Task metadata date display in the task detail UI is reviewed and updated to show user-local friendly formatting where currently raw storage strings are shown.
-- [ ] #4 Config handling/docs/types are aligned for timezone preference support: either remove stale `timezone_preference` support to match upstream or keep it explicitly as backward-compat with tests and clear rationale.
-- [ ] #5 All required validation commands pass: `bun run test && bun run lint && bun run typecheck`.
+- [x] #1 Task detail markdown rendering safely handles angle-bracket type strings (for example `Result<List<MenuItem>>`) without blank/error states and with expected visible output.
+- [x] #2 A regression test is added for the angle-bracket markdown case in extension test suites (unit and/or Playwright as appropriate).
+- [x] #3 Task metadata date display in the task detail UI is reviewed and updated to show user-local friendly formatting where currently raw storage strings are shown.
+- [x] #4 Config handling/docs/types are aligned for timezone preference support: either remove stale `timezone_preference` support to match upstream or keep it explicitly as backward-compat with tests and clear rationale.
+- [x] #5 All required validation commands pass: `bun run test && bun run lint && bun run typecheck`.
 <!-- AC:END -->

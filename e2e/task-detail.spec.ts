@@ -517,4 +517,29 @@ test.describe('Task Detail', () => {
       await expect(page.locator('[data-testid="add-subtask-btn"]')).toBeDisabled();
     });
   });
+
+  test.describe('Angle-bracket markdown safety', () => {
+    test('renders angle-bracket type strings as visible text', async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/task-detail.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          task: {
+            ...sampleTask,
+            description: 'Returns Result<List<MenuItem>> from the API.',
+          },
+          descriptionHtml: '<p>Returns Result&lt;List&lt;MenuItem&gt;&gt; from the API.</p>',
+        },
+      });
+      await page.waitForTimeout(50);
+
+      const descriptionView = page.locator('[data-testid="description-view"]');
+      await expect(descriptionView).toContainText('Result<List<MenuItem>>');
+      await expect(descriptionView).toContainText('from the API');
+    });
+  });
 });

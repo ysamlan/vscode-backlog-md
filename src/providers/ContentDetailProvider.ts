@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { BacklogParser } from '../core/BacklogParser';
+import { sanitizeMarkdownSource } from '../core/sanitizeMarkdown';
 
 // Dynamic import for marked (ESM module)
 let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
@@ -9,7 +10,8 @@ async function parseMarkdown(markdown: string): Promise<string> {
     marked.setOptions({ gfm: true, breaks: true });
     markedParse = marked.parse;
   }
-  const result = markedParse(markdown);
+  const safe = sanitizeMarkdownSource(markdown);
+  const result = markedParse(safe);
   return typeof result === 'string' ? result : await result;
 }
 
