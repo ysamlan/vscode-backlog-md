@@ -18,6 +18,16 @@ vi.mock('util', () => ({
 }));
 
 describe('BacklogCli', () => {
+  function createMockStatusBarItem(): vscode.StatusBarItem {
+    return {
+      text: '',
+      tooltip: '',
+      backgroundColor: undefined,
+      show: vi.fn(),
+      hide: vi.fn(),
+    } as unknown as vscode.StatusBarItem;
+  }
+
   beforeEach(() => {
     // Clear cache before each test
     BacklogCli.clearCache();
@@ -128,15 +138,9 @@ describe('BacklogCli', () => {
 
   describe('updateStatusBarItem', () => {
     it('should update status bar to show local-only mode', () => {
-      const mockStatusBarItem = {
-        text: '',
-        tooltip: '',
-        backgroundColor: undefined as unknown,
-        show: vi.fn(),
-        hide: vi.fn(),
-      };
+      const mockStatusBarItem = createMockStatusBarItem();
 
-      BacklogCli.updateStatusBarItem(mockStatusBarItem as any, 'local-only', 'CLI not installed');
+      BacklogCli.updateStatusBarItem(mockStatusBarItem, 'local-only', 'CLI not installed');
 
       expect(mockStatusBarItem.text).toBe('$(database) Backlog: Local Only');
       expect(mockStatusBarItem.tooltip).toBe('CLI not installed');
@@ -144,15 +148,9 @@ describe('BacklogCli', () => {
     });
 
     it('should update status bar to show cross-branch mode', () => {
-      const mockStatusBarItem = {
-        text: '',
-        tooltip: '',
-        backgroundColor: undefined as unknown,
-        show: vi.fn(),
-        hide: vi.fn(),
-      };
+      const mockStatusBarItem = createMockStatusBarItem();
 
-      BacklogCli.updateStatusBarItem(mockStatusBarItem as any, 'cross-branch');
+      BacklogCli.updateStatusBarItem(mockStatusBarItem, 'cross-branch');
 
       expect(mockStatusBarItem.text).toBe('$(git-branch) Backlog: Cross-Branch');
       expect(mockStatusBarItem.tooltip).toBe('Viewing tasks across all branches');
@@ -160,15 +158,9 @@ describe('BacklogCli', () => {
     });
 
     it('should hide status bar when mode is hidden', () => {
-      const mockStatusBarItem = {
-        text: '',
-        tooltip: '',
-        backgroundColor: undefined as unknown,
-        show: vi.fn(),
-        hide: vi.fn(),
-      };
+      const mockStatusBarItem = createMockStatusBarItem();
 
-      BacklogCli.updateStatusBarItem(mockStatusBarItem as any, 'hidden');
+      BacklogCli.updateStatusBarItem(mockStatusBarItem, 'hidden');
 
       expect(mockStatusBarItem.hide).toHaveBeenCalled();
       expect(mockStatusBarItem.show).not.toHaveBeenCalled();
