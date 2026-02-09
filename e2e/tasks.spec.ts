@@ -1294,6 +1294,114 @@ test.describe('Tasks View', () => {
     });
   });
 
+  test.describe('List View Sorting', () => {
+    const sortTestTasks: (Task & { blocksTaskIds?: string[] })[] = [
+      {
+        id: 'TASK-A',
+        title: 'banana Task',
+        status: 'To Do',
+        priority: 'medium',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-a.md',
+      },
+      {
+        id: 'TASK-B',
+        title: 'Apple Task',
+        status: 'In Progress',
+        priority: 'high',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-b.md',
+      },
+      {
+        id: 'TASK-C',
+        title: 'cherry Task',
+        status: 'To Do',
+        priority: 'high',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-c.md',
+      },
+      {
+        id: 'TASK-D',
+        title: 'Apple Task',
+        status: 'In Progress',
+        priority: 'medium',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-d.md',
+      },
+    ];
+
+    async function getRowIds(page: ReturnType<typeof test.info>['page']): Promise<string[]> {
+      const rows = page.locator('tbody tr');
+      const count = await rows.count();
+      const ids: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const id = await rows.nth(i).getAttribute('data-task-id');
+        ids.push(id!);
+      }
+      return ids;
+    }
+
+    test('title sort is case-insensitive', async ({ page }) => {
+      await setupListViewWithTasks(page, sortTestTasks);
+      // Select all tasks (default is not-done)
+      await page.locator('[data-testid="status-filter"]').selectOption('all');
+      await page.waitForTimeout(50);
+
+      // Click title header to sort by title ascending
+      await page.locator('th[data-sort="title"]').click();
+      await page.waitForTimeout(50);
+
+      const ids = await getRowIds(page);
+      // Expected: Apple Task (TASK-B), Apple Task (TASK-D), banana Task (TASK-A), cherry Task (TASK-C)
+      expect(ids).toEqual(['TASK-B', 'TASK-D', 'TASK-A', 'TASK-C']);
+    });
+
+    test('priority sort uses title then ID as tiebreaker', async ({ page }) => {
+      await setupListViewWithTasks(page, sortTestTasks);
+      await page.locator('[data-testid="status-filter"]').selectOption('all');
+      await page.waitForTimeout(50);
+
+      // Click priority header to sort by priority ascending (high first)
+      await page.locator('th[data-sort="priority"]').click();
+      await page.waitForTimeout(50);
+
+      const ids = await getRowIds(page);
+      // high: TASK-B (Apple Task) then TASK-C (cherry Task)
+      // medium: TASK-D (Apple Task) then TASK-A (banana Task)
+      expect(ids).toEqual(['TASK-B', 'TASK-C', 'TASK-D', 'TASK-A']);
+    });
+
+    test('title sort uses ID as tiebreaker for same titles', async ({ page }) => {
+      await setupListViewWithTasks(page, sortTestTasks);
+      await page.locator('[data-testid="status-filter"]').selectOption('all');
+      await page.waitForTimeout(50);
+
+      await page.locator('th[data-sort="title"]').click();
+      await page.waitForTimeout(50);
+
+      const ids = await getRowIds(page);
+      // Two "Apple Task" entries should be ordered by ID: TASK-B before TASK-D
+      const appleIds = ids.filter((id) => id === 'TASK-B' || id === 'TASK-D');
+      expect(appleIds).toEqual(['TASK-B', 'TASK-D']);
+    });
+  });
+
   test('sends refresh message on mount', async ({ page }) => {
     await installVsCodeMock(page);
     await page.goto('/tasks.html');

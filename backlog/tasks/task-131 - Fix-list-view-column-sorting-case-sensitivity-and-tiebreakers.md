@@ -1,9 +1,10 @@
 ---
 id: TASK-131
 title: Fix list view column sorting case sensitivity and tiebreakers
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-09 22:19'
+updated_date: '2026-02-09 23:54'
 labels:
   - bug
   - ui
@@ -24,9 +25,9 @@ Fix: use `localeCompare` with `{ sensitivity: 'base' }` for string fields; add t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Title sort uses `localeCompare` with `{ sensitivity: 'base' }` for case-insensitive ordering
-- [ ] #2 Priority sort falls through to title (localeCompare) then ID as secondary/tertiary sort keys
-- [ ] #3 Title sort falls through to ID as secondary sort key
-- [ ] #4 Existing status sort with ordinal tiebreaker is unchanged
-- [ ] #5 Unit or Playwright tests cover case-insensitive title sorting
+- [x] #1 Title sort uses `localeCompare` with `{ sensitivity: 'base' }` for case-insensitive ordering
+- [x] #2 Priority sort falls through to title (localeCompare) then ID as secondary/tertiary sort keys
+- [x] #3 Title sort falls through to ID as secondary sort key
+- [x] #4 Existing status sort with ordinal tiebreaker is unchanged
+- [x] #5 Unit or Playwright tests cover case-insensitive title sorting
 <!-- AC:END -->

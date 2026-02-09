@@ -126,6 +126,7 @@
 
   // Sort tasks
   let sortedTasks = $derived.by(() => {
+    const dir = currentSort.direction === 'asc' ? 1 : -1;
     return [...filteredTasks].sort((a, b) => {
       let aVal: string | number = (a as Record<string, unknown>)[currentSort.field] as string ?? '';
       let bVal: string | number = (b as Record<string, unknown>)[currentSort.field] as string ?? '';
@@ -141,8 +142,15 @@
         bVal = statusOrder[bVal as string] ?? statuses.length;
       }
 
-      if (aVal < bVal) return currentSort.direction === 'asc' ? -1 : 1;
-      if (aVal > bVal) return currentSort.direction === 'asc' ? 1 : -1;
+      let cmp: number;
+      if (currentSort.field === 'title') {
+        cmp = (aVal as string).localeCompare(bVal as string, undefined, { sensitivity: 'base' });
+      } else {
+        if (aVal < bVal) cmp = -1;
+        else if (aVal > bVal) cmp = 1;
+        else cmp = 0;
+      }
+      if (cmp !== 0) return cmp * dir;
 
       // Ordinal tiebreaker when sorting by status (matches kanban ordering)
       if (currentSort.field === 'status') {
@@ -151,7 +159,10 @@
         return compareByOrdinal(cardA, cardB);
       }
 
-      return 0;
+      // Tiebreaker: title (case-insensitive), then ID
+      const titleCmp = a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+      if (titleCmp !== 0) return titleCmp;
+      return a.id.localeCompare(b.id);
     });
   });
 
