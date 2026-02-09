@@ -10,6 +10,10 @@ import { FileWatcher } from './core/FileWatcher';
 import { BacklogCli } from './core/BacklogCli';
 import { createDebouncedHandler } from './core/debounce';
 import type { TaskSource } from './core/types';
+import { BACKLOG_DOCUMENT_SELECTOR } from './language/documentSelector';
+import { BacklogCompletionProvider } from './language/BacklogCompletionProvider';
+import { BacklogDocumentLinkProvider } from './language/BacklogDocumentLinkProvider';
+import { BacklogHoverProvider } from './language/BacklogHoverProvider';
 
 let fileWatcher: FileWatcher | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
@@ -36,6 +40,28 @@ export function activate(context: vscode.ExtensionContext) {
   const parser = hasBacklog ? new BacklogParser(backlogFolder) : undefined;
   if (parser) {
     console.log('[Backlog.md] Parser initialized');
+
+    // Register language providers for raw markdown editing
+    context.subscriptions.push(
+      vscode.languages.registerCompletionItemProvider(
+        BACKLOG_DOCUMENT_SELECTOR,
+        new BacklogCompletionProvider(parser),
+        '-' // Trigger on '-' for task ID prefixes like TASK-
+      )
+    );
+    context.subscriptions.push(
+      vscode.languages.registerDocumentLinkProvider(
+        BACKLOG_DOCUMENT_SELECTOR,
+        new BacklogDocumentLinkProvider(parser)
+      )
+    );
+    context.subscriptions.push(
+      vscode.languages.registerHoverProvider(
+        BACKLOG_DOCUMENT_SELECTOR,
+        new BacklogHoverProvider(parser)
+      )
+    );
+    console.log('[Backlog.md] Language providers registered');
   }
 
   // Initialize file watcher (only if backlog folder exists)

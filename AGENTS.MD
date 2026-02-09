@@ -143,6 +143,7 @@ The extension activates when it detects `backlog/tasks/*.md` files.
 
 - `src/extension.ts` - Extension entry point
 - `src/core/` - Business logic (parser, writer, file watcher, types, ordinalUtils)
+- `src/language/` - Language providers for raw Markdown editing (completions, links, hover)
 - `src/providers/` - Webview providers (load Svelte bundles, handle messages)
 - `src/webview/` - Svelte 5 components
   - `components/` - UI components (dashboard, kanban, list, task-detail, shared)
@@ -151,6 +152,18 @@ The extension activates when it detects `backlog/tasks/*.md` files.
   - `lib/` - Shared types
 - `src/test/` - Unit and integration tests
 - `e2e/` - Playwright webview E2E tests
+
+### Language Providers (Editor Intelligence)
+
+The `src/language/` directory contains VS Code language providers that enhance raw Markdown editing for backlog task files. These are scoped via `BACKLOG_DOCUMENT_SELECTOR` to only match files inside `backlog/{tasks,drafts,completed,archive}/` — they do not interfere with other Markdown files or extensions.
+
+- `documentSelector.ts` — Shared `DocumentSelector` constant used by all providers
+- `frontmatterContext.ts` — Determines if a cursor position is inside YAML frontmatter and which field
+- `BacklogCompletionProvider.ts` — Autocomplete for frontmatter fields and task ID references
+- `BacklogDocumentLinkProvider.ts` — Clickable links for task ID references
+- `BacklogHoverProvider.ts` — Hover tooltips showing task details
+
+All providers use `BacklogParser` as their data source (already mtime-cached). Registered in `extension.ts` inside the `if (parser)` block.
 
 ### UI Guidelines
 

@@ -227,6 +227,45 @@ export class Range {
   static isRange(thing: unknown): thing is Range {
     return thing instanceof Range;
   }
+
+  get isEmpty(): boolean {
+    return this.start.isEqual(this.end);
+  }
+
+  get isSingleLine(): boolean {
+    return this.start.line === this.end.line;
+  }
+
+  contains(positionOrRange: Position | Range): boolean {
+    if (positionOrRange instanceof Range) {
+      return this.contains(positionOrRange.start) && this.contains(positionOrRange.end);
+    }
+    return positionOrRange.isAfterOrEqual(this.start) && positionOrRange.isBeforeOrEqual(this.end);
+  }
+
+  intersection(range: Range): Range | undefined {
+    const start = range.start.isAfter(this.start) ? range.start : this.start;
+    const end = range.end.isBefore(this.end) ? range.end : this.end;
+    if (start.isAfter(end)) return undefined;
+    return new Range(start, end);
+  }
+
+  union(other: Range): Range {
+    const start = other.start.isBefore(this.start) ? other.start : this.start;
+    const end = other.end.isAfter(this.end) ? other.end : this.end;
+    return new Range(start, end);
+  }
+
+  with(startOrChange?: Position | { start?: Position; end?: Position }, end?: Position): Range {
+    if (startOrChange && !(startOrChange instanceof Position)) {
+      return new Range(startOrChange.start ?? this.start, startOrChange.end ?? this.end);
+    }
+    return new Range((startOrChange as Position | undefined) ?? this.start, end ?? this.end);
+  }
+
+  isEqual(other: Range): boolean {
+    return this.start.isEqual(other.start) && this.end.isEqual(other.end);
+  }
 }
 
 // Position class mock
@@ -235,6 +274,64 @@ export class Position {
     public readonly line: number,
     public readonly character: number
   ) {}
+
+  isBefore(other: Position): boolean {
+    return this.line < other.line || (this.line === other.line && this.character < other.character);
+  }
+
+  isBeforeOrEqual(other: Position): boolean {
+    return (
+      this.line < other.line || (this.line === other.line && this.character <= other.character)
+    );
+  }
+
+  isAfter(other: Position): boolean {
+    return this.line > other.line || (this.line === other.line && this.character > other.character);
+  }
+
+  isAfterOrEqual(other: Position): boolean {
+    return (
+      this.line > other.line || (this.line === other.line && this.character >= other.character)
+    );
+  }
+
+  isEqual(other: Position): boolean {
+    return this.line === other.line && this.character === other.character;
+  }
+
+  compareTo(other: Position): number {
+    if (this.line < other.line) return -1;
+    if (this.line > other.line) return 1;
+    if (this.character < other.character) return -1;
+    if (this.character > other.character) return 1;
+    return 0;
+  }
+
+  translate(
+    lineDeltaOrChange?: number | { lineDelta?: number; characterDelta?: number },
+    characterDelta?: number
+  ): Position {
+    if (typeof lineDeltaOrChange === 'object') {
+      return new Position(
+        this.line + (lineDeltaOrChange.lineDelta || 0),
+        this.character + (lineDeltaOrChange.characterDelta || 0)
+      );
+    }
+    return new Position(
+      this.line + (lineDeltaOrChange || 0),
+      this.character + (characterDelta || 0)
+    );
+  }
+
+  with(
+    lineOrChange?: number | { line?: number; character?: number },
+    character?: number
+  ): Position {
+    if (typeof lineOrChange === 'object') {
+      return new Position(lineOrChange.line ?? this.line, lineOrChange.character ?? this.character);
+    }
+    return new Position(lineOrChange ?? this.line, character ?? this.character);
+  }
 }
 
 // Selection class mock
@@ -317,6 +414,187 @@ export function createMockExtensionContext(
     logUri: { fsPath: '/test/logs' },
     asAbsolutePath: (relativePath: string) => `/test/extension/${relativePath}`,
     ...overrides,
+  };
+}
+
+// Languages mock implementation
+export const languages = {
+  registerCompletionItemProvider: vi.fn(() => ({ dispose: vi.fn() })),
+  registerDocumentLinkProvider: vi.fn(() => ({ dispose: vi.fn() })),
+  registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
+};
+
+// CompletionItemKind enum
+export enum CompletionItemKind {
+  Text = 0,
+  Method = 1,
+  Function = 2,
+  Constructor = 3,
+  Field = 4,
+  Variable = 5,
+  Class = 6,
+  Interface = 7,
+  Module = 8,
+  Property = 9,
+  Unit = 10,
+  Value = 11,
+  Enum = 12,
+  Keyword = 13,
+  Snippet = 14,
+  Color = 15,
+  File = 16,
+  Reference = 17,
+  Folder = 18,
+  EnumMember = 19,
+  Constant = 20,
+  Struct = 21,
+  Event = 22,
+  Operator = 23,
+  TypeParameter = 24,
+  User = 25,
+}
+
+// CompletionItem class mock
+export class CompletionItem {
+  label: string;
+  kind?: CompletionItemKind;
+  detail?: string;
+  documentation?: string | MarkdownString;
+  sortText?: string;
+  filterText?: string;
+  insertText?: string | SnippetString;
+
+  constructor(label: string, kind?: CompletionItemKind) {
+    this.label = label;
+    this.kind = kind;
+  }
+}
+
+// CompletionList class mock
+export class CompletionList {
+  items: CompletionItem[];
+  isIncomplete: boolean;
+
+  constructor(items?: CompletionItem[], isIncomplete?: boolean) {
+    this.items = items || [];
+    this.isIncomplete = isIncomplete || false;
+  }
+}
+
+// DocumentLink class mock
+export class DocumentLink {
+  range: Range;
+  target?: { fsPath: string; scheme: string; path: string };
+  tooltip?: string;
+
+  constructor(range: Range, target?: { fsPath: string; scheme: string; path: string }) {
+    this.range = range;
+    this.target = target;
+  }
+}
+
+// Hover class mock
+export class Hover {
+  contents: MarkdownString[];
+  range?: Range;
+
+  constructor(contents: MarkdownString | MarkdownString[], range?: Range) {
+    this.contents = Array.isArray(contents) ? contents : [contents];
+    this.range = range;
+  }
+}
+
+// MarkdownString class mock
+export class MarkdownString {
+  value: string;
+  isTrusted: boolean;
+
+  constructor(value?: string) {
+    this.value = value || '';
+    this.isTrusted = false;
+  }
+
+  appendMarkdown(value: string): MarkdownString {
+    this.value += value;
+    return this;
+  }
+
+  appendText(value: string): MarkdownString {
+    this.value += value;
+    return this;
+  }
+
+  appendCodeblock(code: string, language?: string): MarkdownString {
+    this.value += `\`\`\`${language || ''}\n${code}\n\`\`\`\n`;
+    return this;
+  }
+}
+
+// SnippetString class mock
+export class SnippetString {
+  value: string;
+
+  constructor(value?: string) {
+    this.value = value || '';
+  }
+}
+
+/**
+ * Helper to create a mock TextDocument for testing language providers.
+ */
+export function createMockTextDocument(
+  content: string,
+  uri?: string
+): {
+  getText: (range?: Range) => string;
+  lineAt: (line: number) => { text: string; range: Range };
+  lineCount: number;
+  uri: { fsPath: string; scheme: string; path: string };
+  getWordRangeAtPosition: (position: Position, regex?: RegExp) => Range | undefined;
+} {
+  const lines = content.split('\n');
+  const docUri = uri || '/test/backlog/tasks/TASK-1 - Test.md';
+  return {
+    getText(range?: Range): string {
+      if (!range) return content;
+      if (range.start.line === range.end.line) {
+        return (lines[range.start.line] || '').substring(
+          range.start.character,
+          range.end.character
+        );
+      }
+      const result: string[] = [];
+      for (let i = range.start.line; i <= range.end.line; i++) {
+        const line = lines[i] || '';
+        if (i === range.start.line) result.push(line.substring(range.start.character));
+        else if (i === range.end.line) result.push(line.substring(0, range.end.character));
+        else result.push(line);
+      }
+      return result.join('\n');
+    },
+    lineAt(line: number) {
+      const text = lines[line] || '';
+      return {
+        text,
+        range: new Range(new Position(line, 0), new Position(line, text.length)),
+      };
+    },
+    lineCount: lines.length,
+    uri: { fsPath: docUri, scheme: 'file', path: docUri },
+    getWordRangeAtPosition(position: Position, regex?: RegExp): Range | undefined {
+      if (!regex) return undefined;
+      const lineText = lines[position.line] || '';
+      let match: RegExpExecArray | null;
+      regex.lastIndex = 0;
+      while ((match = regex.exec(lineText)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        if (position.character >= start && position.character <= end) {
+          return new Range(new Position(position.line, start), new Position(position.line, end));
+        }
+      }
+      return undefined;
+    },
   };
 }
 

@@ -1,9 +1,10 @@
 ---
 id: TASK-104
 title: 'Add editor intelligence for raw Markdown task files (linking, autocomplete)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-08 13:13'
+updated_date: '2026-02-09 14:46'
 labels:
   - feature
   - editor
@@ -56,3 +57,28 @@ The `DocumentSelector` pattern approach is likely best — it keeps the file as 
 - [ ] #5 Providers are scoped to backlog task files only — no interference with other Markdown files
 - [ ] #6 Existing Markdown language features (syntax highlighting, preview) still work on task files
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented VS Code language providers for backlog task Markdown files:
+
+**New files:**
+- `src/language/documentSelector.ts` — `BACKLOG_DOCUMENT_SELECTOR` scoping providers to `**/backlog/{tasks,drafts,completed,archive}/**/*.md`
+- `src/language/frontmatterContext.ts` — `getFrontmatterContext()` determines if cursor is in frontmatter and which field
+- `src/language/BacklogCompletionProvider.ts` — Autocomplete for frontmatter fields (status, priority, milestone, labels, assignee, dependencies) and task ID references in body
+- `src/language/BacklogDocumentLinkProvider.ts` — Clickable links for task ID references (excluding self-links), opening task detail view
+- `src/language/BacklogHoverProvider.ts` — Hover info showing task title, status, priority, milestone, labels, and truncated description
+
+**Modified files:**
+- `src/extension.ts` — Registers all three providers with document selector in activate()
+- `src/test/mocks/vscode.ts` — Added `languages` namespace mock, `CompletionItem`, `CompletionList`, `DocumentLink`, `Hover`, `MarkdownString`, `SnippetString`, `CompletionItemKind` enum, `createMockTextDocument()` helper, and Position/Range method implementations
+
+**New tests (39 tests across 4 files):**
+- `src/test/unit/frontmatterContext.test.ts` (14 tests)
+- `src/test/unit/BacklogCompletionProvider.test.ts` (10 tests)
+- `src/test/unit/BacklogDocumentLinkProvider.test.ts` (8 tests)
+- `src/test/unit/BacklogHoverProvider.test.ts` (7 tests)
+
+All 601 tests pass, lint clean, typecheck clean, build succeeds.
+<!-- SECTION:FINAL_SUMMARY:END -->

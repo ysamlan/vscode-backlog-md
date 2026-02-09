@@ -16,6 +16,7 @@ A beautiful VS Code extension for browsing and managing [Backlog.md](https://git
 - **Task Detail** — Rich view with inline editing for title, description, priority, status, assignees, and labels
 - **Real-time Sync** — File watcher automatically syncs changes from disk
 - **Theme Support** — Works with Light, Dark, and High Contrast themes
+- **Editor Intelligence** — Autocomplete, clickable links, and hover info for raw Markdown task files (see below)
 
 <details>
 <summary>More screenshots</summary>
@@ -85,6 +86,17 @@ Add JWT-based authentication to the API endpoints.
 | `priority` | `high`, `medium`, `low`                 |
 | `assignee` | List of usernames                       |
 | `labels`   | List of tags                            |
+
+## Editor Intelligence
+
+When you open a raw backlog task file (e.g., via "Open Raw Markdown" or by opening a `.md` file inside `backlog/tasks/`), the extension provides smart editor features on top of the normal Markdown editing experience:
+
+- **Frontmatter autocomplete** — Context-aware suggestions when editing `status:`, `priority:`, `milestone:`, `labels:`, `assignee:`, and `dependencies:` fields. Values come from your `config.yml` and existing tasks.
+- **Task ID autocomplete** — Type a task prefix (e.g., `TASK-`) anywhere in the body or in `dependencies:` to see suggestions of all known task IDs with their titles.
+- **Clickable task links** — Task IDs like `TASK-42` in the document body become clickable links that open the referenced task's detail view.
+- **Hover info** — Hover over any task ID to see a tooltip with the task's title, status, priority, milestone, labels, and a description preview.
+
+These features are scoped exclusively to Markdown files inside `backlog/{tasks,drafts,completed,archive}/` directories. Other Markdown files in your workspace are not affected, and all standard Markdown editor features (syntax highlighting, preview, linting from other extensions) continue to work normally on backlog files.
 
 ## Keyboard Shortcuts
 
