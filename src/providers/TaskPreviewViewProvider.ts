@@ -9,9 +9,19 @@ import {
   getReadOnlyTaskContext,
 } from '../core/types';
 import { BacklogWriter } from '../core/BacklogWriter';
+import { computeSubtasks } from '../core/BacklogParser';
 
 type TaskSelectionRef = {
   taskId: string;
+  filePath?: string;
+  source?: TaskSource;
+  branch?: string;
+};
+
+type SubtaskSummary = {
+  id: string;
+  title: string;
+  status: string;
   filePath?: string;
   source?: TaskSource;
   branch?: string;
@@ -79,6 +89,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
       return;
     }
 
+    const subtaskSummaries = await this.resolveSubtaskSummaries(task, this.selectedTaskRef);
     const statuses = await this.parser.getStatuses();
     this.postMessage({
       type: 'taskPreviewData',
@@ -88,6 +99,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
       readOnlyReason: isReadOnlyTask(task)
         ? `Task is from ${getReadOnlyTaskContext(task)} and is read-only.`
         : undefined,
+      subtaskSummaries,
     });
   }
 
@@ -169,5 +181,69 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
     if (bySource) return bySource;
 
     return localTask ?? crossBranchTasks.find((task) => task.id === taskRef.taskId);
+  }
+
+  private async resolveSubtaskSummaries(
+    task: Task,
+    taskRef: TaskSelectionRef
+  ): Promise<SubtaskSummary[] | undefined> {
+    if (!this.parser) return undefined;
+
+    // Preserve explicit frontmatter subtasks before computeSubtasks() derives parent links.
+    const explicitSubtasksByTaskId = new Map<string, string[]>();
+    const contextTasks =
+      taskRef.source === 'remote' || taskRef.source === 'local-branch'
+        ? await this.parser.getTasksWithCrossBranch()
+        : await this.parser.getTasks();
+
+    for (const contextTask of contextTasks) {
+      if (contextTask.subtasks && contextTask.subtasks.length > 0) {
+        explicitSubtasksByTaskId.set(contextTask.id, [...contextTask.subtasks]);
+      }
+    }
+
+    computeSubtasks(contextTasks);
+    const contextTask = this.resolveTaskFromCollection(contextTasks, taskRef) ?? task;
+
+    const subtaskIds = new Set<string>([
+      ...(explicitSubtasksByTaskId.get(contextTask.id) ?? []),
+      ...(contextTask.subtasks ?? []),
+    ]);
+
+    if (subtaskIds.size === 0) return undefined;
+
+    const taskById = new Map(contextTasks.map((contextTask) => [contextTask.id, contextTask]));
+    const summaries = Array.from(subtaskIds)
+      .map((subtaskId) => taskById.get(subtaskId))
+      .filter((subtask): subtask is Task => Boolean(subtask))
+      .map((subtask) => ({
+        id: subtask.id,
+        title: subtask.title,
+        status: subtask.status,
+        filePath: subtask.filePath,
+        source: subtask.source,
+        branch: subtask.branch,
+      }));
+
+    return summaries.length > 0 ? summaries : undefined;
+  }
+
+  private resolveTaskFromCollection(tasks: Task[], taskRef: TaskSelectionRef): Task | undefined {
+    if (taskRef.filePath) {
+      const byPath = tasks.find(
+        (task) => task.id === taskRef.taskId && task.filePath === taskRef.filePath
+      );
+      if (byPath) return byPath;
+    }
+
+    const bySource = tasks.find(
+      (task) =>
+        task.id === taskRef.taskId &&
+        task.source === taskRef.source &&
+        task.branch === taskRef.branch
+    );
+    if (bySource) return bySource;
+
+    return tasks.find((task) => task.id === taskRef.taskId);
   }
 }

@@ -34,6 +34,7 @@ describe('TaskPreviewViewProvider', () => {
         milestone: '',
         dependencies: [],
       }),
+      getTasks: vi.fn().mockResolvedValue([]),
       getTasksWithCrossBranch: vi.fn().mockResolvedValue([]),
       getStatuses: vi.fn().mockResolvedValue(['To Do', 'In Progress', 'Done']),
     } as unknown as BacklogParser;
@@ -139,6 +140,79 @@ describe('TaskPreviewViewProvider', () => {
       expect.objectContaining({
         type: 'taskPreviewData',
         task: expect.objectContaining({ id: 'TASK-1' }),
+      })
+    );
+  });
+
+  it('includes merged subtask summaries from explicit subtasks and parent_task_id children', async () => {
+    (parser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'TASK-2',
+      title: 'Parent',
+      status: 'In Progress',
+      assignee: [],
+      labels: [],
+      dependencies: [],
+      subtasks: ['TASK-2.1'],
+      filePath: '/repo/backlog/tasks/task-2.md',
+    });
+    (parser.getTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: 'TASK-2',
+        title: 'Parent',
+        status: 'In Progress',
+        assignee: [],
+        labels: [],
+        dependencies: [],
+        subtasks: ['TASK-2.1'],
+        filePath: '/repo/backlog/tasks/task-2.md',
+      },
+      {
+        id: 'TASK-2.1',
+        title: 'Child explicit',
+        status: 'Done',
+        assignee: [],
+        labels: [],
+        dependencies: [],
+        parentTaskId: 'TASK-2',
+        filePath: '/repo/backlog/tasks/task-2.1.md',
+      },
+      {
+        id: 'TASK-2.2',
+        title: 'Child derived',
+        status: 'To Do',
+        assignee: [],
+        labels: [],
+        dependencies: [],
+        parentTaskId: 'TASK-2',
+        filePath: '/repo/backlog/tasks/task-2.2.md',
+      },
+    ]);
+
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    webview.postMessage.mockClear();
+    await provider.selectTask({ taskId: 'TASK-2', filePath: '/repo/backlog/tasks/task-2.md' });
+
+    expect(webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'taskPreviewData',
+        subtaskSummaries: expect.arrayContaining([
+          expect.objectContaining({ id: 'TASK-2.1', title: 'Child explicit' }),
+          expect.objectContaining({ id: 'TASK-2.2', title: 'Child derived' }),
+        ]),
       })
     );
   });

@@ -293,6 +293,14 @@ export type ExtensionMessage =
       statuses: string[];
       isReadOnly: boolean;
       readOnlyReason?: string;
+      subtaskSummaries?: Array<{
+        id: string;
+        title: string;
+        status: string;
+        filePath?: string;
+        source?: TaskSource;
+        branch?: string;
+      }>;
     }
   | { type: 'documentData'; document: BacklogDocument; contentHtml: string }
   | { type: 'decisionData'; decision: BacklogDecision; sections: Record<string, string> };

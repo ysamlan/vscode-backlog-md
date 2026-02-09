@@ -1,8 +1,10 @@
 ---
+id: TASK-6
 title: Refactor database layer
 status: In Progress
 priority: medium
 labels: [feature]
+dependencies: [TASK-3]
 created: 2026-02-04
 updated_date: 2026-02-05
 ordinal: 2000

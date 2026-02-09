@@ -44,6 +44,14 @@ const sampleTaskData = {
     '<p>This is a sample task description with <strong>markdown</strong> formatting.</p>',
 };
 
+const sampleTaskDataWithSubtasks = {
+  ...sampleTaskData,
+  subtaskSummaries: [
+    { id: 'TASK-1.1', title: 'Create auth schema', status: 'Done' },
+    { id: 'TASK-1.2', title: 'Implement login endpoint', status: 'In Progress' },
+  ],
+};
+
 const readOnlyTaskData = {
   ...sampleTaskData,
   task: {
@@ -442,6 +450,20 @@ test.describe('Task Detail', () => {
       expect(message).toEqual({
         type: 'openTask',
         taskId: 'TASK-3',
+      });
+    });
+
+    test('sends openTask message when clicking anywhere on a subtask row', async ({ page }) => {
+      await postMessageToWebview(page, { type: 'taskData', data: sampleTaskDataWithSubtasks });
+      await page.waitForTimeout(50);
+      await clearPostedMessages(page);
+
+      await page.locator('[data-testid="subtask-item-TASK-1.2"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'openTask',
+        taskId: 'TASK-1.2',
       });
     });
   });

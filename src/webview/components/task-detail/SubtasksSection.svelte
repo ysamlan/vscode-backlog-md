@@ -29,19 +29,20 @@
   </div>
   <div class="subtasks-list">
     {#each subtasks as subtask (subtask.id)}
-      <div class="subtask-item" data-testid="subtask-item-{subtask.id}">
+      <button
+        type="button"
+        class="subtask-item"
+        data-testid="subtask-item-{subtask.id}"
+        onclick={() => onOpenTask(subtask.id)}
+        title={`Open ${subtask.id}`}
+      >
         <span class="subtask-status-dot status-dot-{statusToClass(subtask.status)}" style={customStatusStyle(subtask.status)} title={subtask.status}></span>
-        <button
-          type="button"
-          class="subtask-link"
-          data-testid="subtask-link-{subtask.id}"
-          onclick={() => onOpenTask(subtask.id)}
-        >
+        <span class="subtask-link" data-testid="subtask-link-{subtask.id}">
           {subtask.id}
-        </button>
+        </span>
         <span class="subtask-title">{subtask.title}</span>
         <span class="subtask-status-badge status-badge status-{statusToClass(subtask.status)}" style={customStatusStyle(subtask.status)}>{subtask.status}</span>
-      </div>
+      </button>
     {/each}
   </div>
   <button

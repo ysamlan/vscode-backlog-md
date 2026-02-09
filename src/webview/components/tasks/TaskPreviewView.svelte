@@ -1,22 +1,34 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { onMessage, vscode } from '../../stores/vscode.svelte';
   import type { Task, TaskPriority } from '../../lib/types';
   import CompactTaskDetails from './CompactTaskDetails.svelte';
 
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
+  type SubtaskSummary = {
+    id: string;
+    title: string;
+    status: string;
+    filePath?: string;
+    source?: Task['source'];
+    branch?: Task['branch'];
+  };
 
   let task = $state<TaskWithBlocks | null>(null);
   let statuses = $state<string[]>([]);
+  let subtaskSummaries = $state<SubtaskSummary[]>([]);
 
   onMessage((message) => {
     switch (message.type) {
       case 'taskPreviewData':
         task = message.task as TaskWithBlocks;
         statuses = (message.statuses as string[]) || [];
+        subtaskSummaries = (message.subtaskSummaries as SubtaskSummary[]) || [];
         break;
       case 'taskPreviewCleared':
         task = null;
         statuses = [];
+        subtaskSummaries = [];
         break;
     }
   });
@@ -47,7 +59,17 @@
     });
   }
 
-  $effect(() => {
+  function handleOpenSubtask(subtask: SubtaskSummary) {
+    vscode.postMessage({
+      type: 'openTask',
+      taskId: subtask.id,
+      filePath: subtask.filePath,
+      source: subtask.source,
+      branch: subtask.branch,
+    });
+  }
+
+  onMount(() => {
     vscode.postMessage({ type: 'refresh' });
   });
 </script>
@@ -55,7 +77,9 @@
 <CompactTaskDetails
   {task}
   {statuses}
+  {subtaskSummaries}
   onOpenFull={handleOpenFull}
+  onOpenSubtask={handleOpenSubtask}
   onUpdateStatus={handleUpdateStatus}
   onUpdatePriority={handleUpdatePriority}
 />

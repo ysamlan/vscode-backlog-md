@@ -2,16 +2,26 @@
   import { getReadOnlyTaskContext, isReadOnlyTask, type Task, type TaskPriority } from '../../lib/types';
 
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
+  type SubtaskSummary = {
+    id: string;
+    title: string;
+    status: string;
+    filePath?: string;
+    source?: Task['source'];
+    branch?: Task['branch'];
+  };
 
   interface Props {
     task: TaskWithBlocks | null;
     statuses: string[];
+    subtaskSummaries: SubtaskSummary[];
     onOpenFull: (task: TaskWithBlocks) => void;
+    onOpenSubtask: (subtask: SubtaskSummary) => void;
     onUpdateStatus: (task: TaskWithBlocks, status: string) => void;
     onUpdatePriority: (task: TaskWithBlocks, priority: TaskPriority | undefined) => void;
   }
 
-  let { task, statuses, onOpenFull, onUpdateStatus, onUpdatePriority }: Props = $props();
+  let { task, statuses, subtaskSummaries, onOpenFull, onOpenSubtask, onUpdateStatus, onUpdatePriority }: Props = $props();
 
   let isReadOnly = $derived(task ? isReadOnlyTask(task) : false);
   let readOnlyContext = $derived(task ? getReadOnlyTaskContext(task) : '');
@@ -134,6 +144,25 @@
         <span class="compact-muted">No description.</span>
       {/if}
     </div>
+
+    {#if subtaskSummaries.length > 0}
+      <div class="compact-subtasks-heading">Subtasks ({subtaskSummaries.length})</div>
+      <div class="compact-subtasks-list" data-testid="compact-subtasks-list">
+        {#each subtaskSummaries as subtask (subtask.id)}
+          <button
+            type="button"
+            class="compact-subtask-item"
+            data-testid="compact-subtask-item-{subtask.id}"
+            onclick={() => onOpenSubtask(subtask)}
+            title={`Open ${subtask.id}`}
+          >
+            <span class="compact-subtask-id">{subtask.id}</span>
+            <span class="compact-subtask-title">{subtask.title}</span>
+            <span class="compact-subtask-status">{subtask.status}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -332,5 +361,66 @@
 
   .compact-muted {
     color: var(--vscode-descriptionForeground);
+  }
+
+  .compact-subtasks-heading {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+    margin: 10px 0 5px;
+  }
+
+  .compact-subtasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .compact-subtask-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 4px;
+    padding: 5px 6px;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    color: inherit;
+  }
+
+  .compact-subtask-item:hover {
+    background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04));
+  }
+
+  .compact-subtask-item:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder, #007fd4);
+    outline-offset: 1px;
+  }
+
+  .compact-subtask-id {
+    color: var(--vscode-textLink-foreground, #3b82f6);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .compact-subtask-title {
+    min-width: 0;
+    font-size: 11px;
+    color: var(--vscode-foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .compact-subtask-status {
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
   }
 </style>
