@@ -35,6 +35,12 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+
+      - name: Playwright tests
+        run: bun run test:playwright
+
       - name: Verify licenses are up to date
         run: |
           bun run licenses:generate
