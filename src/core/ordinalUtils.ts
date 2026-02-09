@@ -136,3 +136,55 @@ export function compareByOrdinal(a: CardData, b: CardData): number {
 export function sortCardsByOrdinal(cards: CardData[]): CardData[] {
   return [...cards].sort(compareByOrdinal);
 }
+
+export interface ResolveOrdinalConflictsOptions {
+  defaultStep?: number;
+  startOrdinal?: number;
+  forceSequential?: boolean;
+}
+
+/**
+ * Resolve ordinal conflicts by reassigning ordinals where needed.
+ * Returns only the items whose ordinals changed.
+ *
+ * Matches upstream Backlog.md resolveOrdinalConflicts behavior:
+ * - Items with undefined ordinals get assigned
+ * - Duplicate/non-increasing ordinals get bumped
+ * - forceSequential mode reassigns all to even spacing
+ */
+export function resolveOrdinalConflicts<T extends { id: string; ordinal?: number }>(
+  tasks: T[],
+  options: ResolveOrdinalConflictsOptions = {}
+): T[] {
+  const defaultStep = options.defaultStep ?? DEFAULT_STEP;
+  const startOrdinal = options.startOrdinal ?? defaultStep;
+  const forceSequential = options.forceSequential ?? false;
+
+  const updates: T[] = [];
+  let lastOrdinal: number | undefined;
+
+  for (let index = 0; index < tasks.length; index += 1) {
+    const task = tasks[index];
+    if (!task) continue;
+
+    let assigned: number;
+
+    if (forceSequential) {
+      assigned = index === 0 ? startOrdinal : (lastOrdinal ?? startOrdinal) + defaultStep;
+    } else if (task.ordinal === undefined) {
+      assigned = index === 0 ? startOrdinal : (lastOrdinal ?? startOrdinal) + defaultStep;
+    } else if (lastOrdinal !== undefined && task.ordinal <= lastOrdinal) {
+      assigned = lastOrdinal + defaultStep;
+    } else {
+      assigned = task.ordinal;
+    }
+
+    if (assigned !== task.ordinal) {
+      updates.push({ ...task, ordinal: assigned });
+    }
+
+    lastOrdinal = assigned;
+  }
+
+  return updates;
+}

@@ -18,7 +18,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { BacklogParser } from '../../core/BacklogParser';
-import { hasOrdinal, calculateOrdinalsForDrop, sortCardsByOrdinal } from '../../core/ordinalUtils';
+import {
+  hasOrdinal,
+  calculateOrdinalsForDrop,
+  sortCardsByOrdinal,
+  resolveOrdinalConflicts,
+} from '../../core/ordinalUtils';
 import type { Task, ChecklistItem } from '../../core/types';
 
 // Helper: create a parser and parse task content without needing the filesystem
@@ -771,18 +776,37 @@ describe('Upstream Compat: Ordinal/Reorder', () => {
     });
   });
 
-  // Upstream-specific: resolveOrdinalConflicts tests
-  // These test upstream behavior that local code doesn't implement yet.
-  // FIX-115.4: Consider porting resolveOrdinalConflicts as a utility.
-  describe('resolveOrdinalConflicts — upstream behavior (FIX-115.4)', () => {
-    // Upstream has resolveOrdinalConflicts that reassigns ordinals
-    // when duplicates or gaps exist. Local doesn't have this yet.
-    // These tests document the expected behavior for potential porting.
+  describe('resolveOrdinalConflicts — ported from upstream', () => {
+    const item = (id: string, ordinal?: number) => ({ id, ordinal });
 
-    it.todo('should return empty array when ordinals are already increasing');
-    it.todo('should reassign duplicate ordinals');
-    it.todo('should fill in missing ordinals with default spacing');
-    it.todo('should force sequential reassignment when requested');
+    it('should return empty array when ordinals are already increasing', () => {
+      const updates = resolveOrdinalConflicts([item('a', 1000), item('b', 2000), item('c', 3000)]);
+      expect(updates).toHaveLength(0);
+    });
+
+    it('should reassign duplicate ordinals', () => {
+      const updates = resolveOrdinalConflicts([item('a', 1000), item('b', 1000), item('c', 2000)]);
+      expect(updates).toHaveLength(2);
+      expect(updates[0]).toEqual({ id: 'b', ordinal: 2000 });
+      expect(updates[1]).toEqual({ id: 'c', ordinal: 3000 });
+    });
+
+    it('should fill in missing ordinals with default spacing', () => {
+      const updates = resolveOrdinalConflicts([item('a'), item('b'), item('c', 1500)]);
+      expect(updates).toHaveLength(3);
+      expect(updates[0]).toEqual({ id: 'a', ordinal: 1000 });
+      expect(updates[1]).toEqual({ id: 'b', ordinal: 2000 });
+      expect(updates[2]).toEqual({ id: 'c', ordinal: 3000 });
+    });
+
+    it('should force sequential reassignment when requested', () => {
+      const updates = resolveOrdinalConflicts([item('a', 1000), item('b', 2500), item('c', 4500)], {
+        forceSequential: true,
+      });
+      expect(updates).toHaveLength(2);
+      expect(updates[0]).toEqual({ id: 'b', ordinal: 2000 });
+      expect(updates[1]).toEqual({ id: 'c', ordinal: 3000 });
+    });
   });
 });
 
