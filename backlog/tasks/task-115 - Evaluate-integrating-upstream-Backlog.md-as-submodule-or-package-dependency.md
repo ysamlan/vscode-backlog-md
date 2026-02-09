@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@codex'
 created_date: '2026-02-08 22:24'
-updated_date: '2026-02-09 03:30'
+updated_date: '2026-02-09 13:44'
 labels:
   - architecture
   - upstream
@@ -79,23 +79,36 @@ Validation recorded for parent task finalization: bun run test (pass), bun run l
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Completed TASK-115 as a research+planning spike and produced a decision-complete migration workstream.
+## Outcome: Behavioral alignment achieved, no code replacement needed
 
-What changed:
-- Performed architecture review of local extension core modules and upstream Backlog.md source layout.
-- Compared four integration strategies (npm/package dependency, git submodule, git subtree, selective sync/vendoring) against upgrade mechanics, build/runtime compatibility, API stability, licensing posture, and test-surface impact.
-- Identified Bun runtime coupling in upstream source as the primary constraint for direct runtime reuse inside VS Code extension Node host.
-- Recommended selective upstream adoption via adapter boundaries with parity-gated migration, with optional subtree-based provenance for synchronized imports.
-- Defined candidate module migration order and explicit retain-local areas where extension-native behavior is preferable.
-- Decomposed work into executable subtasks TASK-115.1..TASK-115.7 with dependencies and test expectations.
+### Key correction
+The initial spike incorrectly claimed upstream Backlog.md modules were coupled to Bun runtime APIs. **This was false.** All candidate modules (parser, serializer, structured-sections, prefix-config, reorder) are pure TypeScript with zero Bun-specific APIs. The only external dependency is `gray-matter`. Bun coupling exists only in upstream's infrastructure (test runner, file I/O helpers, web server, CLI entry point).
 
-Testing:
-- Ran bun run test (pass).
-- Ran bun run lint (pass with existing warnings only).
-- Ran bun run typecheck (pass).
+### What we did instead of code replacement
+Rather than replacing 1,700 LOC of working, well-tested parser/writer code behind adapter layers, we took a more proportionate approach:
 
-Risk and rollback:
-- Keep legacy code path available during migration.
-- Use dual-run parity gates before cutover per module.
-- Roll back module-by-module immediately on behavioral regressions.
+1. **TASK-115.1** — Corrected the Bun-coupling premise. Produced a detailed side-by-side comparison of local vs upstream implementations. Identified specific behavioral deltas and function gaps in both directions. Recommended behavioral alignment over code replacement.
+
+2. **TASK-115.2** — Ported 50 upstream test cases as a compatibility suite (`src/test/unit/upstreamCompat.test.ts`). Covers parser, serializer, acceptance criteria, ID/prefix, ordinal/reorder, roundtrip, and document/decision parsing.
+
+3. **TASK-115.3** — Fixed parser date normalization for upstream compatibility:
+   - `normalizeDateValue()` now preserves HH:mm time components (was truncating to date-only)
+   - Handles ISO datetime format (T→space conversion)
+   - Supports 3 legacy date formats: DD-MM-YY, DD/MM/YY, DD.MM.YY
+
+4. **TASK-115.4** — Ported `resolveOrdinalConflicts()` from upstream as a new utility in `ordinalUtils.ts`. Handles duplicate ordinals, missing ordinals, and forced sequential reassignment.
+
+### Result
+- **50/50 upstream compatibility tests passing** (0 todos)
+- **562 total tests passing**, 0 failures
+- Clean lint and typecheck
+- Format-level compatibility with upstream guaranteed by the ported test suite
+- Extension-specific features (drag-and-drop ordinals, cross-branch loading, mtime caching) preserved unchanged
+
+### Documented intentional divergences
+- **YAML library**: local uses `js-yaml` directly, upstream uses `gray-matter` (wraps `js-yaml`)
+- **Serialization format**: local uses inline arrays `[a, b]`, upstream uses block-style YAML — both valid
+- **Field order**: minor differences in serialization order — both produce valid YAML
+- **Internal type names**: local `createdAt`/`updatedAt` vs upstream `createdDate`/`updatedDate`
+- **Checklist item shape**: local `{ id, text, checked }` vs upstream `{ index, text, checked }`"
 <!-- SECTION:FINAL_SUMMARY:END -->
