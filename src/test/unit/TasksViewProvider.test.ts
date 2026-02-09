@@ -41,6 +41,7 @@ describe('TasksViewProvider', () => {
       getBlockedByThisTask: vi.fn().mockResolvedValue([]),
       getDrafts: vi.fn().mockResolvedValue([]),
       getCompletedTasks: vi.fn().mockResolvedValue([]),
+      getArchivedTasks: vi.fn().mockResolvedValue([]),
     } as unknown as BacklogParser;
   });
 
@@ -1496,6 +1497,40 @@ describe('TasksViewProvider', () => {
       ).mock.calls.find((call: unknown[]) => (call[0] as { type: string }).type === 'tasksUpdated');
       const sentTasks = (tasksUpdatedCall![0] as { tasks: Task[] }).tasks;
       expect(sentTasks[0]).not.toHaveProperty('subtaskProgress');
+    });
+
+    it('computes blockingDependencyIds and excludes completed/archived dependencies', async () => {
+      const tasks: Task[] = [
+        { ...baseTask, id: 'T-1', status: 'To Do', dependencies: ['T-2', 'T-3', 'T-4', 'T-99'] },
+        { ...baseTask, id: 'T-2', status: 'In Progress', dependencies: [] },
+        { ...baseTask, id: 'T-3', status: 'Done', dependencies: [] },
+      ];
+
+      (mockParser.getTasks as Mock).mockResolvedValue(tasks);
+      (mockParser.getCompletedTasks as Mock).mockResolvedValue([
+        { ...baseTask, id: 'T-4', status: 'Done', dependencies: [], source: 'completed' },
+      ]);
+      (mockParser.getArchivedTasks as Mock).mockResolvedValue([
+        { ...baseTask, id: 'T-5', status: 'Done', dependencies: [], folder: 'archive' },
+      ]);
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'tasksUpdated',
+          tasks: expect.arrayContaining([
+            expect.objectContaining({
+              id: 'T-1',
+              blockingDependencyIds: ['T-2', 'T-99'],
+            }),
+          ]),
+        })
+      );
     });
   });
 });

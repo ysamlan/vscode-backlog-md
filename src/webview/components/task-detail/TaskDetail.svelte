@@ -21,6 +21,7 @@
   let milestones: string[] = $state([]);
   let blocksTaskIds: string[] = $state([]);
   let isBlocked = $state(false);
+  let missingDependencyIds: string[] = $state([]);
   let descriptionHtml = $state('');
   let isDraft = $state(false);
   let isArchived = $state(false);
@@ -42,6 +43,7 @@
           milestones = data.milestones;
           blocksTaskIds = data.blocksTaskIds;
           isBlocked = data.isBlocked;
+          missingDependencyIds = data.missingDependencyIds ?? [];
           descriptionHtml = data.descriptionHtml;
           isDraft = data.isDraft ?? false;
           isArchived = data.isArchived ?? false;
@@ -199,6 +201,7 @@
     milestone={task.milestone}
     dependencies={task.dependencies}
     {blocksTaskIds}
+    {missingDependencyIds}
     {uniqueLabels}
     {uniqueAssignees}
     {milestones}

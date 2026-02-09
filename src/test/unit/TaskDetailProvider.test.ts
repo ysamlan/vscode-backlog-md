@@ -81,6 +81,8 @@ describe('TaskDetailProvider', () => {
       getMilestones: vi.fn().mockResolvedValue([]),
       getTasks: vi.fn().mockResolvedValue([]),
       getBlockedByThisTask: vi.fn().mockResolvedValue([]),
+      getCompletedTasks: vi.fn().mockResolvedValue([]),
+      getArchivedTasks: vi.fn().mockResolvedValue([]),
     } as unknown as BacklogParser;
 
     // Reset fs mocks
@@ -607,6 +609,51 @@ describe('TaskDetailProvider', () => {
       expect(taskDataCall).toBeTruthy();
       expect(taskDataCall![0].data.parentTask).toBeUndefined();
       expect(taskDataCall![0].data.subtaskSummaries).toBeUndefined();
+    });
+
+    it('should include missingDependencyIds and blocked state for unresolved dependency links', async () => {
+      const filePath = '/test/backlog/tasks/task-10.md';
+      (mockParser.getTask as Mock).mockImplementation(async (taskId: string) => {
+        if (taskId === 'TASK-10') {
+          return {
+            id: 'TASK-10',
+            title: 'Needs missing dependency',
+            status: 'To Do',
+            labels: [],
+            assignee: [],
+            dependencies: ['TASK-404'],
+            acceptanceCriteria: [],
+            definitionOfDone: [],
+            filePath,
+          };
+        }
+        return undefined;
+      });
+      (mockParser.getTasks as Mock).mockResolvedValue([
+        {
+          id: 'TASK-10',
+          title: 'Needs missing dependency',
+          status: 'To Do',
+          labels: [],
+          assignee: [],
+          dependencies: ['TASK-404'],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath,
+        },
+      ]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-10');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.isBlocked).toBe(true);
+      expect(taskDataCall![0].data.missingDependencyIds).toEqual(['TASK-404']);
     });
   });
 

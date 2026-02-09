@@ -61,12 +61,16 @@
 
   function handleOpenSubtask(subtask: SubtaskSummary) {
     vscode.postMessage({
-      type: 'openTask',
+      type: 'selectTask',
       taskId: subtask.id,
       filePath: subtask.filePath,
       source: subtask.source,
       branch: subtask.branch,
     });
+  }
+
+  function handleOpenRelatedTask(taskId: string) {
+    vscode.postMessage({ type: 'selectTask', taskId });
   }
 
   onMount(() => {
@@ -80,6 +84,7 @@
   {subtaskSummaries}
   onOpenFull={handleOpenFull}
   onOpenSubtask={handleOpenSubtask}
+  onOpenRelatedTask={handleOpenRelatedTask}
   onUpdateStatus={handleUpdateStatus}
   onUpdatePriority={handleUpdatePriority}
 />

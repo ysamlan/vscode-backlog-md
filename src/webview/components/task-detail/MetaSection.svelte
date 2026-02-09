@@ -5,6 +5,7 @@
     milestone: string | undefined;
     dependencies: string[];
     blocksTaskIds: string[];
+    missingDependencyIds?: string[];
     uniqueLabels: string[];
     uniqueAssignees: string[];
     milestones: string[];
@@ -23,6 +24,7 @@
     milestone,
     dependencies,
     blocksTaskIds,
+    missingDependencyIds = [],
     uniqueLabels,
     uniqueAssignees,
     milestones,
@@ -198,9 +200,9 @@
       </div>
     </div>
 
-    <!-- Blocked By (dependencies) -->
+    <!-- Blocked by (dependencies) -->
     <div class="meta-item">
-      <div class="meta-label">Blocked By</div>
+      <div class="meta-label">Blocked by</div>
       <div data-testid="blocked-by">
         {#if dependencies.length > 0}
           {#each dependencies as dep, i (dep)}
@@ -214,6 +216,18 @@
             >
               {dep}
             </button>
+            {#if missingDependencyIds.includes(dep)}
+              <span
+                class="missing-dependency-warning"
+                data-testid="missing-dependency-warning-{dep}"
+                title="Linked task not found"
+                aria-label="Linked task not found"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                </svg>
+              </span>
+            {/if}
           {/each}
         {:else}
           <span class="empty-value">None</span>

@@ -115,6 +115,60 @@ describe('TaskPreviewViewProvider', () => {
     });
   });
 
+  it('handles selectTask messages by refreshing preview selection in place', async () => {
+    (parser.getTask as ReturnType<typeof vi.fn>).mockImplementation(async (taskId: string) => ({
+      id: taskId,
+      title: `Task ${taskId}`,
+      status: 'To Do',
+      assignee: [],
+      labels: [],
+      milestone: '',
+      dependencies: [],
+      filePath: `/repo/backlog/tasks/${taskId}.md`,
+    }));
+
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    const handler = webview.onDidReceiveMessage.mock.calls[0]?.[0];
+    expect(typeof handler).toBe('function');
+
+    webview.postMessage.mockClear();
+    (vscode.commands.executeCommand as ReturnType<typeof vi.fn>).mockClear();
+
+    await handler({
+      type: 'selectTask',
+      taskId: 'TASK-22',
+      filePath: '/repo/backlog/tasks/TASK-22.md',
+      source: 'local',
+      branch: 'main',
+    });
+
+    expect(webviewView.show).toHaveBeenCalledWith(true);
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      'backlog.openTaskDetail',
+      expect.anything()
+    );
+    expect(webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'taskPreviewData',
+        task: expect.objectContaining({ id: 'TASK-22' }),
+      })
+    );
+  });
+
   it('shows the preview view when selecting a task and posts data', async () => {
     const provider = new TaskPreviewViewProvider(
       extensionUri,

@@ -29,6 +29,7 @@ interface TaskDetailData {
   milestones: string[];
   blocksTaskIds: string[];
   isBlocked: boolean;
+  missingDependencyIds?: string[];
   descriptionHtml: string;
   isDraft?: boolean;
   isArchived?: boolean;
@@ -258,15 +259,25 @@ export class TaskDetailProvider {
 
     try {
       // Fetch all supporting data
-      const [statuses, uniqueLabels, uniqueAssignees, configMilestones, allTasks, blocksTaskIds] =
-        await Promise.all([
-          this.parser.getStatuses(),
-          this.parser.getUniqueLabels(),
-          this.parser.getUniqueAssignees(),
-          this.parser.getMilestones(),
-          this.parser.getTasks(),
-          this.parser.getBlockedByThisTask(task.id),
-        ]);
+      const [
+        statuses,
+        uniqueLabels,
+        uniqueAssignees,
+        configMilestones,
+        allTasks,
+        blocksTaskIds,
+        completedTasks,
+        archivedTasks,
+      ] = await Promise.all([
+        this.parser.getStatuses(),
+        this.parser.getUniqueLabels(),
+        this.parser.getUniqueAssignees(),
+        this.parser.getMilestones(),
+        this.parser.getTasks(),
+        this.parser.getBlockedByThisTask(task.id),
+        this.parser.getCompletedTasks(),
+        this.parser.getArchivedTasks(),
+      ]);
 
       // Combine config milestones with unique milestones from tasks
       const configMilestoneNames = configMilestones.map((m) => m.name);
@@ -276,14 +287,24 @@ export class TaskDetailProvider {
         ...taskMilestones.filter((m) => !configMilestoneNames.includes(m!)),
       ] as string[];
 
-      // Check if task is blocked by incomplete dependencies
-      let isBlocked = false;
-      if (task.dependencies.length > 0) {
-        const depTasks = await Promise.all(
-          task.dependencies.map((depId) => this.parser!.getTask(depId))
-        );
-        isBlocked = depTasks.some((depTask) => depTask && depTask.status !== 'Done');
-      }
+      // Check if task is blocked by active dependencies and track unresolved links
+      const doneStatus = statuses.length > 0 ? statuses[statuses.length - 1] : 'Done';
+      const activeTaskById = new Map(allTasks.map((activeTask) => [activeTask.id, activeTask]));
+      const completedTaskIds = new Set(completedTasks.map((completedTask) => completedTask.id));
+      const archivedTaskIds = new Set(archivedTasks.map((archivedTask) => archivedTask.id));
+      const missingDependencyIds: string[] = [];
+      const blockingDependencyIds = task.dependencies.filter((depId) => {
+        if (completedTaskIds.has(depId) || archivedTaskIds.has(depId)) {
+          return false;
+        }
+        const depTask = activeTaskById.get(depId);
+        if (!depTask) {
+          missingDependencyIds.push(depId);
+          return true;
+        }
+        return depTask.status !== doneStatus;
+      });
+      const isBlocked = blockingDependencyIds.length > 0;
 
       // Parse description markdown
       const descriptionHtml = task.description ? await parseMarkdown(task.description) : '';
@@ -323,6 +344,7 @@ export class TaskDetailProvider {
         milestones,
         blocksTaskIds,
         isBlocked,
+        missingDependencyIds: missingDependencyIds.length > 0 ? missingDependencyIds : undefined,
         descriptionHtml,
         isDraft: task.folder === 'drafts',
         isArchived: task.folder === 'archive',

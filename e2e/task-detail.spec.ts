@@ -52,6 +52,11 @@ const sampleTaskDataWithSubtasks = {
   ],
 };
 
+const sampleTaskDataWithMissingDependency = {
+  ...sampleTaskData,
+  missingDependencyIds: ['TASK-2'],
+};
+
 const readOnlyTaskData = {
   ...sampleTaskData,
   task: {
@@ -465,6 +470,16 @@ test.describe('Task Detail', () => {
         type: 'openTask',
         taskId: 'TASK-1.2',
       });
+    });
+
+    test('shows warning indicator for missing dependency links', async ({ page }) => {
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: sampleTaskDataWithMissingDependency,
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="missing-dependency-warning-TASK-2"]')).toBeVisible();
     });
   });
 

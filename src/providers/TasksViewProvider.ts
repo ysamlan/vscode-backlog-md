@@ -166,20 +166,25 @@ export class TasksViewProvider extends BaseViewProvider {
         taskLoader = this.parser.getTasks();
       }
 
-      const [tasks, statuses, milestones, draftCountFromFolder] = await Promise.all([
-        taskLoader,
-        this.parser.getStatuses(),
-        this.parser.getMilestones(),
-        this.viewMode !== 'drafts'
-          ? this.parser.getDrafts().then((d) => d.length)
-          : Promise.resolve(0),
-      ]);
+      const [tasks, statuses, milestones, draftCountFromFolder, completedTasks, archivedTasks] =
+        await Promise.all([
+          taskLoader,
+          this.parser.getStatuses(),
+          this.parser.getMilestones(),
+          this.viewMode !== 'drafts'
+            ? this.parser.getDrafts().then((d) => d.length)
+            : Promise.resolve(0),
+          this.parser.getCompletedTasks(),
+          this.parser.getArchivedTasks(),
+        ]);
 
       // Compute subtask relationships from parentTaskId fields
       computeSubtasks(tasks);
 
       // The last configured status is treated as the "done" status
       const doneStatus = statuses.length > 0 ? statuses[statuses.length - 1] : 'Done';
+      const completedTaskIds = new Set(completedTasks.map((task) => task.id));
+      const archivedTaskIds = new Set(archivedTasks.map((task) => task.id));
 
       // Build reverse dependency map and task-by-id lookup once — O(n)
       const taskById = new Map<string, Task>();
@@ -200,10 +205,20 @@ export class TasksViewProvider extends BaseViewProvider {
         const enhanced: Task & {
           blocksTaskIds?: string[];
           subtaskProgress?: { total: number; done: number };
+          blockingDependencyIds?: string[];
         } = {
           ...task,
           blocksTaskIds: reverseDeps.get(task.id) || [],
         };
+        const blockingDependencyIds = task.dependencies.filter((depId) => {
+          if (completedTaskIds.has(depId) || archivedTaskIds.has(depId)) return false;
+          const depTask = taskById.get(depId);
+          if (!depTask) return true;
+          return depTask.status !== doneStatus;
+        });
+        if (blockingDependencyIds.length > 0) {
+          enhanced.blockingDependencyIds = blockingDependencyIds;
+        }
         if (task.subtasks && task.subtasks.length > 0) {
           const total = task.subtasks.length;
           const done = task.subtasks.filter((childId) => {

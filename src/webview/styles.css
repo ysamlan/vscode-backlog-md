@@ -561,17 +561,24 @@ body {
   padding: 8px;
 }
 
-/* Task card dependency links */
-.task-card-deps {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--vscode-widget-border, #303031);
-  font-size: 10px;
+/* Blocked indicator used in cards and list rows */
+.blocked-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  color: var(--vscode-inputValidation-warningForeground, #cca700);
 }
 
+.task-card .blocked-indicator {
+  margin-left: auto;
+}
+
+.blocked-indicator svg {
+  opacity: 0.9;
+}
+
+/* Legacy dependency styles kept for compatibility with older compiled bundles */
 .task-deps {
   display: inline-flex;
   align-items: center;
@@ -603,16 +610,6 @@ body {
   font-size: 10px;
 }
 
-/* List view dependency indicator */
-.deps-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 8px;
-  font-size: 10px;
-  color: var(--vscode-descriptionForeground, #858585);
-}
-
 .list-task-id {
   display: inline-flex;
   align-items: center;
@@ -623,10 +620,6 @@ body {
   color: var(--vscode-descriptionForeground, #858585);
   margin-right: 6px;
   vertical-align: middle;
-}
-
-.deps-indicator svg {
-  opacity: 0.7;
 }
 
 .readonly-indicator {
@@ -1052,6 +1045,13 @@ body {
 .dependency-link:focus {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: 2px;
+}
+
+.missing-dependency-warning {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: var(--vscode-inputValidation-warningForeground, #cca700);
 }
 
 .empty-value {

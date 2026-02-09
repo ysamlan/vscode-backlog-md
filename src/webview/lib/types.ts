@@ -66,6 +66,7 @@ export interface TaskDetailData {
   milestones: string[];
   blocksTaskIds: string[];
   isBlocked: boolean;
+  missingDependencyIds?: string[];
   descriptionHtml: string;
   isDraft?: boolean;
   isArchived?: boolean;

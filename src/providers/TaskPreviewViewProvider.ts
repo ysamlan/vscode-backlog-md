@@ -110,6 +110,14 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
       case 'refresh':
         await this.refresh();
         return;
+      case 'selectTask':
+        await this.selectTask({
+          taskId: message.taskId,
+          filePath: message.filePath,
+          source: message.source,
+          branch: message.branch,
+        });
+        return;
       case 'openTask':
         await vscode.commands.executeCommand('backlog.openTaskDetail', {
           taskId: message.taskId,

@@ -22,7 +22,6 @@
     task,
     taskIdDisplay,
     onSelectTask,
-    onOpenTask,
     onReadOnlyDragAttempt,
     ondragstart,
     ondragend,
@@ -35,26 +34,15 @@
     isSaving = saving;
   }
 
-  function handleClick(e: MouseEvent) {
-    // Check if click was on a dependency link
-    const target = e.target as HTMLElement;
-    if (target.closest('.dep-link')) {
-      return; // Let the dep link handler deal with it
-    }
+  function handleClick() {
     onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
   }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
+      onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
     }
-  }
-
-  function handleDepClick(e: MouseEvent, taskId: string) {
-    e.preventDefault();
-    e.stopPropagation();
-    onOpenTask(taskId);
   }
 
   function handleDragStart(e: DragEvent) {
@@ -82,9 +70,10 @@
 
   // Compute derived values
   let displayLabels = $derived(task.labels?.slice(0, 2) ?? []);
-  let hasDependencies = $derived((task.dependencies?.length ?? 0) > 0);
-  let hasBlocks = $derived((task.blocksTaskIds?.length ?? 0) > 0);
-  let showDepsSection = $derived(hasDependencies || hasBlocks);
+  let hasBlockingDependencies = $derived((task.blockingDependencyIds?.length ?? 0) > 0);
+  let blockingDependencyTitle = $derived(
+    hasBlockingDependencies ? `Blocked by: ${task.blockingDependencyIds!.join(', ')}` : ''
+  );
   let hasSubtaskProgress = $derived(task.subtaskProgress !== undefined && task.subtaskProgress.total > 0);
   let readOnlyContext = $derived(getReadOnlyTaskContext(task));
   let displayTaskId = $derived(formatTaskIdForDisplay(task.id, taskIdDisplay));
@@ -132,51 +121,18 @@
         {readOnlyContext}
       </span>
     {/if}
+    {#if hasBlockingDependencies}
+      <span
+        class="blocked-indicator"
+        data-testid="blocked-indicator-{task.id}"
+        title={blockingDependencyTitle}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        </svg>
+      </span>
+    {/if}
   </div>
-  {#if showDepsSection}
-    <div class="task-card-deps">
-      {#if hasDependencies}
-        <span class="task-deps">
-          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>
-          </svg>
-          {#each task.dependencies.slice(0, 2) as depId, i (depId)}
-            {#if i > 0}, {/if}
-            <button
-              type="button"
-              class="dep-link"
-              onclick={(e) => handleDepClick(e, depId)}
-            >
-              {depId}
-            </button>
-          {/each}
-          {#if task.dependencies.length > 2}
-            <span class="dep-overflow">+{task.dependencies.length - 2}</span>
-          {/if}
-        </span>
-      {/if}
-      {#if hasBlocks}
-        <span class="task-deps">
-          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d="m12 5 7 7-7 7"/><path d="M5 12h14"/>
-          </svg>
-          {#each task.blocksTaskIds!.slice(0, 2) as blockId, i (blockId)}
-            {#if i > 0}, {/if}
-            <button
-              type="button"
-              class="dep-link"
-              onclick={(e) => handleDepClick(e, blockId)}
-            >
-              {blockId}
-            </button>
-          {/each}
-          {#if task.blocksTaskIds!.length > 2}
-            <span class="dep-overflow">+{task.blocksTaskIds!.length - 2}</span>
-          {/if}
-        </span>
-      {/if}
-    </div>
-  {/if}
   {#if hasSubtaskProgress}
     <div class="task-card-subtasks" data-testid="subtask-progress-{task.id}">
       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

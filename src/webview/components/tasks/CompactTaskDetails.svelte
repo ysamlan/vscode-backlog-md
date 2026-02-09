@@ -17,11 +17,21 @@
     subtaskSummaries: SubtaskSummary[];
     onOpenFull: (task: TaskWithBlocks) => void;
     onOpenSubtask: (subtask: SubtaskSummary) => void;
+    onOpenRelatedTask: (taskId: string) => void;
     onUpdateStatus: (task: TaskWithBlocks, status: string) => void;
     onUpdatePriority: (task: TaskWithBlocks, priority: TaskPriority | undefined) => void;
   }
 
-  let { task, statuses, subtaskSummaries, onOpenFull, onOpenSubtask, onUpdateStatus, onUpdatePriority }: Props = $props();
+  let {
+    task,
+    statuses,
+    subtaskSummaries,
+    onOpenFull,
+    onOpenSubtask,
+    onOpenRelatedTask,
+    onUpdateStatus,
+    onUpdatePriority,
+  }: Props = $props();
 
   let isReadOnly = $derived(task ? isReadOnlyTask(task) : false);
   let readOnlyContext = $derived(task ? getReadOnlyTaskContext(task) : '');
@@ -35,7 +45,14 @@
     medium: 'Medium',
     low: 'Low',
   };
-  let hasMeta = $derived(Boolean(task?.labels.length || task?.assignee.length || task?.dependencies.length));
+  let hasMeta = $derived(
+    Boolean(
+      task?.labels.length ||
+        task?.assignee.length ||
+        task?.dependencies.length ||
+        (task?.blocksTaskIds?.length ?? 0) > 0
+    )
+  );
 </script>
 
 <div class="compact-details-pane" data-testid="compact-details-pane">
@@ -129,8 +146,36 @@
         {/if}
         {#if task.dependencies.length > 0}
           <div class="compact-meta-line">
-            <span class="compact-meta-key">Dependencies</span>
-            <span class="compact-meta-value">{task.dependencies.join(', ')}</span>
+            <span class="compact-meta-key">Blocked by</span>
+            <span class="compact-meta-value">
+              {#each task.dependencies as depId, i (depId)}
+                {#if i > 0}, {/if}
+                <button
+                  type="button"
+                  class="compact-related-link"
+                  onclick={() => onOpenRelatedTask(depId)}
+                >
+                  {depId}
+                </button>
+              {/each}
+            </span>
+          </div>
+        {/if}
+        {#if (task.blocksTaskIds?.length ?? 0) > 0}
+          <div class="compact-meta-line">
+            <span class="compact-meta-key">Blocks</span>
+            <span class="compact-meta-value">
+              {#each task.blocksTaskIds ?? [] as blockId, i (blockId)}
+                {#if i > 0}, {/if}
+                <button
+                  type="button"
+                  class="compact-related-link"
+                  onclick={() => onOpenRelatedTask(blockId)}
+                >
+                  {blockId}
+                </button>
+              {/each}
+            </span>
           </div>
         {/if}
       </div>
@@ -422,5 +467,19 @@
     font-size: 10px;
     color: var(--vscode-descriptionForeground);
     white-space: nowrap;
+  }
+
+  .compact-related-link {
+    background: none;
+    border: none;
+    color: var(--vscode-textLink-foreground, #3794ff);
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    text-decoration: none;
+  }
+
+  .compact-related-link:hover {
+    text-decoration: underline;
   }
 </style>

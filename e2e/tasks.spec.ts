@@ -27,6 +27,7 @@ const sampleTasks: (Task & { blocksTaskIds?: string[] })[] = [
     definitionOfDone: [],
     filePath: '/test/tasks/task-1.md',
     ordinal: 1000,
+    blockingDependencyIds: ['TASK-99'],
   },
   {
     id: 'TASK-2',
@@ -348,7 +349,9 @@ test.describe('Tasks View', () => {
       });
     });
 
-    test('keyboard Enter still sends openTask message from card', async ({ page }) => {
+    test('keyboard Enter sends selectTask message from card for preview navigation', async ({
+      page,
+    }) => {
       await clearPostedMessages(page);
       const card = page.locator('[data-testid="task-TASK-1"]');
       await card.focus();
@@ -356,10 +359,16 @@ test.describe('Tasks View', () => {
 
       const message = await getLastPostedMessage(page);
       expect(message).toEqual({
-        type: 'openTask',
+        type: 'selectTask',
         taskId: 'TASK-1',
         filePath: '/test/tasks/task-1.md',
       });
+    });
+
+    test('shows blocked icon on card when task has active blockers', async ({ page }) => {
+      const indicator = page.locator('[data-testid="blocked-indicator-TASK-1"]').first();
+      await expect(indicator).toBeVisible();
+      await expect(indicator).toHaveAttribute('title', 'Blocked by: TASK-99');
     });
   });
 
@@ -502,6 +511,26 @@ test.describe('Tasks View', () => {
         taskId: 'TASK-1',
         filePath: '/test/tasks/task-1.md',
       });
+    });
+
+    test('keyboard Enter on row sends selectTask message', async ({ page }) => {
+      await clearPostedMessages(page);
+      const row = page.locator('[data-testid="task-row-TASK-1"]');
+      await row.focus();
+      await page.keyboard.press('Enter');
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'selectTask',
+        taskId: 'TASK-1',
+        filePath: '/test/tasks/task-1.md',
+      });
+    });
+
+    test('shows blocked icon in list row when task has active blockers', async ({ page }) => {
+      const indicator = page.locator('[data-testid="blocked-indicator-TASK-1"]').first();
+      await expect(indicator).toBeVisible();
+      await expect(indicator).toHaveAttribute('title', 'Blocked by: TASK-99');
     });
 
     test('list view does not overflow at sidebar width', async ({ page }) => {

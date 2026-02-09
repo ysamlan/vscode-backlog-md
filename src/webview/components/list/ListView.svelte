@@ -245,7 +245,7 @@
   function handleRowKeydown(e: KeyboardEvent, task: TaskWithBlocks) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
+      onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       const next = (e.target as HTMLElement).nextElementSibling as HTMLElement;
@@ -534,8 +534,7 @@
           ondrop={handleDrop}
         >
           {#each displayTasks as { task, isSubtask } (taskRowKey(task))}
-            {@const depsCount = task.dependencies?.length ?? 0}
-            {@const blocksCount = task.blocksTaskIds?.length ?? 0}
+            {@const blockerCount = task.blockingDependencyIds?.length ?? 0}
             {@const isReadOnly = isReadOnlyTask(task)}
             <tr
               data-task-id={task.id}
@@ -595,21 +594,15 @@
                     {getReadOnlyTaskContext(task)}
                   </span>
                 {/if}
-                {#if depsCount > 0 || blocksCount > 0}
+                {#if blockerCount > 0}
                   <span
-                    class="deps-indicator"
-                    title="Blocked by: {depsCount}, Blocks: {blocksCount}"
+                    class="blocked-indicator"
+                    data-testid="blocked-indicator-{task.id}"
+                    title="Blocked by: {task.blockingDependencyIds!.join(', ')}"
                   >
-                    {#if depsCount > 0}
-                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>
-                      </svg>{depsCount}
-                    {/if}
-                    {#if blocksCount > 0}
-                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path d="m12 5 7 7-7 7"/><path d="M5 12h14"/>
-                      </svg>{blocksCount}
-                    {/if}
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    </svg>
                   </span>
                 {/if}
                 {#if task.labels.length > 0}
