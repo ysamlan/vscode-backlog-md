@@ -35,6 +35,21 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Backlog.md",
+      "properties": {
+        "backlog.taskIdDisplay": {
+          "type": "string",
+          "enum": [
+            "full",
+            "number",
+            "hidden"
+          ],
+          "default": "full",
+          "description": "Controls how task IDs are shown in task cards and list rows: full (TASK-123), number (123), or hidden."
+        }
+      }
+    },
     "commands": [
       {
         "command": "backlog.openKanban",

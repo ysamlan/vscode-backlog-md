@@ -4,6 +4,8 @@ import {
   WebviewMessage,
   DataSourceMode,
   Task,
+  TaskIdDisplayMode,
+  TasksViewSettings,
   isReadOnlyTask,
   getReadOnlyTaskContext,
 } from '../core/types';
@@ -28,6 +30,17 @@ export class TasksViewProvider extends BaseViewProvider {
   private dataSourceReason?: string;
   private collapsedColumns: Set<string> = new Set();
   private collapsedMilestones: Set<string> = new Set();
+
+  private getTasksViewSettings(): TasksViewSettings {
+    const configuredMode = vscode.workspace
+      .getConfiguration('backlog')
+      .get<TaskIdDisplayMode>('taskIdDisplay', 'full');
+
+    const taskIdDisplay: TaskIdDisplayMode =
+      configuredMode === 'number' || configuredMode === 'hidden' ? configuredMode : 'full';
+
+    return { taskIdDisplay };
+  }
 
   protected get viewType(): string {
     return 'backlog.kanban';
@@ -117,6 +130,7 @@ export class TasksViewProvider extends BaseViewProvider {
         type: 'configUpdated',
         config: { projectName: config.project_name },
       });
+      this.postMessage({ type: 'settingsUpdated', settings: this.getTasksViewSettings() });
 
       // Activate cross-branch mode from config
       if (config.check_active_branches) {

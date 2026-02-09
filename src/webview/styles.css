@@ -422,6 +422,20 @@ body {
   word-break: break-word;
 }
 
+.task-card-id {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--vscode-descriptionForeground, #858585);
+}
+
+.task-card-id-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
 .task-card-meta {
   display: flex;
   gap: 6px;
@@ -597,6 +611,18 @@ body {
   margin-left: 8px;
   font-size: 10px;
   color: var(--vscode-descriptionForeground, #858585);
+}
+
+.list-task-id {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--vscode-widget-border, #303031);
+  color: var(--vscode-descriptionForeground, #858585);
+  margin-right: 6px;
+  vertical-align: middle;
 }
 
 .deps-indicator svg {

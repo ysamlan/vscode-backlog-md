@@ -1,16 +1,24 @@
 <script lang="ts">
-  import { isReadOnlyTask, getReadOnlyTaskContext, type Task } from '../../lib/types';
+  import {
+    isReadOnlyTask,
+    getReadOnlyTaskContext,
+    type Task,
+    type TaskIdDisplayMode,
+  } from '../../lib/types';
+  import { formatTaskIdForDisplay } from '../../lib/taskIdDisplay';
   import PriorityIcon from './PriorityIcon.svelte';
 
   interface Props {
     task: Task & { blocksTaskIds?: string[]; subtaskProgress?: { total: number; done: number } };
+    taskIdDisplay: TaskIdDisplayMode;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onReadOnlyDragAttempt?: (task: Task) => void;
     ondragstart?: (e: DragEvent) => void;
     ondragend?: (e: DragEvent) => void;
   }
 
-  let { task, onOpenTask, onReadOnlyDragAttempt, ondragstart, ondragend }: Props = $props();
+  let { task, taskIdDisplay, onOpenTask, onReadOnlyDragAttempt, ondragstart, ondragend }: Props =
+    $props();
 
   let isSaving = $state(false);
 
@@ -71,6 +79,8 @@
   let showDepsSection = $derived(hasDependencies || hasBlocks);
   let hasSubtaskProgress = $derived(task.subtaskProgress !== undefined && task.subtaskProgress.total > 0);
   let readOnlyContext = $derived(getReadOnlyTaskContext(task));
+  let displayTaskId = $derived(formatTaskIdForDisplay(task.id, taskIdDisplay));
+  let showTaskId = $derived(taskIdDisplay !== 'hidden');
 </script>
 
 <div
@@ -88,9 +98,17 @@
   ondragend={handleDragEnd}
   role="button"
 >
+  {#if showTaskId}
+    <div class="task-card-id-row">
+      <div class="task-card-id" data-testid="task-id-{task.id}">{displayTaskId}</div>
+      {#if task.priority}
+        <PriorityIcon priority={task.priority} size={14} />
+      {/if}
+    </div>
+  {/if}
   <div class="task-card-title">{task.title}</div>
   <div class="task-card-meta">
-    {#if task.priority}
+    {#if task.priority && !showTaskId}
       <PriorityIcon priority={task.priority} size={14} />
     {/if}
     {#each displayLabels as label (label)}

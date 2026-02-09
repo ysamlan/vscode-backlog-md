@@ -1,6 +1,13 @@
 <script lang="ts">
-  import { isReadOnlyTask, getReadOnlyTaskContext, type Task, type Milestone } from '../../lib/types';
+  import {
+    isReadOnlyTask,
+    getReadOnlyTaskContext,
+    type Task,
+    type Milestone,
+    type TaskIdDisplayMode,
+  } from '../../lib/types';
   import { statusToClass, customStatusStyle } from '../../lib/statusColors';
+  import { formatTaskIdForDisplay } from '../../lib/taskIdDisplay';
   import { compareByOrdinal, calculateOrdinalsForDrop, type CardData } from '../../../core/ordinalUtils';
   import PriorityIcon from '../shared/PriorityIcon.svelte';
 
@@ -10,6 +17,7 @@
     tasks: TaskWithBlocks[];
     statuses: string[];
     milestones: Milestone[];
+    taskIdDisplay: TaskIdDisplayMode;
     currentFilter: string;
     currentMilestone: string;
     currentLabel: string;
@@ -31,6 +39,7 @@
     tasks,
     statuses = [],
     milestones,
+    taskIdDisplay,
     currentFilter,
     currentMilestone,
     currentLabel,
@@ -567,6 +576,11 @@
                 {/if}
                 {#if isDraftsView}
                   <span class="draft-badge">DRAFT</span>
+                {/if}
+                {#if taskIdDisplay !== 'hidden'}
+                  <span class="list-task-id" data-testid="task-row-id-{task.id}">
+                    {formatTaskIdForDisplay(task.id, taskIdDisplay)}
+                  </span>
                 {/if}
                 {task.title}
                 {#if isReadOnly}

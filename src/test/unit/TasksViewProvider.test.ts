@@ -109,6 +109,46 @@ describe('TasksViewProvider', () => {
     });
   });
 
+  describe('tasks view settings', () => {
+    it('should post settingsUpdated with default task id display mode', async () => {
+      const getConfigValue = vi.fn().mockReturnValue('full');
+      (vscode.workspace.getConfiguration as Mock).mockReturnValue({
+        get: getConfigValue,
+      });
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(vscode.workspace.getConfiguration).toHaveBeenCalledWith('backlog');
+      expect(getConfigValue).toHaveBeenCalledWith('taskIdDisplay', 'full');
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'full' },
+      });
+    });
+
+    it('should post settingsUpdated with configured number mode', async () => {
+      const getConfigValue = vi.fn().mockReturnValue('number');
+      (vscode.workspace.getConfiguration as Mock).mockReturnValue({
+        get: getConfigValue,
+      });
+
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      await provider.refresh();
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'number' },
+      });
+    });
+  });
+
   describe('setViewMode', () => {
     it('should post activeTabChanged and viewModeChanged when mode changes', () => {
       const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);

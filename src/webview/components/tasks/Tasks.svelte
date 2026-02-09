@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getReadOnlyTaskContext, type Task, type Milestone, type TaskStatus, type DashboardStats, type TabMode, type BacklogDocument, type BacklogDecision } from '../../lib/types';
+  import { getReadOnlyTaskContext, type Task, type Milestone, type TaskStatus, type DashboardStats, type TabMode, type BacklogDocument, type BacklogDecision, type TaskIdDisplayMode } from '../../lib/types';
   import { vscode, onMessage } from '../../stores/vscode.svelte';
   import KanbanBoard from '../kanban/KanbanBoard.svelte';
   import ListView from '../list/ListView.svelte';
@@ -54,6 +54,7 @@
 
   // Draft count for tab badge
   let draftCount = $state(0);
+  let taskIdDisplay = $state<TaskIdDisplayMode>('full');
 
   // Keyboard shortcuts popup state
   let showShortcuts = $state(false);
@@ -152,6 +153,10 @@
 
       case 'draftCountUpdated':
         draftCount = message.count;
+        break;
+
+      case 'settingsUpdated':
+        taskIdDisplay = message.settings.taskIdDisplay;
         break;
 
       case 'statsUpdated':
@@ -425,6 +430,7 @@
         {configMilestones}
         {collapsedColumns}
         {collapsedMilestones}
+        {taskIdDisplay}
         onOpenTask={handleOpenTask}
         onToggleColumnCollapse={handleToggleColumnCollapse}
         onToggleMilestoneCollapse={handleToggleMilestoneCollapse}
@@ -440,6 +446,7 @@
       {tasks}
       {statuses}
       milestones={configMilestones}
+      {taskIdDisplay}
       {currentFilter}
       {currentMilestone}
       {currentLabel}
@@ -462,6 +469,7 @@
       {tasks}
       {statuses}
       milestones={configMilestones}
+      {taskIdDisplay}
       {currentFilter}
       {currentMilestone}
       {currentLabel}

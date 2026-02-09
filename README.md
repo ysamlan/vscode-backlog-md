@@ -117,6 +117,26 @@ Open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P) and type "Backlog":
 | **Backlog: Create Task**       | Create a new task file      |
 | **Backlog: Refresh**           | Refresh tasks from disk     |
 
+## Settings
+
+Configure extension settings in VS Code Settings (`Ctrl+,` / `Cmd+,`), then search for `Backlog`.
+
+### Task ID Display
+
+Use `backlog.taskIdDisplay` to control how task IDs appear in card and list views:
+
+- `full` (default): `TASK-123`
+- `number`: `123` (or `2.1` for subtask IDs like `TASK-2.1`)
+- `hidden`: do not show task IDs
+
+You can also set it in `settings.json`:
+
+```json
+{
+  "backlog.taskIdDisplay": "full"
+}
+```
+
 ## Requirements
 
 - VS Code 1.108.0 or later

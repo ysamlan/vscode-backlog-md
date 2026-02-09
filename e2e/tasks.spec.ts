@@ -408,6 +408,40 @@ test.describe('Tasks View', () => {
       await expect(rows).toHaveCount(7);
     });
 
+    test('renders full task id in list view when task id display mode is full', async ({
+      page,
+    }) => {
+      await postMessageToWebview(page, {
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'full' },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="task-row-id-TASK-1"]')).toHaveText('TASK-1');
+    });
+
+    test('renders numeric portion in list view when task id display mode is number', async ({
+      page,
+    }) => {
+      await postMessageToWebview(page, {
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'number' },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="task-row-id-TASK-1"]')).toHaveText('1');
+    });
+
+    test('hides task id in list view when task id display mode is hidden', async ({ page }) => {
+      await postMessageToWebview(page, {
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'hidden' },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="task-row-id-TASK-1"]')).toHaveCount(0);
+    });
+
     test('filter by status works', async ({ page }) => {
       await page.locator('button[data-filter="status:To Do"]').click();
       const rows = page.locator('tbody tr');
@@ -528,6 +562,46 @@ test.describe('Tasks View', () => {
       // Done group: TASK-6, TASK-7 (no ordinal, by ID)
       const doneTasks = taskIds.filter((id) => ['TASK-6', 'TASK-7'].includes(id));
       expect(doneTasks).toEqual(['TASK-6', 'TASK-7']);
+    });
+  });
+
+  test.describe('Kanban task id display', () => {
+    test.beforeEach(async ({ page }) => {
+      await setupTasksView(page);
+    });
+
+    test('renders full task id in card view when task id display mode is full', async ({
+      page,
+    }) => {
+      await postMessageToWebview(page, {
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'full' },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="task-id-TASK-1"]')).toHaveText('TASK-1');
+    });
+
+    test('renders numeric portion in card view when task id display mode is number', async ({
+      page,
+    }) => {
+      await postMessageToWebview(page, {
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'number' },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="task-id-TASK-1"]')).toHaveText('1');
+    });
+
+    test('hides task id in card view when task id display mode is hidden', async ({ page }) => {
+      await postMessageToWebview(page, {
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'hidden' },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="task-id-TASK-1"]')).toHaveCount(0);
     });
   });
 
@@ -1061,6 +1135,41 @@ test.describe('Tasks View', () => {
       const lowIcon = page.locator('[data-testid="priority-icon-low"]');
       await expect(lowIcon).toBeVisible();
       await expect(lowIcon).toHaveAttribute('title', 'Low');
+    });
+
+    test('kanban shows priority icon on same row as task id when task id display is visible', async ({
+      page,
+    }) => {
+      await setupPriorityView(page);
+      await postMessageToWebview(page, {
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'full' },
+      });
+      await page.waitForTimeout(50);
+
+      const card = page.locator('[data-testid="task-TASK-P1"]');
+      const idRow = card.locator('.task-card-id-row');
+      await expect(idRow).toBeVisible();
+      await expect(idRow.locator('[data-testid="task-id-TASK-P1"]')).toHaveText('TASK-P1');
+      await expect(idRow.locator('[data-testid="priority-icon-high"]')).toBeVisible();
+    });
+
+    test('kanban keeps priority icon in meta area when task id display is hidden', async ({
+      page,
+    }) => {
+      await setupPriorityView(page);
+      await postMessageToWebview(page, {
+        type: 'settingsUpdated',
+        settings: { taskIdDisplay: 'hidden' },
+      });
+      await page.waitForTimeout(50);
+
+      const card = page.locator('[data-testid="task-TASK-P1"]');
+      await expect(card.locator('.task-card-id-row')).toHaveCount(0);
+      await expect(card.locator('[data-testid="task-id-TASK-P1"]')).toHaveCount(0);
+      await expect(
+        card.locator('.task-card-meta [data-testid="priority-icon-high"]')
+      ).toBeVisible();
     });
 
     test('no priority icon for tasks without priority', async ({ page }) => {

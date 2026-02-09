@@ -10,6 +10,15 @@ export type TaskStatus = string;
 export type TaskPriority = 'high' | 'medium' | 'low';
 
 /**
+ * User preference for how task IDs are displayed in Tasks webview
+ */
+export type TaskIdDisplayMode = 'full' | 'number' | 'hidden';
+
+export interface TasksViewSettings {
+  taskIdDisplay: TaskIdDisplayMode;
+}
+
+/**
  * A checklist item (used for acceptance criteria and definition of done)
  */
 export interface ChecklistItem {
@@ -256,6 +265,7 @@ export type ExtensionMessage =
       tab: 'kanban' | 'list' | 'drafts' | 'archived' | 'dashboard' | 'docs' | 'decisions';
     }
   | { type: 'draftCountUpdated'; count: number }
+  | { type: 'settingsUpdated'; settings: TasksViewSettings }
   | {
       type: 'statsUpdated';
       stats: {

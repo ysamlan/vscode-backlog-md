@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Task, Milestone } from '../../lib/types';
+  import type { Task, Milestone, TaskIdDisplayMode } from '../../lib/types';
   import KanbanColumn from './KanbanColumn.svelte';
   import MilestoneSection from './MilestoneSection.svelte';
   import { calculateOrdinalsForDrop, type CardData } from '../../../core/ordinalUtils';
@@ -18,6 +18,7 @@
     configMilestones: Milestone[];
     collapsedColumns: Set<string>;
     collapsedMilestones: Set<string>;
+    taskIdDisplay: TaskIdDisplayMode;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onToggleColumnCollapse: (status: string) => void;
     onToggleMilestoneCollapse: (milestone: string) => void;
@@ -38,6 +39,7 @@
     configMilestones,
     collapsedColumns,
     collapsedMilestones,
+    taskIdDisplay,
     onOpenTask,
     onToggleColumnCollapse,
     onToggleMilestoneCollapse,
@@ -132,12 +134,13 @@
 {:else if milestoneGrouping}
   <div class="kanban-board milestone-grouped">
     {#each milestoneGroups as group (group.name ?? '__uncategorized__')}
-      <MilestoneSection
-        milestoneName={group.name}
-        tasks={group.tasks}
-        {columns}
-        collapsed={collapsedMilestones.has(group.name ?? '__uncategorized__')}
-        onToggleCollapse={onToggleMilestoneCollapse}
+        <MilestoneSection
+          milestoneName={group.name}
+          tasks={group.tasks}
+          {columns}
+          collapsed={collapsedMilestones.has(group.name ?? '__uncategorized__')}
+          {taskIdDisplay}
+          onToggleCollapse={onToggleMilestoneCollapse}
         {onOpenTask}
         {onReadOnlyDragAttempt}
         onDrop={handleDrop}
@@ -153,6 +156,7 @@
         label={col.label}
         tasks={columnTasks}
         collapsed={collapsedColumns.has(col.status)}
+        {taskIdDisplay}
         onToggleCollapse={onToggleColumnCollapse}
         {onOpenTask}
         {onReadOnlyDragAttempt}

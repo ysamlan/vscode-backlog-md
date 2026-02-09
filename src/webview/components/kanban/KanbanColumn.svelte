@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isReadOnlyTask, type Task } from '../../lib/types';
+  import { isReadOnlyTask, type Task, type TaskIdDisplayMode } from '../../lib/types';
   import TaskCard from '../shared/TaskCard.svelte';
   import { sortCardsByOrdinal, type CardData } from '../../../core/ordinalUtils';
 
@@ -9,6 +9,7 @@
     status: string;
     label: string;
     tasks: TaskWithBlocks[];
+    taskIdDisplay: TaskIdDisplayMode;
     collapsed: boolean;
     milestone?: string;
     mini?: boolean;
@@ -22,6 +23,7 @@
     status,
     label,
     tasks,
+    taskIdDisplay,
     collapsed,
     milestone,
     mini = false,
@@ -163,7 +165,7 @@
       {#if dropIndicatorIndex === index}
         <div class="drop-indicator"></div>
       {/if}
-      <TaskCard {task} {onOpenTask} {onReadOnlyDragAttempt} />
+      <TaskCard {task} {taskIdDisplay} {onOpenTask} {onReadOnlyDragAttempt} />
     {/each}
     {#if dropIndicatorIndex === sortedTasks.length}
       <div class="drop-indicator"></div>

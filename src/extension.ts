@@ -231,6 +231,14 @@ export function activate(context: vscode.ExtensionContext) {
     });
   }
 
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration('backlog.taskIdDisplay')) {
+        tasksProvider.refresh();
+      }
+    })
+  );
+
   // Check for cross-branch feature configuration and CLI availability
   if (parser) {
     checkCrossBranchConfig(parser, context, tasksProvider);

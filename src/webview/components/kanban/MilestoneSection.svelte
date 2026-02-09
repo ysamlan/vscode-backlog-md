@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Task, Milestone } from '../../lib/types';
+  import type { Task, Milestone, TaskIdDisplayMode } from '../../lib/types';
   import KanbanColumn from './KanbanColumn.svelte';
 
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
@@ -14,6 +14,7 @@
     tasks: TaskWithBlocks[];
     columns: StatusColumn[];
     collapsed: boolean;
+    taskIdDisplay: TaskIdDisplayMode;
     onToggleCollapse: (milestone: string) => void;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onReadOnlyDragAttempt?: (task: Task) => void;
@@ -25,6 +26,7 @@
     tasks,
     columns,
     collapsed,
+    taskIdDisplay,
     onToggleCollapse,
     onOpenTask,
     onReadOnlyDragAttempt,
@@ -90,6 +92,7 @@
           label={col.label}
           tasks={columnTasks}
           collapsed={false}
+          {taskIdDisplay}
           milestone={milestoneKey}
           mini={true}
           onToggleCollapse={noOpToggle}
