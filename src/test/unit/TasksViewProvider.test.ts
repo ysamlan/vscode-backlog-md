@@ -447,6 +447,32 @@ describe('TasksViewProvider', () => {
     });
   });
 
+  describe('handleMessage selectTask', () => {
+    it('should forward selected task identity to registered selection handler', async () => {
+      const onSelectTask = vi.fn().mockResolvedValue(undefined);
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      provider.setTaskSelectionHandler(onSelectTask);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({
+        type: 'selectTask',
+        taskId: 'TASK-42',
+        filePath: '/fake/backlog/tasks/task-42.md',
+        source: 'local',
+        branch: 'feature/current',
+      });
+
+      expect(onSelectTask).toHaveBeenCalledWith({
+        taskId: 'TASK-42',
+        filePath: '/fake/backlog/tasks/task-42.md',
+        source: 'local',
+        branch: 'feature/current',
+      });
+    });
+  });
+
   describe('handleMessage restoreTask', () => {
     it('should call restoreArchivedTask and refresh on restore', async () => {
       const mockWriter = {

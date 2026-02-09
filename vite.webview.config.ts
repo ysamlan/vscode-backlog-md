@@ -33,6 +33,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         tasks: resolve(__dirname, 'src/webview/entries/tasks.ts'),
+        'task-preview': resolve(__dirname, 'src/webview/entries/task-preview.ts'),
         'task-detail': resolve(__dirname, 'src/webview/entries/task-detail.ts'),
         'content-detail': resolve(__dirname, 'src/webview/entries/content-detail.ts'),
       },

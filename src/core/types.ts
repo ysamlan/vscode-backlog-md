@@ -189,6 +189,13 @@ export interface BacklogConfig {
 export type WebviewMessage =
   | { type: 'refresh' }
   | {
+      type: 'selectTask';
+      taskId: string;
+      filePath?: string;
+      source?: TaskSource;
+      branch?: string;
+    }
+  | {
       type: 'openTask';
       taskId: string;
       filePath?: string;
@@ -279,5 +286,13 @@ export type ExtensionMessage =
   | { type: 'configUpdated'; config: { projectName?: string } }
   | { type: 'documentsUpdated'; documents: BacklogDocument[] }
   | { type: 'decisionsUpdated'; decisions: BacklogDecision[] }
+  | { type: 'taskPreviewCleared' }
+  | {
+      type: 'taskPreviewData';
+      task: Task;
+      statuses: string[];
+      isReadOnly: boolean;
+      readOnlyReason?: string;
+    }
   | { type: 'documentData'; document: BacklogDocument; contentHtml: string }
   | { type: 'decisionData'; decision: BacklogDecision; sections: Record<string, string> };

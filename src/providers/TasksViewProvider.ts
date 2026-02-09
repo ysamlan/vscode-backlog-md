@@ -4,6 +4,7 @@ import {
   WebviewMessage,
   DataSourceMode,
   Task,
+  TaskSource,
   TaskIdDisplayMode,
   TasksViewSettings,
   isReadOnlyTask,
@@ -30,6 +31,12 @@ export class TasksViewProvider extends BaseViewProvider {
   private dataSourceReason?: string;
   private collapsedColumns: Set<string> = new Set();
   private collapsedMilestones: Set<string> = new Set();
+  private onSelectTask?: (taskRef: {
+    taskId: string;
+    filePath?: string;
+    source?: TaskSource;
+    branch?: string;
+  }) => void | Promise<void>;
 
   private getTasksViewSettings(): TasksViewSettings {
     const configuredMode = vscode.workspace
@@ -44,6 +51,17 @@ export class TasksViewProvider extends BaseViewProvider {
 
   protected get viewType(): string {
     return 'backlog.kanban';
+  }
+
+  setTaskSelectionHandler(
+    handler: (taskRef: {
+      taskId: string;
+      filePath?: string;
+      source?: TaskSource;
+      branch?: string;
+    }) => void | Promise<void>
+  ): void {
+    this.onSelectTask = handler;
   }
 
   resolveWebviewView(
@@ -239,6 +257,16 @@ export class TasksViewProvider extends BaseViewProvider {
 
       case 'openTask': {
         vscode.commands.executeCommand('backlog.openTaskDetail', {
+          taskId: message.taskId,
+          filePath: message.filePath,
+          source: message.source,
+          branch: message.branch,
+        });
+        break;
+      }
+
+      case 'selectTask': {
+        await this.onSelectTask?.({
           taskId: message.taskId,
           filePath: message.filePath,
           source: message.source,

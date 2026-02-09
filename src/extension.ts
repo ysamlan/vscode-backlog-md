@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { TasksViewProvider } from './providers/TasksViewProvider';
 import { TaskDetailProvider } from './providers/TaskDetailProvider';
 import { ContentDetailProvider } from './providers/ContentDetailProvider';
+import { TaskPreviewViewProvider } from './providers/TaskPreviewViewProvider';
 import { BacklogParser } from './core/BacklogParser';
 import { BacklogWriter } from './core/BacklogWriter';
 import { TaskCreatePanel } from './providers/TaskCreatePanel';
@@ -77,6 +78,20 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider('backlog.kanban', tasksProvider)
   );
   console.log('[Backlog.md] Tasks view provider registered');
+
+  const taskPreviewProvider = new TaskPreviewViewProvider(
+    context.extensionUri,
+    parser,
+    context,
+    () => tasksProvider.refresh()
+  );
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider('backlog.taskPreview', taskPreviewProvider, {
+      webviewOptions: { retainContextWhenHidden: true },
+    })
+  );
+  tasksProvider.setTaskSelectionHandler((taskRef) => taskPreviewProvider.selectTask(taskRef));
+  console.log('[Backlog.md] Task preview view provider registered');
 
   // Create Task Detail provider for opening task details in editor
   const taskDetailProvider = new TaskDetailProvider(context.extensionUri, parser);
