@@ -1,6 +1,6 @@
 # Contributing to Backlog.md for VS Code
 
-Thank you for your interest in contributing! This document provides guidelines and instructions for contributing to the project.
+This document provides guidelines and instructions for contributing to the project.
 
 ## Development Setup
 
@@ -117,6 +117,27 @@ Short description of what was done
 ## Backlog Tasks
 
 This project uses [Backlog.md](https://github.com/backlog-md/backlog) for task management. Check the `backlog/tasks/` folder to see current work items and pick up unassigned tasks.
+
+### Cross-Branch Demo Workspace
+
+Use this script to create a local demo repository with deterministic branch-divergent tasks:
+
+```bash
+bun run demo:cross-branch-setup
+```
+
+Optional:
+
+```bash
+# Create at a custom path and overwrite if it already exists
+bash scripts/setup-cross-branch-demo.sh /tmp/my-cross-branch-demo --reset
+```
+
+What to verify in the UI for cross-branch functionality:
+
+1. Open the generated workspace in VS Code and open the Backlog view.
+2. `TASK-900` appears from `feature/cross-branch-demo` and is read-only.
+3. `TASK-1` on `main` remains editable.
 
 ## Getting Help
 

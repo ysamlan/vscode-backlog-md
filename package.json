@@ -31,7 +31,9 @@
     "Visualization"
   ],
   "activationEvents": [
-    "workspaceContains:**/backlog/tasks/*.md"
+    "workspaceContains:**/backlog/tasks/*.md",
+    "workspaceContains:**/backlog/config.yml",
+    "workspaceContains:**/backlog/config.yaml"
   ],
   "main": "./dist/extension.js",
   "contributes": {
