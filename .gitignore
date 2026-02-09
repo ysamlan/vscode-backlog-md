@@ -10,3 +10,6 @@ out/
 .claude/settings.local.json
 tmp/
 test-results/
+
+# https://github.com/obra/superpowers/blob/main/skills/using-git-worktrees/SKILL.md
+.worktrees/
