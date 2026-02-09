@@ -69,8 +69,9 @@ Short description of what was done
 
 Completes TASK-XX.
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+Co-Authored-By: ${model}
 ```
+(where ${model} is the contributing agent's model, like "Claude 4.5-Opus" or "OpenAI 5.3-Codex)
 
 **Adding dependencies**: Always use `bun add` to add new packages rather than manually editing package.json. This ensures the latest version is installed and bun.lockb is updated correctly.
 
