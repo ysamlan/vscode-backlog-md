@@ -2,7 +2,7 @@
  * Content Detail (Documents & Decisions) E2E Tests
  *
  * Tests the content-detail webview panel for rendering documents
- * and decisions with correct data, badges, and "Open Raw File" button.
+ * and decisions with correct data, badges, and "Open Markdown File" button.
  */
 import { test, expect } from '@playwright/test';
 import {
@@ -123,7 +123,7 @@ test.describe('Document Detail', () => {
     await expect(body.locator('strong')).toContainText('rendered');
   });
 
-  test('open raw file button sends openFile message', async ({ page }) => {
+  test('open markdown file button sends openFile message', async ({ page }) => {
     await postMessageToWebview(page, {
       type: 'documentData',
       document: sampleDocument,

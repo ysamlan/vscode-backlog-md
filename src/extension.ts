@@ -42,7 +42,7 @@ export function activate(context: vscode.ExtensionContext) {
   if (parser) {
     console.log('[Backlog.md] Parser initialized');
 
-    // Register language providers for raw markdown editing
+    // Register language providers for markdown editing
     context.subscriptions.push(
       vscode.languages.registerCompletionItemProvider(
         BACKLOG_DOCUMENT_SELECTOR,
@@ -224,23 +224,30 @@ export function activate(context: vscode.ExtensionContext) {
     )
   );
 
-  // Register open raw markdown command
+  // Register open markdown command
+  const openMarkdownCommand = async () => {
+    const taskId = TaskDetailProvider.getCurrentTaskId();
+    if (!taskId) {
+      vscode.window.showInformationMessage('No task is currently open');
+      return;
+    }
+    if (!parser) {
+      vscode.window.showErrorMessage('No backlog folder found');
+      return;
+    }
+    const task = await parser.getTask(taskId);
+    if (task?.filePath) {
+      vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
+    }
+  };
+
   context.subscriptions.push(
-    vscode.commands.registerCommand('backlog.openRawMarkdown', async () => {
-      const taskId = TaskDetailProvider.getCurrentTaskId();
-      if (!taskId) {
-        vscode.window.showInformationMessage('No task is currently open');
-        return;
-      }
-      if (!parser) {
-        vscode.window.showErrorMessage('No backlog folder found');
-        return;
-      }
-      const task = await parser.getTask(taskId);
-      if (task?.filePath) {
-        vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
-      }
-    })
+    vscode.commands.registerCommand('backlog.openMarkdown', openMarkdownCommand)
+  );
+
+  // Backward-compatible alias for older keybindings/macros
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.openRawMarkdown', openMarkdownCommand)
   );
 
   // Register create task command (opens form to create a draft)

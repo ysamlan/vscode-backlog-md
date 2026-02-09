@@ -68,11 +68,11 @@
     <div class="detail-header" data-testid="document-header">
       <div class="header-top">
         <span class="entity-id">{document.id}</span>
-        <button class="open-file-btn" data-testid="open-file-btn" onclick={handleOpenFile} title="Open raw markdown file">
+        <button class="open-file-btn" data-testid="open-file-btn" onclick={handleOpenFile} title="Open markdown file">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/>
           </svg>
-          Open Raw File
+          Open Markdown File
         </button>
       </div>
       <h1 class="detail-title">{document.title}</h1>
@@ -103,11 +103,11 @@
     <div class="detail-header" data-testid="decision-header">
       <div class="header-top">
         <span class="entity-id">{decision.id}</span>
-        <button class="open-file-btn" data-testid="open-file-btn" onclick={handleOpenFile} title="Open raw markdown file">
+        <button class="open-file-btn" data-testid="open-file-btn" onclick={handleOpenFile} title="Open markdown file">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/>
           </svg>
-          Open Raw File
+          Open Markdown File
         </button>
       </div>
       <h1 class="detail-title">{decision.title}</h1>

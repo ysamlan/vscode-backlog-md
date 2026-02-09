@@ -414,7 +414,7 @@ test.describe('Task Detail', () => {
   });
 
   test.describe('Actions', () => {
-    test('sends openFile message when clicking Open Raw Markdown', async ({ page }) => {
+    test('sends openFile message when clicking Open Markdown', async ({ page }) => {
       await clearPostedMessages(page);
 
       await page.locator('[data-testid="open-file-btn"]').click();

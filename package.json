@@ -80,8 +80,8 @@
         "icon": "$(add)"
       },
       {
-        "command": "backlog.openRawMarkdown",
-        "title": "Backlog: Open Task Raw Markdown"
+        "command": "backlog.openMarkdown",
+        "title": "Backlog: Open Task Markdown"
       },
       {
         "command": "backlog.showListView",
