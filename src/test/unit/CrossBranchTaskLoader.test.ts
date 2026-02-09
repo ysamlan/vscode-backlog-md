@@ -74,7 +74,7 @@ status: ${status}
     fs.mkdirSync(backlogDir);
 
     // Initialize git repo
-    git('init');
+    git('init -b main');
     git('config user.email "test@test.com"');
     git('config user.name "Test"');
 
@@ -191,7 +191,7 @@ status: ${status}
       fs.mkdirSync(conflictBacklogDir);
 
       // Initialize git
-      execSync('git init', { cwd: conflictTempDir, stdio: 'pipe' });
+      execSync('git init -b main', { cwd: conflictTempDir, stdio: 'pipe' });
       execSync('git config user.email "test@test.com"', { cwd: conflictTempDir, stdio: 'pipe' });
       execSync('git config user.name "Test"', { cwd: conflictTempDir, stdio: 'pipe' });
 
@@ -414,7 +414,7 @@ status: Done
       const isolatedBacklog = path.join(isolatedDir, 'backlog');
       fs.mkdirSync(isolatedBacklog);
 
-      execSync('git init', { cwd: isolatedDir, stdio: 'pipe' });
+      execSync('git init -b main', { cwd: isolatedDir, stdio: 'pipe' });
       execSync('git config user.email "test@test.com"', { cwd: isolatedDir, stdio: 'pipe' });
       execSync('git config user.name "Test"', { cwd: isolatedDir, stdio: 'pipe' });
 

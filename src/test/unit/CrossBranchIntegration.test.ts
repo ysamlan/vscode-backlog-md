@@ -56,7 +56,7 @@ status: ${status}
     fs.mkdirSync(backlogDir);
 
     // Initialize git repo
-    git('init');
+    git('init -b main');
     git('config user.email "test@test.com"');
     git('config user.name "Test"');
 
