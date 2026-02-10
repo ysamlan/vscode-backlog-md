@@ -3,7 +3,7 @@ dist/
 out/
 *.vsix
 .vscode-test/
-.DS_Store
+**/.DS_Store
 
 # vscode-extension-tester artifacts
 /core

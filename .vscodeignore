@@ -25,6 +25,7 @@ backlog/**
 
 # Documentation / AI agent configs (not needed in extension)
 docs/**
+!docs/images/**
 CLAUDE.md
 AGENTS.MD
 CONTRIBUTING.md
@@ -59,7 +60,7 @@ tmp/**
 .node-version
 mise.toml
 bun.lock
-.DS_Store
+**/.DS_Store
 
 # Source maps (not needed in production)
 dist/**/*.map
