@@ -297,6 +297,7 @@ export type ExtensionMessage =
       type: 'taskPreviewData';
       task: Task;
       statuses: string[];
+      descriptionHtml: string;
       isReadOnly: boolean;
       readOnlyReason?: string;
       subtaskSummaries?: Array<{

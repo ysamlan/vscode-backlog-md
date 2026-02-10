@@ -198,6 +198,80 @@ describe('TaskPreviewViewProvider', () => {
     );
   });
 
+  it('includes descriptionHtml as rendered markdown in taskPreviewData', async () => {
+    (parser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'TASK-5',
+      title: 'Markdown task',
+      status: 'To Do',
+      assignee: [],
+      labels: [],
+      dependencies: [],
+      description: '**bold text** and `code`',
+    });
+
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    webview.postMessage.mockClear();
+    await provider.selectTask({ taskId: 'TASK-5' });
+
+    const call = webview.postMessage.mock.calls.find(
+      (c: unknown[]) => (c[0] as { type: string }).type === 'taskPreviewData'
+    );
+    expect(call).toBeDefined();
+    const data = call![0] as { descriptionHtml: string };
+    expect(data.descriptionHtml).toContain('<strong>bold text</strong>');
+    expect(data.descriptionHtml).toContain('<code>code</code>');
+  });
+
+  it('sends empty descriptionHtml when task has no description', async () => {
+    (parser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'TASK-6',
+      title: 'No desc',
+      status: 'To Do',
+      assignee: [],
+      labels: [],
+      dependencies: [],
+      description: '',
+    });
+
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    webview.postMessage.mockClear();
+    await provider.selectTask({ taskId: 'TASK-6' });
+
+    const call = webview.postMessage.mock.calls.find(
+      (c: unknown[]) => (c[0] as { type: string }).type === 'taskPreviewData'
+    );
+    expect(call).toBeDefined();
+    expect((call![0] as { descriptionHtml: string }).descriptionHtml).toBe('');
+  });
+
   it('includes merged subtask summaries from explicit subtasks and parent_task_id children', async () => {
     (parser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: 'TASK-2',

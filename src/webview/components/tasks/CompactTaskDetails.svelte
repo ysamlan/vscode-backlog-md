@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getReadOnlyTaskContext, isReadOnlyTask, type Task, type TaskPriority } from '../../lib/types';
   import { formatStoredUtcDateForDisplay } from '../../lib/date-display';
+  import { renderMermaidAction } from '../../lib/mermaidAction';
 
   type TaskWithBlocks = Task & { blocksTaskIds?: string[] };
   type SubtaskSummary = {
@@ -15,6 +16,7 @@
   interface Props {
     task: TaskWithBlocks | null;
     statuses: string[];
+    descriptionHtml: string;
     subtaskSummaries: SubtaskSummary[];
     onOpenFull: (task: TaskWithBlocks) => void;
     onOpenSubtask: (subtask: SubtaskSummary) => void;
@@ -26,6 +28,7 @@
   let {
     task,
     statuses,
+    descriptionHtml,
     subtaskSummaries,
     onOpenFull,
     onOpenSubtask,
@@ -198,9 +201,12 @@
     {/if}
 
     <div class="compact-description-heading">Description</div>
-    <div class="compact-description">
-      {#if task.description}
-        {task.description}
+    <div
+      class="compact-description markdown-content"
+      use:renderMermaidAction={descriptionHtml}
+    >
+      {#if descriptionHtml}
+        {@html descriptionHtml}
       {:else}
         <span class="compact-muted">No description.</span>
       {/if}
@@ -415,7 +421,6 @@
   .compact-description {
     font-size: 12px;
     line-height: 1.45;
-    white-space: pre-wrap;
     overflow-wrap: anywhere;
     color: var(--vscode-foreground);
   }

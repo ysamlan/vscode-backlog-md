@@ -16,6 +16,7 @@
 
   let task = $state<TaskWithBlocks | null>(null);
   let statuses = $state<string[]>([]);
+  let descriptionHtml = $state('');
   let subtaskSummaries = $state<SubtaskSummary[]>([]);
 
   onMessage((message) => {
@@ -23,11 +24,13 @@
       case 'taskPreviewData':
         task = message.task as TaskWithBlocks;
         statuses = (message.statuses as string[]) || [];
+        descriptionHtml = (message.descriptionHtml as string) || '';
         subtaskSummaries = (message.subtaskSummaries as SubtaskSummary[]) || [];
         break;
       case 'taskPreviewCleared':
         task = null;
         statuses = [];
+        descriptionHtml = '';
         subtaskSummaries = [];
         break;
     }
@@ -81,6 +84,7 @@
 <CompactTaskDetails
   {task}
   {statuses}
+  {descriptionHtml}
   {subtaskSummaries}
   onOpenFull={handleOpenFull}
   onOpenSubtask={handleOpenSubtask}

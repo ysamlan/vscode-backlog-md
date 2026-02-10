@@ -4,7 +4,7 @@ title: Add Mermaid diagram rendering in webview markdown previews
 status: Done
 assignee: []
 created_date: '2026-02-10 03:31'
-updated_date: '2026-02-10 13:22'
+updated_date: '2026-02-10 20:25'
 labels:
   - feature
   - webview
@@ -66,7 +66,7 @@ This could be a shared utility/action used from each view, or a Svelte wrapper c
 <!-- AC:BEGIN -->
 - [x] #1 Mermaid fenced code blocks render as SVG diagrams in task detail view mode
 - [x] #2 Mermaid renders in content-detail view (docs, decisions)
-- [ ] #3 Mermaid renders in task preview panel (sidebar)
+- [x] #3 Mermaid renders in task preview panel (sidebar)
 - [x] #4 Raw mermaid code still visible when editing description in task-detail
 - [x] #5 Mermaid library is lazy-loaded only when mermaid blocks are detected
 - [x] #6 Diagrams respect VS Code dark/light theme

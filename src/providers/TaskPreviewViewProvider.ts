@@ -10,6 +10,20 @@ import {
 } from '../core/types';
 import { BacklogWriter } from '../core/BacklogWriter';
 import { computeSubtasks } from '../core/BacklogParser';
+import { sanitizeMarkdownSource } from '../core/sanitizeMarkdown';
+
+// Dynamic import for marked (ESM module)
+let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
+async function parseMarkdown(markdown: string): Promise<string> {
+  if (!markedParse) {
+    const { marked } = await import('marked');
+    marked.setOptions({ gfm: true, breaks: true });
+    markedParse = marked.parse;
+  }
+  const safe = sanitizeMarkdownSource(markdown);
+  const result = markedParse(safe);
+  return typeof result === 'string' ? result : await result;
+}
 
 type TaskSelectionRef = {
   taskId: string;
@@ -53,7 +67,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src ${webview.cspSource};">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource};">
     <link href="${styleUri}" rel="stylesheet">
     <link href="${componentStyleUri}" rel="stylesheet">
     <title>Task Preview</title>
@@ -98,10 +112,14 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
       this.selectedTaskRef
     );
     const statuses = await this.parser.getStatuses();
+    const descriptionHtml = taskWithBlocks.description
+      ? await parseMarkdown(taskWithBlocks.description)
+      : '';
     this.postMessage({
       type: 'taskPreviewData',
       task: taskWithBlocks,
       statuses,
+      descriptionHtml,
       isReadOnly: isReadOnlyTask(taskWithBlocks),
       readOnlyReason: isReadOnlyTask(taskWithBlocks)
         ? `Task is from ${getReadOnlyTaskContext(taskWithBlocks)} and is read-only.`
