@@ -522,12 +522,12 @@ export class BacklogParser {
           descriptionLines.push(line);
         }
       } else if (currentSection === 'acceptance') {
-        const checkItem = this.parseChecklistItem(trimmedLine);
+        const checkItem = this.parseChecklistItem(trimmedLine, task.acceptanceCriteria.length + 1);
         if (checkItem) {
           task.acceptanceCriteria.push(checkItem);
         }
       } else if (currentSection === 'dod') {
-        const checkItem = this.parseChecklistItem(trimmedLine);
+        const checkItem = this.parseChecklistItem(trimmedLine, task.definitionOfDone.length + 1);
         if (checkItem) {
           task.definitionOfDone.push(checkItem);
         }
@@ -683,13 +683,13 @@ export class BacklogParser {
     return undefined;
   }
 
-  private parseChecklistItem(line: string): ChecklistItem | undefined {
+  private parseChecklistItem(line: string, fallbackIndex: number): ChecklistItem | undefined {
     // Match patterns like "- [ ] #1 Item text" or "- [x] Item text"
     const match = line.match(/^-\s*\[([ xX])\]\s*(?:#(\d+)\s+)?(.+)$/);
     if (!match) return undefined;
 
     return {
-      id: match[2] ? parseInt(match[2], 10) : Date.now(),
+      id: match[2] ? parseInt(match[2], 10) : fallbackIndex,
       checked: match[1].toLowerCase() === 'x',
       text: match[3].trim(),
     };
