@@ -1,10 +1,10 @@
 ---
 id: TASK-66
 title: Set up VS Code Marketplace publisher account
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-04 01:40'
-updated_date: '2026-02-06 16:00'
+updated_date: '2026-02-10 16:31'
 labels:
   - 'epic:polish'
   - 'phase:9'

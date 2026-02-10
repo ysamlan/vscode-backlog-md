@@ -679,6 +679,15 @@ export class TasksViewProvider extends BaseViewProvider {
         break;
       }
 
+      case 'initBacklog': {
+        if (message.mode === 'defaults') {
+          vscode.commands.executeCommand('backlog.init', { defaults: true });
+        } else {
+          vscode.commands.executeCommand('backlog.init');
+        }
+        break;
+      }
+
       case 'toggleMilestoneCollapse': {
         const milestone = message.milestone;
         if (this.collapsedMilestones.has(milestone)) {

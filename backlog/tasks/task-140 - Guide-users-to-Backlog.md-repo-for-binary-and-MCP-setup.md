@@ -4,6 +4,7 @@ title: Guide users to Backlog.md repo for binary and MCP setup
 status: To Do
 assignee: []
 created_date: '2026-02-10 14:40'
+updated_date: '2026-02-10 16:24'
 labels: []
 dependencies:
   - TASK-136
@@ -22,4 +23,5 @@ Add clear onboarding guidance in the init flow so users can install Backlog.md b
 - [ ] #3 The guidance uses stable repository/install links and copy that is easy to follow from within the extension UI.
 - [ ] #4 If setup cannot be completed in-app, the user is still given an unambiguous next step to complete installation externally.
 - [ ] #5 Any affected docs/UI text are updated and verified for consistency with current extension terminology.
+- [ ] #6 #6 Guidance mentions shell completions (`backlog completion install`) as an optional post-install step for CLI users.
 <!-- AC:END -->

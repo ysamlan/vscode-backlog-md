@@ -242,7 +242,8 @@ export type WebviewMessage =
   | { type: 'focusTaskPreview' }
   | { type: 'requestCreateTask' }
   | { type: 'openDocument'; documentId: string }
-  | { type: 'openDecision'; decisionId: string };
+  | { type: 'openDecision'; decisionId: string }
+  | { type: 'initBacklog'; mode: 'defaults' | 'customize' };
 
 /**
  * Data source mode for task viewing

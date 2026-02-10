@@ -869,6 +869,46 @@ body {
   font-size: 12px;
 }
 
+/* Init backlog actions */
+.init-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.init-button {
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+}
+
+.init-button.primary {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+}
+
+.init-button.primary:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.init-button.secondary {
+  background: var(--vscode-button-secondaryBackground, #313131);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+}
+
+.init-button.secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground, #3c3c3c);
+}
+
+.init-hint {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #858585);
+}
+
 .sort-indicator {
   margin-left: 4px;
 }

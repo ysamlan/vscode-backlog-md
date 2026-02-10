@@ -435,11 +435,27 @@
     </div>
     <h3>No Backlog Found</h3>
     <p>
-      This workspace doesn't have a <code>backlog/</code> folder.
+      This workspace doesn't have a <code>backlog/</code> folder.<br />
+      Get started by initializing one.
     </p>
-    <p>
-      To use Backlog.md, create a <code>backlog/tasks/</code> folder<br />
-      in your project root with markdown task files.
+    <div class="init-actions">
+      <button
+        class="init-button primary"
+        data-testid="init-defaults-btn"
+        onclick={() => vscode.postMessage({ type: 'initBacklog', mode: 'defaults' })}
+      >
+        Initialize with Defaults
+      </button>
+      <button
+        class="init-button secondary"
+        data-testid="init-customize-btn"
+        onclick={() => vscode.postMessage({ type: 'initBacklog', mode: 'customize' })}
+      >
+        Customize...
+      </button>
+    </div>
+    <p class="init-hint">
+      Or run <code>Backlog: Initialize</code> from the Command Palette
     </p>
   </div>
 {:else if activeTab === 'kanban'}

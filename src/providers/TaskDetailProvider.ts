@@ -95,8 +95,12 @@ export class TaskDetailProvider {
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly parser: BacklogParser | undefined
+    private parser: BacklogParser | undefined
   ) {}
+
+  setParser(parser: BacklogParser): void {
+    this.parser = parser;
+  }
 
   /**
    * Handle file change events from the FileWatcher.

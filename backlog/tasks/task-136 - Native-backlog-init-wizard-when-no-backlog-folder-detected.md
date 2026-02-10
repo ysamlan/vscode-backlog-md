@@ -1,9 +1,10 @@
 ---
 id: TASK-136
 title: Native backlog init wizard when no backlog folder detected
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-10 03:35'
+updated_date: '2026-02-10 15:52'
 labels:
   - feature
   - ux
@@ -120,3 +121,26 @@ Option C — Hybrid:
 - [ ] #8 backlog.init command registered in command palette
 - [ ] #9 Re-running init on existing project is blocked or warns (no accidental overwrite)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented the native Backlog Init Wizard feature with all planned components:
+
+**New files:**
+- `src/core/initBacklog.ts` — Pure init logic with `generateConfigYml()`, `initializeBacklog()`, and `validateTaskPrefix()` functions
+- `src/test/unit/initBacklog.test.ts` — 11 unit tests covering config generation, directory creation, validation, and error cases
+
+**Modified files:**
+- `src/core/types.ts` — Added `initBacklog` message type to `WebviewMessage` union
+- `src/providers/BaseViewProvider.ts` — Made `parser` mutable, added `setParser()` method
+- `src/providers/TaskDetailProvider.ts` — Same pattern: mutable parser + `setParser()`
+- `src/providers/ContentDetailProvider.ts` — Same pattern: mutable parser + `setParser()`
+- `src/providers/TasksViewProvider.ts` — Added `initBacklog` message handler that delegates to `backlog.init` command
+- `src/webview/components/tasks/Tasks.svelte` — Replaced static empty state with "Initialize with Defaults" (primary) and "Customize..." (secondary) buttons
+- `src/webview/styles.css` — Added `.init-actions`, `.init-button.primary`, `.init-button.secondary`, `.init-hint` styles
+- `src/extension.ts` — Registered `backlog.init` command with defaults/customize flows, reinitialize logic that creates parser + file watcher + updates all providers
+- `package.json` — Added `backlog.init` command and `onCommand:backlog.init` activation event
+
+All 666 tests pass, lint clean, typecheck clean.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -15,6 +15,7 @@ import { BACKLOG_DOCUMENT_SELECTOR } from './language/documentSelector';
 import { BacklogCompletionProvider } from './language/BacklogCompletionProvider';
 import { BacklogDocumentLinkProvider } from './language/BacklogDocumentLinkProvider';
 import { BacklogHoverProvider } from './language/BacklogHoverProvider';
+import { initializeBacklog, type InitBacklogOptions } from './core/initBacklog';
 
 let fileWatcher: FileWatcher | undefined;
 let statusBarItem: vscode.StatusBarItem | undefined;
@@ -28,8 +29,8 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // Find backlog folder in workspace
-  const backlogFolder = findBacklogFolder();
-  const hasBacklog = backlogFolder !== undefined;
+  let backlogFolder = findBacklogFolder();
+  let hasBacklog = backlogFolder !== undefined;
 
   if (!hasBacklog) {
     console.log('[Backlog.md] No backlog folder found in workspace');
@@ -38,31 +39,37 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   // Initialize parser (may be undefined if no backlog folder)
-  const parser = hasBacklog ? new BacklogParser(backlogFolder) : undefined;
-  if (parser) {
-    console.log('[Backlog.md] Parser initialized');
+  let parser = hasBacklog ? new BacklogParser(backlogFolder!) : undefined;
+  let languageProvidersRegistered = false;
 
-    // Register language providers for markdown editing
+  function registerLanguageProviders(activeParser: BacklogParser) {
+    if (languageProvidersRegistered) return;
     context.subscriptions.push(
       vscode.languages.registerCompletionItemProvider(
         BACKLOG_DOCUMENT_SELECTOR,
-        new BacklogCompletionProvider(parser),
+        new BacklogCompletionProvider(activeParser),
         '-' // Trigger on '-' for task ID prefixes like TASK-
       )
     );
     context.subscriptions.push(
       vscode.languages.registerDocumentLinkProvider(
         BACKLOG_DOCUMENT_SELECTOR,
-        new BacklogDocumentLinkProvider(parser)
+        new BacklogDocumentLinkProvider(activeParser)
       )
     );
     context.subscriptions.push(
       vscode.languages.registerHoverProvider(
         BACKLOG_DOCUMENT_SELECTOR,
-        new BacklogHoverProvider(parser)
+        new BacklogHoverProvider(activeParser)
       )
     );
+    languageProvidersRegistered = true;
     console.log('[Backlog.md] Language providers registered');
+  }
+
+  if (parser) {
+    console.log('[Backlog.md] Parser initialized');
+    registerLanguageProviders(parser);
   }
 
   // Initialize file watcher (only if backlog folder exists)
@@ -254,6 +261,235 @@ export function activate(context: vscode.ExtensionContext) {
   // Backward-compatible alias for older keybindings/macros
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.openRawMarkdown', openMarkdownCommand)
+  );
+
+  // Register backlog init command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.init', async (args?: { defaults?: boolean }) => {
+      // Check if backlog already exists
+      const existingBacklog = findBacklogFolder();
+      if (existingBacklog) {
+        vscode.window.showInformationMessage('A backlog folder already exists in this workspace.');
+        return;
+      }
+
+      // Get workspace root
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('No workspace folder open. Please open a folder first.');
+        return;
+      }
+
+      let workspaceRoot: string;
+      if (workspaceFolders.length === 1) {
+        workspaceRoot = workspaceFolders[0].uri.fsPath;
+      } else {
+        const picked = await vscode.window.showWorkspaceFolderPick({
+          placeHolder: 'Select workspace folder to initialize backlog in',
+        });
+        if (!picked) return;
+        workspaceRoot = picked.uri.fsPath;
+      }
+
+      let options: InitBacklogOptions;
+
+      if (args?.defaults) {
+        // Quick init with defaults
+        const folderName = workspaceRoot.split(/[\\/]/).pop() || 'My Project';
+        options = {
+          projectName: folderName,
+          taskPrefix: 'task',
+          statuses: ['To Do', 'In Progress', 'Done'],
+        };
+      } else {
+        // Customization wizard
+        const folderName = workspaceRoot.split(/[\\/]/).pop() || 'My Project';
+
+        const projectName = await vscode.window.showInputBox({
+          prompt: 'Project name',
+          value: folderName,
+          validateInput: (value) => (value.trim() ? null : 'Project name cannot be empty'),
+        });
+        if (projectName === undefined) return;
+
+        const taskPrefix = await vscode.window.showInputBox({
+          prompt: 'Task ID prefix (letters only, e.g. "task" → TASK-1)',
+          value: 'task',
+          validateInput: (value) =>
+            /^[a-zA-Z]+$/.test(value) ? null : 'Prefix must contain only letters (a-z, A-Z)',
+        });
+        if (taskPrefix === undefined) return;
+
+        const statusesInput = await vscode.window.showInputBox({
+          prompt: 'Statuses (comma-separated)',
+          value: 'To Do, In Progress, Done',
+          validateInput: (value) => {
+            const items = value
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean);
+            return items.length >= 2 ? null : 'At least 2 statuses required';
+          },
+        });
+        if (statusesInput === undefined) return;
+
+        options = {
+          projectName: projectName.trim(),
+          taskPrefix: taskPrefix.trim(),
+          statuses: statusesInput
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        };
+
+        // Advanced settings wizard (matches upstream advanced-config-wizard flow)
+        const advancedChoice = await vscode.window.showQuickPick(['No', 'Yes'], {
+          placeHolder: 'Configure advanced settings now?',
+        });
+        if (advancedChoice === undefined) return;
+
+        if (advancedChoice === 'Yes') {
+          // Cross-branch tracking
+          const crossBranch = await vscode.window.showQuickPick(['Yes', 'No'], {
+            placeHolder: 'Check task states across active branches?',
+          });
+          if (crossBranch === undefined) return;
+          options.checkActiveBranches = crossBranch === 'Yes';
+
+          if (options.checkActiveBranches) {
+            const remoteOps = await vscode.window.showQuickPick(['Yes', 'No'], {
+              placeHolder: 'Check task states in remote branches?',
+            });
+            if (remoteOps === undefined) return;
+            options.remoteOperations = remoteOps === 'Yes';
+
+            const branchDays = await vscode.window.showInputBox({
+              prompt: 'How many days should a branch be considered active?',
+              value: '30',
+              validateInput: (value) => {
+                const n = parseInt(value, 10);
+                return n >= 1 && n <= 365 ? null : 'Enter a number between 1 and 365';
+              },
+            });
+            if (branchDays === undefined) return;
+            options.activeBranchDays = parseInt(branchDays, 10);
+          }
+
+          // Git settings
+          const bypassHooks = await vscode.window.showQuickPick(['No', 'Yes'], {
+            placeHolder: 'Bypass git hooks when committing?',
+          });
+          if (bypassHooks === undefined) return;
+          options.bypassGitHooks = bypassHooks === 'Yes';
+
+          const autoCommit = await vscode.window.showQuickPick(['No', 'Yes'], {
+            placeHolder: 'Enable automatic commits for Backlog operations?',
+          });
+          if (autoCommit === undefined) return;
+          options.autoCommit = autoCommit === 'Yes';
+
+          // Zero-padded IDs
+          const zeroPadded = await vscode.window.showQuickPick(['No', 'Yes'], {
+            placeHolder: 'Enable zero-padded IDs for consistent formatting? (e.g. TASK-001)',
+          });
+          if (zeroPadded === undefined) return;
+
+          if (zeroPadded === 'Yes') {
+            const padWidth = await vscode.window.showInputBox({
+              prompt: 'Number of digits for zero-padding (e.g. 3 → TASK-001)',
+              value: '3',
+              validateInput: (value) => {
+                const n = parseInt(value, 10);
+                return n >= 1 && n <= 10 ? null : 'Enter a number between 1 and 10';
+              },
+            });
+            if (padWidth === undefined) return;
+            options.zeroPaddedIds = parseInt(padWidth, 10);
+          }
+
+          // Editor
+          const editorCmd = await vscode.window.showInputBox({
+            prompt: 'Default editor command (leave blank to use system default)',
+            placeHolder: "e.g. 'code --wait', 'vim', 'nano'",
+            value: '',
+          });
+          if (editorCmd === undefined) return;
+          if (editorCmd.trim()) {
+            options.defaultEditor = editorCmd.trim();
+          }
+
+          // Web UI settings
+          const webUi = await vscode.window.showQuickPick(['No', 'Yes'], {
+            placeHolder: 'Configure web UI settings now?',
+          });
+          if (webUi === undefined) return;
+
+          if (webUi === 'Yes') {
+            const port = await vscode.window.showInputBox({
+              prompt: 'Default web UI port',
+              value: '6420',
+              validateInput: (value) => {
+                const n = parseInt(value, 10);
+                return n >= 1 && n <= 65535 ? null : 'Enter a port between 1 and 65535';
+              },
+            });
+            if (port === undefined) return;
+            options.defaultPort = parseInt(port, 10);
+
+            const autoOpen = await vscode.window.showQuickPick(['Yes', 'No'], {
+              placeHolder: 'Automatically open browser when starting web UI?',
+            });
+            if (autoOpen === undefined) return;
+            options.autoOpenBrowser = autoOpen === 'Yes';
+          }
+        }
+      }
+
+      try {
+        const newBacklogPath = initializeBacklog(workspaceRoot, options);
+        console.log('[Backlog.md] Backlog initialized at:', newBacklogPath);
+
+        // Reinitialize the extension with the new backlog
+        backlogFolder = newBacklogPath;
+        hasBacklog = true;
+
+        // Create new parser
+        parser = new BacklogParser(newBacklogPath);
+
+        // Dispose old file watcher if any, create new one
+        if (fileWatcher) {
+          fileWatcher.dispose();
+        }
+        fileWatcher = new FileWatcher(newBacklogPath);
+        context.subscriptions.push(fileWatcher);
+
+        // Wire up debounced refresh for the new file watcher
+        const debouncedRefresh = createDebouncedHandler((uri: vscode.Uri) => {
+          console.log('[Backlog.md] Debounced refresh triggered (post-init)');
+          tasksProvider.refresh();
+          TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
+        }, 300);
+        fileWatcher.onDidChange((uri) => {
+          debouncedRefresh(uri);
+        });
+
+        // Update all providers with the new parser
+        tasksProvider.setParser(parser);
+        taskPreviewProvider.setParser(parser);
+        taskDetailProvider.setParser(parser);
+        contentDetailProvider.setParser(parser);
+
+        // Register language providers if not already registered
+        registerLanguageProviders(parser);
+
+        // Refresh the tasks view to clear the empty state
+        await tasksProvider.refresh();
+
+        vscode.window.showInformationMessage(`Backlog initialized in ${newBacklogPath}`);
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to initialize backlog: ${error}`);
+      }
+    })
   );
 
   // Register create task command (opens form to create a draft)

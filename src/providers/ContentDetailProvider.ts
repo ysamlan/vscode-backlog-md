@@ -30,8 +30,12 @@ export class ContentDetailProvider {
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly parser: BacklogParser | undefined
+    private parser: BacklogParser | undefined
   ) {}
+
+  setParser(parser: BacklogParser): void {
+    this.parser = parser;
+  }
 
   /**
    * Open or update the panel to show a document
