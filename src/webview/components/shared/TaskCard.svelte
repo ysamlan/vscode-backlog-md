@@ -11,6 +11,7 @@
   interface Props {
     task: Task & { blocksTaskIds?: string[]; subtaskProgress?: { total: number; done: number } };
     taskIdDisplay: TaskIdDisplayMode;
+    isActiveEdited?: boolean;
     onSelectTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onReadOnlyDragAttempt?: (task: Task) => void;
@@ -21,6 +22,7 @@
   let {
     task,
     taskIdDisplay,
+    isActiveEdited = false,
     onSelectTask,
     onReadOnlyDragAttempt,
     ondragstart,
@@ -87,6 +89,7 @@
 <div
   class="task-card"
   class:saving={isSaving}
+  class:active-edited={isActiveEdited}
   class:readonly-task={isReadOnlyTask(task)}
   tabindex="0"
   draggable="true"

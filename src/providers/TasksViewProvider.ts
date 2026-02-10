@@ -12,6 +12,7 @@ import {
 } from '../core/types';
 import { BacklogWriter } from '../core/BacklogWriter';
 import { computeSubtasks } from '../core/BacklogParser';
+import { TaskDetailProvider } from './TaskDetailProvider';
 
 /**
  * Provides a unified tasks webview with toggle between Kanban and List views
@@ -31,6 +32,7 @@ export class TasksViewProvider extends BaseViewProvider {
   private dataSourceReason?: string;
   private collapsedColumns: Set<string> = new Set();
   private collapsedMilestones: Set<string> = new Set();
+  private activeEditedTaskId: string | null = null;
   private onSelectTask?: (taskRef: {
     taskId: string;
     filePath?: string;
@@ -62,6 +64,14 @@ export class TasksViewProvider extends BaseViewProvider {
     }) => void | Promise<void>
   ): void {
     this.onSelectTask = handler;
+  }
+
+  /**
+   * Update the active edited task ID and notify the webview for highlighting
+   */
+  setActiveEditedTaskId(taskId: string | null): void {
+    this.activeEditedTaskId = taskId;
+    this.postMessage({ type: 'activeEditedTaskChanged', taskId });
   }
 
   resolveWebviewView(
@@ -281,12 +291,20 @@ export class TasksViewProvider extends BaseViewProvider {
       }
 
       case 'selectTask': {
-        await this.onSelectTask?.({
+        const taskRef = {
           taskId: message.taskId,
           filePath: message.filePath,
           source: message.source,
           branch: message.branch,
-        });
+        };
+        // Always update the sidebar preview
+        await this.onSelectTask?.(taskRef);
+        // Also update the full edit view when a detail panel is already active
+        if (TaskDetailProvider.hasActivePanel()) {
+          vscode.commands.executeCommand('backlog.openTaskDetail', taskRef, {
+            preserveFocus: true,
+          });
+        }
         break;
       }
 

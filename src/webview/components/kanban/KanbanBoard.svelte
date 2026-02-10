@@ -19,6 +19,7 @@
     collapsedColumns: Set<string>;
     collapsedMilestones: Set<string>;
     taskIdDisplay: TaskIdDisplayMode;
+    activeEditedTaskId?: string | null;
     onSelectTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onToggleColumnCollapse: (status: string) => void;
@@ -41,6 +42,7 @@
     collapsedColumns,
     collapsedMilestones,
     taskIdDisplay,
+    activeEditedTaskId = null,
     onSelectTask,
     onOpenTask,
     onToggleColumnCollapse,
@@ -142,6 +144,7 @@
           {columns}
           collapsed={collapsedMilestones.has(group.name ?? '__uncategorized__')}
           {taskIdDisplay}
+          {activeEditedTaskId}
           onToggleCollapse={onToggleMilestoneCollapse}
         {onSelectTask}
         {onOpenTask}
@@ -160,6 +163,7 @@
         tasks={columnTasks}
         collapsed={collapsedColumns.has(col.status)}
         {taskIdDisplay}
+        {activeEditedTaskId}
         onToggleCollapse={onToggleColumnCollapse}
         {onSelectTask}
         {onOpenTask}

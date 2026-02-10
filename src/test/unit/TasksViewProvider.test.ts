@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import * as vscode from 'vscode';
 import { createMockExtensionContext } from '../mocks/vscode';
 import { TasksViewProvider } from '../../providers/TasksViewProvider';
+import { TaskDetailProvider } from '../../providers/TaskDetailProvider';
 import { BacklogParser } from '../../core/BacklogParser';
 import { Task } from '../../core/types';
 
@@ -1544,6 +1545,103 @@ describe('TasksViewProvider', () => {
           ]),
         })
       );
+    });
+  });
+
+  describe('selectTask routing and active task highlighting', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should route to openTaskDetail command and update preview when TaskDetailProvider has an active panel', async () => {
+      vi.spyOn(TaskDetailProvider, 'hasActivePanel').mockReturnValue(true);
+
+      const onSelectTask = vi.fn().mockResolvedValue(undefined);
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      provider.setTaskSelectionHandler(onSelectTask);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({
+        type: 'selectTask',
+        taskId: 'TASK-10',
+        filePath: '/fake/backlog/tasks/task-10.md',
+        source: 'local',
+        branch: 'main',
+      });
+
+      const taskRef = {
+        taskId: 'TASK-10',
+        filePath: '/fake/backlog/tasks/task-10.md',
+        source: 'local',
+        branch: 'main',
+      };
+      // Both preview and editor should be updated
+      expect(onSelectTask).toHaveBeenCalledWith(taskRef);
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+        'backlog.openTaskDetail',
+        taskRef,
+        { preserveFocus: true }
+      );
+    });
+
+    it('should call onSelectTask handler when TaskDetailProvider has no active panel', async () => {
+      vi.spyOn(TaskDetailProvider, 'hasActivePanel').mockReturnValue(false);
+
+      const onSelectTask = vi.fn().mockResolvedValue(undefined);
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      provider.setTaskSelectionHandler(onSelectTask);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({
+        type: 'selectTask',
+        taskId: 'TASK-20',
+        filePath: '/fake/backlog/tasks/task-20.md',
+        source: 'local',
+        branch: 'feature/test',
+      });
+
+      expect(onSelectTask).toHaveBeenCalledWith({
+        taskId: 'TASK-20',
+        filePath: '/fake/backlog/tasks/task-20.md',
+        source: 'local',
+        branch: 'feature/test',
+      });
+      expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+        'backlog.openTaskDetail',
+        expect.anything()
+      );
+    });
+
+    it('should post activeEditedTaskChanged message when setActiveEditedTaskId is called with a task ID', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      provider.setActiveEditedTaskId('TASK-55');
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'activeEditedTaskChanged',
+        taskId: 'TASK-55',
+      });
+    });
+
+    it('should post activeEditedTaskChanged message with null when setActiveEditedTaskId is called with null', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      (mockWebview.postMessage as ReturnType<typeof vi.fn>).mockClear();
+
+      provider.setActiveEditedTaskId(null);
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'activeEditedTaskChanged',
+        taskId: null,
+      });
     });
   });
 });

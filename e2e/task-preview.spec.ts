@@ -141,7 +141,9 @@ test.describe('Task Preview Panel', () => {
     });
 
     test('displays updated date chip', async ({ page }) => {
-      await expect(page.locator('.compact-updated-chip')).toContainText('2026-01-15');
+      // Date is locale-formatted by formatStoredUtcDateForDisplay, so check for "Updated" prefix and year
+      await expect(page.locator('.compact-updated-chip')).toContainText('Updated');
+      await expect(page.locator('.compact-updated-chip')).toContainText('2026');
     });
   });
 

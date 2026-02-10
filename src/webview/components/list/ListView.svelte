@@ -18,6 +18,7 @@
     statuses: string[];
     milestones: Milestone[];
     taskIdDisplay: TaskIdDisplayMode;
+    activeEditedTaskId?: string | null;
     currentFilter: string;
     currentMilestone: string;
     currentLabel: string;
@@ -39,6 +40,7 @@
     statuses = [],
     milestones,
     taskIdDisplay,
+    activeEditedTaskId = null,
     currentFilter,
     currentMilestone,
     currentLabel,
@@ -498,6 +500,7 @@
               class:dragging={draggedTaskId === task.id}
               class:drop-before={dropTargetTaskId === task.id && dropPosition === 'before'}
               class:drop-after={dropTargetTaskId === task.id && dropPosition === 'after'}
+              class:active-edited={activeEditedTaskId === task.id}
               class:completed-row={task.source === 'completed'}
               class:draft-row={isDraftsView}
               class:archived-row={isArchivedView}

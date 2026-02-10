@@ -58,6 +58,9 @@
   // Keyboard shortcuts popup state
   let showShortcuts = $state(false);
 
+  // Active edited task (from task detail panel)
+  let activeEditedTaskId = $state<string | null>(null);
+
   // Message handlers
   onMessage((message) => {
     switch (message.type) {
@@ -153,6 +156,10 @@
 
       case 'settingsUpdated':
         taskIdDisplay = message.settings.taskIdDisplay;
+        break;
+
+      case 'activeEditedTaskChanged':
+        activeEditedTaskId = message.taskId ?? null;
         break;
 
       case 'statsUpdated':
@@ -466,6 +473,7 @@
         {collapsedColumns}
         {collapsedMilestones}
         {taskIdDisplay}
+        {activeEditedTaskId}
         onSelectTask={handleSelectTask}
         onOpenTask={handleOpenTask}
         onToggleColumnCollapse={handleToggleColumnCollapse}
@@ -483,6 +491,7 @@
       {statuses}
       milestones={configMilestones}
       {taskIdDisplay}
+      {activeEditedTaskId}
       {currentFilter}
       {currentMilestone}
       {currentLabel}
@@ -505,6 +514,7 @@
       {statuses}
       milestones={configMilestones}
       {taskIdDisplay}
+      {activeEditedTaskId}
       {currentFilter}
       {currentMilestone}
       {currentLabel}

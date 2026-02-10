@@ -73,6 +73,26 @@ export class TaskDetailProvider {
     return TaskDetailProvider.currentTaskId;
   }
 
+  /**
+   * Check if a task detail panel is currently active and visible
+   */
+  public static hasActivePanel(): boolean {
+    return TaskDetailProvider.currentPanel !== undefined && TaskDetailProvider.currentPanel.visible;
+  }
+
+  private static onActiveTaskChangedCallback: ((taskId: string | null) => void) | undefined;
+
+  /**
+   * Register a callback that fires when the active edited task changes
+   */
+  public static onActiveTaskChanged(callback: (taskId: string | null) => void): void {
+    TaskDetailProvider.onActiveTaskChangedCallback = callback;
+  }
+
+  private static notifyActiveTaskChanged(taskId: string | null): void {
+    TaskDetailProvider.onActiveTaskChangedCallback?.(taskId);
+  }
+
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly parser: BacklogParser | undefined
@@ -103,7 +123,10 @@ export class TaskDetailProvider {
   /**
    * Open or update the task detail panel for a specific task
    */
-  async openTask(taskRef: string | OpenTaskRequest): Promise<void> {
+  async openTask(
+    taskRef: string | OpenTaskRequest,
+    options?: { preserveFocus?: boolean }
+  ): Promise<void> {
     if (!this.parser) {
       vscode.window.showErrorMessage('No backlog folder found');
       return;
@@ -130,7 +153,7 @@ export class TaskDetailProvider {
 
     // If we already have a panel, show it and update content
     if (TaskDetailProvider.currentPanel) {
-      TaskDetailProvider.currentPanel.reveal(column);
+      TaskDetailProvider.currentPanel.reveal(column, options?.preserveFocus);
       TaskDetailProvider.currentPanel.title = `${task.id}: ${task.title}`;
       TaskDetailProvider.currentTaskId = task.id;
       TaskDetailProvider.currentTaskRef = {
@@ -140,6 +163,7 @@ export class TaskDetailProvider {
         branch: task.branch,
       };
       await this.sendTaskData(TaskDetailProvider.currentPanel.webview, task);
+      TaskDetailProvider.notifyActiveTaskChanged(task.id);
       return;
     }
 
@@ -173,6 +197,15 @@ export class TaskDetailProvider {
       await this.handleMessage(message);
     });
 
+    // Track visibility changes for active task highlighting
+    panel.onDidChangeViewState(() => {
+      if (panel.visible) {
+        TaskDetailProvider.notifyActiveTaskChanged(TaskDetailProvider.currentTaskId ?? null);
+      } else {
+        TaskDetailProvider.notifyActiveTaskChanged(null);
+      }
+    });
+
     // Reset when the panel is closed
     panel.onDidDispose(() => {
       TaskDetailProvider.currentPanel = undefined;
@@ -180,7 +213,10 @@ export class TaskDetailProvider {
       TaskDetailProvider.currentTaskRef = undefined;
       TaskDetailProvider.currentFileHash = undefined;
       TaskDetailProvider.currentFilePath = undefined;
+      TaskDetailProvider.notifyActiveTaskChanged(null);
     });
+
+    TaskDetailProvider.notifyActiveTaskChanged(task.id);
   }
 
   /**

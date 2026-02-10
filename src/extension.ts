@@ -97,6 +97,11 @@ export function activate(context: vscode.ExtensionContext) {
   const taskDetailProvider = new TaskDetailProvider(context.extensionUri, parser);
   console.log('[Backlog.md] Task detail provider created');
 
+  // Track active edited task for sidebar highlighting and routing
+  TaskDetailProvider.onActiveTaskChanged((taskId) => {
+    tasksProvider.setActiveEditedTaskId(taskId);
+  });
+
   // Create Content Detail provider for opening docs/decisions in editor
   const contentDetailProvider = new ContentDetailProvider(context.extensionUri, parser);
   console.log('[Backlog.md] Content detail provider created');
@@ -217,9 +222,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand(
       'backlog.openTaskDetail',
       (
-        task: string | { taskId: string; filePath?: string; source?: TaskSource; branch?: string }
+        task: string | { taskId: string; filePath?: string; source?: TaskSource; branch?: string },
+        options?: { preserveFocus?: boolean }
       ) => {
-        taskDetailProvider.openTask(task);
+        taskDetailProvider.openTask(task, options);
       }
     )
   );

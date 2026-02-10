@@ -3,9 +3,10 @@ id: TASK-134
 title: >-
   Route sidebar task navigation to edit view when edit mode is active and
   highlight active edited task in Tasks view
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-09 23:34'
+updated_date: '2026-02-10 00:15'
 labels:
   - feature
   - navigation

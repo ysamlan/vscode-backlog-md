@@ -306,4 +306,5 @@ export type ExtensionMessage =
       }>;
     }
   | { type: 'documentData'; document: BacklogDocument; contentHtml: string }
-  | { type: 'decisionData'; decision: BacklogDecision; sections: Record<string, string> };
+  | { type: 'decisionData'; decision: BacklogDecision; sections: Record<string, string> }
+  | { type: 'activeEditedTaskChanged'; taskId: string | null };

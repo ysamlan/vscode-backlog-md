@@ -62,10 +62,14 @@ describe('TaskDetailProvider', () => {
       webview: mockWebview as vscode.Webview,
       reveal: vi.fn(),
       title: '',
+      visible: true,
       dispose: vi.fn(),
       onDidDispose: vi.fn((callback: () => void) => {
         // Store callback for later invocation in tests
         (mockPanel as { _disposeCallback?: () => void })._disposeCallback = callback;
+        return { dispose: vi.fn() };
+      }),
+      onDidChangeViewState: vi.fn(() => {
         return { dispose: vi.fn() };
       }),
     };

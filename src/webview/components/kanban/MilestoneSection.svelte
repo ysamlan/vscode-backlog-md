@@ -15,6 +15,7 @@
     columns: StatusColumn[];
     collapsed: boolean;
     taskIdDisplay: TaskIdDisplayMode;
+    activeEditedTaskId?: string | null;
     onToggleCollapse: (milestone: string) => void;
     onSelectTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
     onOpenTask: (taskId: string, taskMeta?: Pick<Task, 'filePath' | 'source' | 'branch'>) => void;
@@ -28,6 +29,7 @@
     columns,
     collapsed,
     taskIdDisplay,
+    activeEditedTaskId = null,
     onToggleCollapse,
     onSelectTask,
     onOpenTask,
@@ -95,6 +97,7 @@
           tasks={columnTasks}
           collapsed={false}
           {taskIdDisplay}
+          {activeEditedTaskId}
           milestone={milestoneKey}
           mini={true}
           onToggleCollapse={noOpToggle}

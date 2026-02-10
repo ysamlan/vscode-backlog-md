@@ -10,6 +10,7 @@
     label: string;
     tasks: TaskWithBlocks[];
     taskIdDisplay: TaskIdDisplayMode;
+    activeEditedTaskId?: string | null;
     collapsed: boolean;
     milestone?: string;
     mini?: boolean;
@@ -25,6 +26,7 @@
     label,
     tasks,
     taskIdDisplay,
+    activeEditedTaskId = null,
     collapsed,
     milestone,
     mini = false,
@@ -167,7 +169,7 @@
       {#if dropIndicatorIndex === index}
         <div class="drop-indicator"></div>
       {/if}
-      <TaskCard {task} {taskIdDisplay} {onSelectTask} {onOpenTask} {onReadOnlyDragAttempt} />
+      <TaskCard {task} {taskIdDisplay} isActiveEdited={activeEditedTaskId === task.id} {onSelectTask} {onOpenTask} {onReadOnlyDragAttempt} />
     {/each}
     {#if dropIndicatorIndex === sortedTasks.length}
       <div class="drop-indicator"></div>

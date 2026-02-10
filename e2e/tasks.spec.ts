@@ -1410,4 +1410,96 @@ test.describe('Tasks View', () => {
     const message = await getLastPostedMessage(page);
     expect(message).toEqual({ type: 'refresh' });
   });
+
+  test.describe('Active Edited Task Highlight', () => {
+    test('kanban view highlights the matching task card with active-edited class', async ({
+      page,
+    }) => {
+      await setupTasksView(page);
+
+      // Send activeEditedTaskChanged message with TASK-1
+      await postMessageToWebview(page, {
+        type: 'activeEditedTaskChanged',
+        taskId: 'TASK-1',
+      });
+      await page.waitForTimeout(50);
+
+      // The matching task card should have the active-edited class
+      const highlightedCard = page.locator('.task-card.active-edited');
+      await expect(highlightedCard).toHaveCount(1);
+      await expect(highlightedCard).toHaveAttribute('data-task-id', 'TASK-1');
+    });
+
+    test('list view highlights the matching row with active-edited class', async ({ page }) => {
+      await setupTasksView(page);
+
+      // Switch to list view
+      await postMessageToWebview(page, { type: 'viewModeChanged', viewMode: 'list' });
+      await page.waitForTimeout(50);
+
+      // Send activeEditedTaskChanged message with TASK-1
+      await postMessageToWebview(page, {
+        type: 'activeEditedTaskChanged',
+        taskId: 'TASK-1',
+      });
+      await page.waitForTimeout(50);
+
+      // The matching row should have the active-edited class
+      const highlightedRow = page.locator('tr.active-edited');
+      await expect(highlightedRow).toHaveCount(1);
+      await expect(highlightedRow).toHaveAttribute('data-task-id', 'TASK-1');
+    });
+
+    test('clears highlight when taskId is null', async ({ page }) => {
+      await setupTasksView(page);
+
+      // First set an active task
+      await postMessageToWebview(page, {
+        type: 'activeEditedTaskChanged',
+        taskId: 'TASK-1',
+      });
+      await page.waitForTimeout(50);
+      await expect(page.locator('.task-card.active-edited')).toHaveCount(1);
+
+      // Clear the highlight by sending null
+      await postMessageToWebview(page, {
+        type: 'activeEditedTaskChanged',
+        taskId: null,
+      });
+      await page.waitForTimeout(50);
+
+      // No elements should have active-edited class
+      await expect(page.locator('.active-edited')).toHaveCount(0);
+    });
+
+    test('switching active task moves highlight from task A to task B', async ({ page }) => {
+      await setupTasksView(page);
+
+      // Highlight TASK-1
+      await postMessageToWebview(page, {
+        type: 'activeEditedTaskChanged',
+        taskId: 'TASK-1',
+      });
+      await page.waitForTimeout(50);
+
+      const highlightedA = page.locator('.task-card.active-edited');
+      await expect(highlightedA).toHaveCount(1);
+      await expect(highlightedA).toHaveAttribute('data-task-id', 'TASK-1');
+
+      // Switch highlight to TASK-4
+      await postMessageToWebview(page, {
+        type: 'activeEditedTaskChanged',
+        taskId: 'TASK-4',
+      });
+      await page.waitForTimeout(50);
+
+      // Only TASK-4 should have the highlight
+      const highlightedCards = page.locator('.task-card.active-edited');
+      await expect(highlightedCards).toHaveCount(1);
+      await expect(highlightedCards).toHaveAttribute('data-task-id', 'TASK-4');
+
+      // TASK-1 should no longer have the class
+      await expect(page.locator('[data-testid="task-TASK-1"]')).not.toHaveClass(/active-edited/);
+    });
+  });
 });
