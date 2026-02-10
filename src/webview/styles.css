@@ -2117,6 +2117,68 @@ body {
   white-space: pre-wrap;
 }
 
+/* ============================================
+   Agent Setup Banner
+   ============================================ */
+
+.agent-setup-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--vscode-inputValidation-infoBackground, rgba(59, 130, 246, 0.1));
+  border-bottom: 1px solid var(--vscode-inputValidation-infoBorder, rgba(59, 130, 246, 0.4));
+  font-size: 12px;
+  color: var(--vscode-foreground, #cccccc);
+}
+
+.agent-setup-banner .banner-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.agent-setup-banner .banner-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-setup-banner .banner-action-btn {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+}
+
+.agent-setup-banner .banner-action-btn:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.agent-setup-banner .banner-dismiss-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--vscode-descriptionForeground, #858585);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.agent-setup-banner .banner-dismiss-btn:hover {
+  color: var(--vscode-foreground, #cccccc);
+  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04));
+}
+
 /* Utility classes */
 .hidden {
   display: none !important;

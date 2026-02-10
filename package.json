@@ -127,6 +127,10 @@
       {
         "command": "backlog.selectBacklog",
         "title": "Backlog: Select Active Backlog"
+      },
+      {
+        "command": "backlog.setupAgentIntegration",
+        "title": "Backlog: Set Up Agent Integration"
       }
     ],
     "menus": {},

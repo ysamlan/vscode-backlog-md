@@ -16,6 +16,7 @@ import { BacklogDocumentLinkProvider } from './language/BacklogDocumentLinkProvi
 import { BacklogHoverProvider } from './language/BacklogHoverProvider';
 import { initializeBacklog, type InitBacklogOptions } from './core/initBacklog';
 import { BacklogWorkspaceManager, type BacklogRoot } from './core/BacklogWorkspaceManager';
+import { detectPackageManager } from './core/AgentIntegrationDetector';
 
 let fileWatcher: FileWatcher | undefined;
 let crossBranchStatusBarItem: vscode.StatusBarItem | undefined;
@@ -91,6 +92,10 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('backlog.kanban', tasksProvider)
   );
+  // Set workspace root for integration detection
+  if (activeRoot?.workspaceFolder) {
+    tasksProvider.setWorkspaceRoot(activeRoot.workspaceFolder.uri.fsPath);
+  }
   console.log('[Backlog.md] Tasks view provider registered');
 
   const taskPreviewProvider = new TaskPreviewViewProvider(
@@ -147,6 +152,9 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Update all view providers
+    if (root.workspaceFolder) {
+      tasksProvider.setWorkspaceRoot(root.workspaceFolder.uri.fsPath);
+    }
     tasksProvider.setParser(parser);
     taskPreviewProvider.setParser(parser);
     taskDetailProvider.setParser(parser);
@@ -166,6 +174,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Check cross-branch config for the new root
     checkCrossBranchConfig(parser, context, tasksProvider);
+
+    // Check agent integration status for the new root
+    tasksProvider.checkAndSendIntegrationState();
 
     // Update workspace status bar
     updateWorkspaceStatusBar(manager);
@@ -557,8 +568,50 @@ export function activate(context: vscode.ExtensionContext) {
         });
 
         vscode.window.showInformationMessage(`Backlog initialized in ${newBacklogPath}`);
+
+        // Check agent integration after init (switchActiveBacklog already fires,
+        // but we also need to check in case the view was already resolved)
+        tasksProvider.checkAndSendIntegrationState();
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to initialize backlog: ${error}`);
+      }
+    })
+  );
+
+  // Register agent integration setup command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.setupAgentIntegration', async () => {
+      const cliResult = await BacklogCli.isAvailable();
+
+      if (cliResult.available) {
+        // CLI available — run backlog init in terminal (re-init shows integration wizard)
+        const terminal = vscode.window.createTerminal('Backlog Agent Setup');
+        terminal.show();
+        terminal.sendText('backlog init');
+        return;
+      }
+
+      // CLI not available — detect package manager and offer install
+      const pm = await detectPackageManager();
+
+      if (pm) {
+        const installCmd =
+          pm === 'bun'
+            ? 'bun install -g backlog.md && backlog init'
+            : 'npm install -g backlog.md && backlog init';
+
+        const terminal = vscode.window.createTerminal('Backlog Agent Setup');
+        terminal.show();
+        terminal.sendText(installCmd);
+      } else {
+        // No package manager found — offer to open documentation
+        const selection = await vscode.window.showInformationMessage(
+          'No package manager (bun or npm) found. Install Backlog.md CLI manually to set up agent integration.',
+          'Open Documentation'
+        );
+        if (selection === 'Open Documentation') {
+          vscode.env.openExternal(vscode.Uri.parse('https://github.com/MrLesk/Backlog.md'));
+        }
       }
     })
   );
@@ -604,6 +657,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Check for cross-branch feature configuration and CLI availability
   if (parser) {
     checkCrossBranchConfig(parser, context, tasksProvider);
+    tasksProvider.checkAndSendIntegrationState();
   }
 
   console.log('[Backlog.md] Extension activation complete!');

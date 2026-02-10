@@ -13,6 +13,8 @@ import {
 import { BacklogWriter } from '../core/BacklogWriter';
 import { computeSubtasks } from '../core/BacklogParser';
 import { TaskDetailProvider } from './TaskDetailProvider';
+import { detectIntegration } from '../core/AgentIntegrationDetector';
+import { BacklogCli } from '../core/BacklogCli';
 
 /**
  * Provides a unified tasks webview with toggle between Kanban and List views
@@ -33,6 +35,7 @@ export class TasksViewProvider extends BaseViewProvider {
   private collapsedColumns: Set<string> = new Set();
   private collapsedMilestones: Set<string> = new Set();
   private activeEditedTaskId: string | null = null;
+  private workspaceRoot: string | undefined;
   private onSelectTask?: (taskRef: {
     taskId: string;
     filePath?: string;
@@ -72,6 +75,46 @@ export class TasksViewProvider extends BaseViewProvider {
   setActiveEditedTaskId(taskId: string | null): void {
     this.activeEditedTaskId = taskId;
     this.postMessage({ type: 'activeEditedTaskChanged', taskId });
+  }
+
+  /**
+   * Set the workspace root path for integration detection
+   */
+  setWorkspaceRoot(root: string): void {
+    this.workspaceRoot = root;
+  }
+
+  /**
+   * Check agent integration status and send banner state to webview.
+   * Respects dismissal persisted in globalState.
+   */
+  async checkAndSendIntegrationState(): Promise<void> {
+    if (!this._view || !this.workspaceRoot) return;
+
+    // Check if banner was dismissed for this workspace
+    const dismissKey = `backlog.integrationBannerDismissed.${this.workspaceRoot}`;
+    if (this.context?.globalState.get<boolean>(dismissKey, false)) {
+      this.postMessage({ type: 'integrationBannerState', show: false, cliAvailable: false });
+      return;
+    }
+
+    try {
+      const status = await detectIntegration(this.workspaceRoot);
+      if (status.hasAnyIntegration) {
+        this.postMessage({ type: 'integrationBannerState', show: false, cliAvailable: false });
+        return;
+      }
+
+      const cliResult = await BacklogCli.isAvailable();
+      this.postMessage({
+        type: 'integrationBannerState',
+        show: true,
+        cliAvailable: cliResult.available,
+      });
+    } catch (error) {
+      console.error('[Backlog.md] Error checking integration status:', error);
+      this.postMessage({ type: 'integrationBannerState', show: false, cliAvailable: false });
+    }
   }
 
   resolveWebviewView(
@@ -685,6 +728,20 @@ export class TasksViewProvider extends BaseViewProvider {
         } else {
           vscode.commands.executeCommand('backlog.init');
         }
+        break;
+      }
+
+      case 'setupAgentIntegration': {
+        vscode.commands.executeCommand('backlog.setupAgentIntegration');
+        break;
+      }
+
+      case 'dismissIntegrationBanner': {
+        if (this.context && this.workspaceRoot) {
+          const dismissKey = `backlog.integrationBannerDismissed.${this.workspaceRoot}`;
+          await this.context.globalState.update(dismissKey, true);
+        }
+        this.postMessage({ type: 'integrationBannerState', show: false, cliAvailable: false });
         break;
       }
 

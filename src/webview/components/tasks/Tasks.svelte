@@ -7,6 +7,7 @@
   import DocumentsList from '../docs/DocumentsList.svelte';
   import DecisionsList from '../decisions/DecisionsList.svelte';
   import TabBar from '../shared/TabBar.svelte';
+  import AgentSetupBanner from '../shared/AgentSetupBanner.svelte';
   import Toast from '../shared/Toast.svelte';
   import KeyboardShortcutsPopup from '../shared/KeyboardShortcutsPopup.svelte';
   import { onMount } from 'svelte';
@@ -57,6 +58,10 @@
 
   // Keyboard shortcuts popup state
   let showShortcuts = $state(false);
+
+  // Agent integration banner state
+  let showIntegrationBanner = $state(false);
+  let integrationCliAvailable = $state(false);
 
   // Active edited task (from task detail panel)
   let activeEditedTaskId = $state<string | null>(null);
@@ -176,6 +181,11 @@
 
       case 'configUpdated':
         projectName = message.config?.projectName;
+        break;
+
+      case 'integrationBannerState':
+        showIntegrationBanner = message.show;
+        integrationCliAvailable = message.cliAvailable;
         break;
 
       case 'error':
@@ -427,6 +437,10 @@
   onCreateTask={() => vscode.postMessage({ type: 'requestCreateTask' })}
   onRefresh={() => vscode.postMessage({ type: 'refresh' })}
 />
+
+{#if showIntegrationBanner && !noBacklog}
+  <AgentSetupBanner cliAvailable={integrationCliAvailable} />
+{/if}
 
 {#if noBacklog}
   <div class="empty-state">
