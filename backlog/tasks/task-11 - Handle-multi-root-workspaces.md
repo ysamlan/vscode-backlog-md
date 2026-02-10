@@ -1,10 +1,10 @@
 ---
 id: TASK-11
 title: Handle multi-root workspaces
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-02 23:21'
-updated_date: '2026-02-10 16:23'
+updated_date: '2026-02-10 16:46'
 labels:
   - 'epic:file-watching'
   - 'phase:3'

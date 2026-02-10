@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import { TasksViewProvider } from './providers/TasksViewProvider';
 import { TaskDetailProvider } from './providers/TaskDetailProvider';
 import { ContentDetailProvider } from './providers/ContentDetailProvider';
@@ -16,9 +15,11 @@ import { BacklogCompletionProvider } from './language/BacklogCompletionProvider'
 import { BacklogDocumentLinkProvider } from './language/BacklogDocumentLinkProvider';
 import { BacklogHoverProvider } from './language/BacklogHoverProvider';
 import { initializeBacklog, type InitBacklogOptions } from './core/initBacklog';
+import { BacklogWorkspaceManager, type BacklogRoot } from './core/BacklogWorkspaceManager';
 
 let fileWatcher: FileWatcher | undefined;
-let statusBarItem: vscode.StatusBarItem | undefined;
+let crossBranchStatusBarItem: vscode.StatusBarItem | undefined;
+let workspaceStatusBarItem: vscode.StatusBarItem | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('[Backlog.md] Extension activating...');
@@ -28,40 +29,46 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.workspaceFolders?.map((f) => f.uri.fsPath)
   );
 
-  // Find backlog folder in workspace
-  let backlogFolder = findBacklogFolder();
-  let hasBacklog = backlogFolder !== undefined;
+  // Initialize workspace manager
+  const manager = new BacklogWorkspaceManager(context.workspaceState);
+  context.subscriptions.push(manager);
+  const activeRoot = manager.initialize();
+  manager.startWatching();
 
-  if (!hasBacklog) {
+  const backlogFolder = activeRoot?.backlogPath;
+
+  if (!backlogFolder) {
     console.log('[Backlog.md] No backlog folder found in workspace');
   } else {
     console.log('[Backlog.md] Found backlog folder:', backlogFolder);
   }
 
   // Initialize parser (may be undefined if no backlog folder)
-  let parser = hasBacklog ? new BacklogParser(backlogFolder!) : undefined;
+  let parser = backlogFolder ? new BacklogParser(backlogFolder) : undefined;
+
+  // Language providers: stored so we can call setParser() on switch
+  let completionProvider: BacklogCompletionProvider | undefined;
+  let linkProvider: BacklogDocumentLinkProvider | undefined;
+  let hoverProvider: BacklogHoverProvider | undefined;
   let languageProvidersRegistered = false;
 
   function registerLanguageProviders(activeParser: BacklogParser) {
     if (languageProvidersRegistered) return;
+    completionProvider = new BacklogCompletionProvider(activeParser);
+    linkProvider = new BacklogDocumentLinkProvider(activeParser);
+    hoverProvider = new BacklogHoverProvider(activeParser);
     context.subscriptions.push(
       vscode.languages.registerCompletionItemProvider(
         BACKLOG_DOCUMENT_SELECTOR,
-        new BacklogCompletionProvider(activeParser),
+        completionProvider,
         '-' // Trigger on '-' for task ID prefixes like TASK-
       )
     );
     context.subscriptions.push(
-      vscode.languages.registerDocumentLinkProvider(
-        BACKLOG_DOCUMENT_SELECTOR,
-        new BacklogDocumentLinkProvider(activeParser)
-      )
+      vscode.languages.registerDocumentLinkProvider(BACKLOG_DOCUMENT_SELECTOR, linkProvider)
     );
     context.subscriptions.push(
-      vscode.languages.registerHoverProvider(
-        BACKLOG_DOCUMENT_SELECTOR,
-        new BacklogHoverProvider(activeParser)
-      )
+      vscode.languages.registerHoverProvider(BACKLOG_DOCUMENT_SELECTOR, hoverProvider)
     );
     languageProvidersRegistered = true;
     console.log('[Backlog.md] Language providers registered');
@@ -73,7 +80,7 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   // Initialize file watcher (only if backlog folder exists)
-  if (hasBacklog && backlogFolder) {
+  if (backlogFolder) {
     fileWatcher = new FileWatcher(backlogFolder);
     console.log('[Backlog.md] File watcher initialized');
     context.subscriptions.push(fileWatcher);
@@ -112,6 +119,88 @@ export function activate(context: vscode.ExtensionContext) {
   // Create Content Detail provider for opening docs/decisions in editor
   const contentDetailProvider = new ContentDetailProvider(context.extensionUri, parser);
   console.log('[Backlog.md] Content detail provider created');
+
+  // --- switchActiveBacklog: consolidated reinit logic ---
+  function switchActiveBacklog(root: BacklogRoot | undefined) {
+    if (!root) return;
+
+    console.log('[Backlog.md] Switching active backlog to:', root.backlogPath);
+
+    // Dispose old file watcher
+    if (fileWatcher) {
+      fileWatcher.dispose();
+    }
+
+    // Create new parser and file watcher
+    parser = new BacklogParser(root.backlogPath);
+    fileWatcher = new FileWatcher(root.backlogPath);
+    context.subscriptions.push(fileWatcher);
+
+    // Wire debounced refresh
+    const debouncedRefresh = createDebouncedHandler((uri: vscode.Uri) => {
+      console.log('[Backlog.md] Debounced refresh triggered');
+      tasksProvider.refresh();
+      TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
+    }, 300);
+    fileWatcher.onDidChange((uri) => {
+      debouncedRefresh(uri);
+    });
+
+    // Update all view providers
+    tasksProvider.setParser(parser);
+    taskPreviewProvider.setParser(parser);
+    taskDetailProvider.setParser(parser);
+    contentDetailProvider.setParser(parser);
+
+    // Update language providers (or register them for the first time)
+    if (languageProvidersRegistered) {
+      completionProvider!.setParser(parser);
+      linkProvider!.setParser(parser);
+      hoverProvider!.setParser(parser);
+    } else {
+      registerLanguageProviders(parser);
+    }
+
+    // Refresh views
+    tasksProvider.refresh();
+
+    // Check cross-branch config for the new root
+    checkCrossBranchConfig(parser, context, tasksProvider);
+
+    // Update workspace status bar
+    updateWorkspaceStatusBar(manager);
+  }
+
+  // Subscribe to active root changes (e.g. from selectBacklog or addRoot)
+  context.subscriptions.push(
+    manager.onDidChangeActiveRoot((root) => {
+      switchActiveBacklog(root);
+    })
+  );
+
+  // --- Workspace status bar (shown when multiple roots) ---
+  function updateWorkspaceStatusBar(mgr: BacklogWorkspaceManager) {
+    const roots = mgr.getRoots();
+    if (roots.length <= 1) {
+      workspaceStatusBarItem?.hide();
+      return;
+    }
+    if (!workspaceStatusBarItem) {
+      workspaceStatusBarItem = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        99
+      );
+      workspaceStatusBarItem.command = 'backlog.selectBacklog';
+      context.subscriptions.push(workspaceStatusBarItem);
+    }
+    const active = mgr.getActiveRoot();
+    workspaceStatusBarItem.text = `$(checklist) ${active?.label ?? 'No backlog'}`;
+    workspaceStatusBarItem.tooltip = active
+      ? `${active.backlogPath} — Click to switch`
+      : 'Click to select a backlog';
+    workspaceStatusBarItem.show();
+  }
+  updateWorkspaceStatusBar(manager);
 
   // Register commands
   context.subscriptions.push(
@@ -263,16 +352,16 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('backlog.openRawMarkdown', openMarkdownCommand)
   );
 
+  // Register backlog.selectBacklog command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.selectBacklog', async () => {
+      await manager.selectBacklog();
+    })
+  );
+
   // Register backlog init command
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.init', async (args?: { defaults?: boolean }) => {
-      // Check if backlog already exists
-      const existingBacklog = findBacklogFolder();
-      if (existingBacklog) {
-        vscode.window.showInformationMessage('A backlog folder already exists in this workspace.');
-        return;
-      }
-
       // Get workspace root
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -280,17 +369,28 @@ export function activate(context: vscode.ExtensionContext) {
         return;
       }
 
-      let workspaceRoot: string;
+      let selectedFolder: vscode.WorkspaceFolder;
       if (workspaceFolders.length === 1) {
-        workspaceRoot = workspaceFolders[0].uri.fsPath;
+        selectedFolder = workspaceFolders[0];
       } else {
         const picked = await vscode.window.showWorkspaceFolderPick({
           placeHolder: 'Select workspace folder to initialize backlog in',
         });
         if (!picked) return;
-        workspaceRoot = picked.uri.fsPath;
+        selectedFolder = picked;
       }
 
+      // Check if this specific folder already has a backlog
+      const existingPath = vscode.Uri.joinPath(selectedFolder.uri, 'backlog').fsPath;
+      const { existsSync } = await import('fs');
+      if (existsSync(existingPath)) {
+        vscode.window.showInformationMessage(
+          `A backlog folder already exists in ${selectedFolder.name}.`
+        );
+        return;
+      }
+
+      const workspaceRoot = selectedFolder.uri.fsPath;
       let options: InitBacklogOptions;
 
       if (args?.defaults) {
@@ -449,41 +549,12 @@ export function activate(context: vscode.ExtensionContext) {
         const newBacklogPath = initializeBacklog(workspaceRoot, options);
         console.log('[Backlog.md] Backlog initialized at:', newBacklogPath);
 
-        // Reinitialize the extension with the new backlog
-        backlogFolder = newBacklogPath;
-        hasBacklog = true;
-
-        // Create new parser
-        parser = new BacklogParser(newBacklogPath);
-
-        // Dispose old file watcher if any, create new one
-        if (fileWatcher) {
-          fileWatcher.dispose();
-        }
-        fileWatcher = new FileWatcher(newBacklogPath);
-        context.subscriptions.push(fileWatcher);
-
-        // Wire up debounced refresh for the new file watcher
-        const debouncedRefresh = createDebouncedHandler((uri: vscode.Uri) => {
-          console.log('[Backlog.md] Debounced refresh triggered (post-init)');
-          tasksProvider.refresh();
-          TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
-        }, 300);
-        fileWatcher.onDidChange((uri) => {
-          debouncedRefresh(uri);
+        // Add the new root to the manager — this fires onDidChangeActiveRoot → switchActiveBacklog
+        manager.addRoot({
+          backlogPath: newBacklogPath,
+          workspaceFolder: selectedFolder,
+          label: selectedFolder.name,
         });
-
-        // Update all providers with the new parser
-        tasksProvider.setParser(parser);
-        taskPreviewProvider.setParser(parser);
-        taskDetailProvider.setParser(parser);
-        contentDetailProvider.setParser(parser);
-
-        // Register language providers if not already registered
-        registerLanguageProviders(parser);
-
-        // Refresh the tasks view to clear the empty state
-        await tasksProvider.refresh();
 
         vscode.window.showInformationMessage(`Backlog initialized in ${newBacklogPath}`);
       } catch (error) {
@@ -496,12 +567,13 @@ export function activate(context: vscode.ExtensionContext) {
   const writer = new BacklogWriter();
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.createTask', () => {
-      if (!backlogFolder || !parser) {
+      const activeBacklogPath = manager.getActiveRoot()?.backlogPath;
+      if (!activeBacklogPath || !parser) {
         vscode.window.showErrorMessage('No backlog folder found in workspace');
         return;
       }
 
-      TaskCreatePanel.show(context.extensionUri, writer, parser, backlogFolder, {
+      TaskCreatePanel.show(context.extensionUri, writer, parser, activeBacklogPath, {
         tasksProvider,
         taskDetailProvider,
       });
@@ -541,8 +613,11 @@ export function deactivate() {
   if (fileWatcher) {
     fileWatcher.dispose();
   }
-  if (statusBarItem) {
-    statusBarItem.dispose();
+  if (crossBranchStatusBarItem) {
+    crossBranchStatusBarItem.dispose();
+  }
+  if (workspaceStatusBarItem) {
+    workspaceStatusBarItem.dispose();
   }
 }
 
@@ -570,32 +645,15 @@ async function checkCrossBranchConfig(
     console.log('[Backlog.md] Cross-branch features enabled, using native git support');
 
     // Create status bar item
-    statusBarItem = BacklogCli.createStatusBarItem();
-    context.subscriptions.push(statusBarItem);
+    crossBranchStatusBarItem = BacklogCli.createStatusBarItem();
+    context.subscriptions.push(crossBranchStatusBarItem);
 
     // Update to show cross-branch mode
-    BacklogCli.updateStatusBarItem(statusBarItem, 'cross-branch');
+    BacklogCli.updateStatusBarItem(crossBranchStatusBarItem, 'cross-branch');
 
     // Notify the tasks provider about the data source mode
     tasksProvider.setDataSourceMode('cross-branch');
   } catch (error) {
     console.error('[Backlog.md] Error checking cross-branch config:', error);
   }
-}
-
-function findBacklogFolder(): string | undefined {
-  const workspaceFolders = vscode.workspace.workspaceFolders;
-  if (!workspaceFolders) {
-    return undefined;
-  }
-
-  for (const folder of workspaceFolders) {
-    const backlogPath = vscode.Uri.joinPath(folder.uri, 'backlog').fsPath;
-    // Check if the backlog folder actually exists
-    if (fs.existsSync(backlogPath)) {
-      return backlogPath;
-    }
-  }
-
-  return undefined;
 }

@@ -11,6 +11,10 @@ const TASK_ID_PATTERN = /\b([A-Z]+-\d+(?:\.\d+)*)\b/g;
 export class BacklogHoverProvider implements vscode.HoverProvider {
   constructor(private parser: BacklogParser) {}
 
+  setParser(parser: BacklogParser): void {
+    this.parser = parser;
+  }
+
   async provideHover(
     document: vscode.TextDocument,
     position: vscode.Position,

@@ -123,6 +123,10 @@
       {
         "command": "backlog.openDecisionDetail",
         "title": "Backlog: Open Decision Detail"
+      },
+      {
+        "command": "backlog.selectBacklog",
+        "title": "Backlog: Select Active Backlog"
       }
     ],
     "menus": {},

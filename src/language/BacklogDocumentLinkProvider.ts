@@ -11,6 +11,10 @@ const TASK_ID_PATTERN = /\b([A-Z]+-\d+(?:\.\d+)*)\b/g;
 export class BacklogDocumentLinkProvider implements vscode.DocumentLinkProvider {
   constructor(private parser: BacklogParser) {}
 
+  setParser(parser: BacklogParser): void {
+    this.parser = parser;
+  }
+
   async provideDocumentLinks(
     document: vscode.TextDocument,
     _token: vscode.CancellationToken

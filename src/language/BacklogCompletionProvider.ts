@@ -10,6 +10,10 @@ import { getFrontmatterContext } from './frontmatterContext';
 export class BacklogCompletionProvider implements vscode.CompletionItemProvider {
   constructor(private parser: BacklogParser) {}
 
+  setParser(parser: BacklogParser): void {
+    this.parser = parser;
+  }
+
   async provideCompletionItems(
     document: vscode.TextDocument,
     position: vscode.Position,
