@@ -5,9 +5,9 @@
 
 A VS Code extension for browsing and managing [Backlog.md](https://github.com/backlog-md/backlog) tasks directly in your editor. Backlog.md is human-friendly and machine-accessible tool for managing a project task list and backlog in Markdown format.
 
-![Kanban Board](docs/images/kanban-board.png)
+![Kanban + Edit Task](docs/images/kanban-plus-edit.png)
 
-![Task List](docs/images/task-list.png)
+![List + Task Details](docs/images/list-plus-details.png)
 
 ## Features
 
@@ -21,8 +21,9 @@ A VS Code extension for browsing and managing [Backlog.md](https://github.com/ba
 <details>
 <summary>More screenshots</summary>
 
-![Task List](docs/images/task-list.png)
-![Task Detail](docs/images/task-detail.png)
+![Dashboard + Add New Task](docs/images/dashboard-plus-add-new.png)
+![List + Markdown Editing](docs/images/list-plus-markdown.png)
+![List + Details + Add New Task](docs/images/list-plus-details-plus-add-new.png)
 
 </details>
 

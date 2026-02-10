@@ -590,7 +590,7 @@ limitations under the License.
 
 The following npm package may be included in this product:
 
- - svelte@5.49.2
+ - svelte@5.50.0
 
 This package contains the following license:
 

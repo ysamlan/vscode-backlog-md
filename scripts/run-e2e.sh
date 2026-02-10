@@ -6,7 +6,11 @@ set -e
 # Use a project-local directory for test resources to avoid macOS temp folder quarantine issues
 STORAGE_PATH=".vscode-test"
 
-CMD="bunx extest setup-and-run 'out/test/e2e/*.test.js' --mocha_config .mocharc.json --storage $STORAGE_PATH"
+# Use an isolated extensions dir so other installed extensions (e.g. GitLens) don't steal focus
+EXTENSIONS_DIR="$STORAGE_PATH/test-extensions"
+mkdir -p "$EXTENSIONS_DIR"
+
+CMD="bunx extest setup-and-run 'out/test/e2e/*.test.js' --mocha_config .mocharc.json --storage $STORAGE_PATH --extensions_dir $EXTENSIONS_DIR"
 
 # Check if we need xvfb:
 # - Not on macOS (darwin) - macOS doesn't use X11
