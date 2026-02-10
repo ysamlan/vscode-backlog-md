@@ -6,6 +6,7 @@ out/**
 node_modules/**
 .gitignore
 .prettierignore
+.prettierrc
 .mocharc.json
 tsconfig.json
 tsconfig.e2e.json
@@ -22,14 +23,21 @@ svelte.config.mjs
 # Backlog (development task tracking)
 backlog/**
 
-# Documentation (not needed in extension)
+# Documentation / AI agent configs (not needed in extension)
 docs/**
 CLAUDE.md
+AGENTS.MD
+CONTRIBUTING.md
 .claude/**
+.codex/**
 .agents/**
+
+# github configs / CI settings
+.github/**
 
 # Test fixtures and results
 src/test/**
+test/**
 test-results/**
 
 # E2E test artifacts
@@ -51,6 +59,8 @@ tmp/**
 .node-version
 mise.toml
 bun.lock
+.DS_Store
 
 # Source maps (not needed in production)
 dist/**/*.map
+
