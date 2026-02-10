@@ -2021,6 +2021,62 @@ body {
   vertical-align: middle;
 }
 
+/* ============================================
+   Mermaid Diagram Styles
+   ============================================ */
+
+.mermaid {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error {
+  border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+  background: var(--vscode-inputValidation-errorBackground, rgba(90, 29, 29, 0.3));
+  border-radius: 6px;
+  padding: 12px;
+  margin: 8px 0;
+}
+
+.mermaid-error-title {
+  font-weight: 600;
+  color: var(--vscode-errorForeground, #f48771);
+  margin-bottom: 6px;
+}
+
+.mermaid-error-message {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  white-space: pre-wrap;
+  margin: 0 0 8px 0;
+  color: var(--vscode-editor-foreground, #d4d4d4);
+}
+
+.mermaid-error-source {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #858585);
+}
+
+.mermaid-error-source summary {
+  cursor: pointer;
+}
+
+.mermaid-error-source pre {
+  margin-top: 4px;
+  padding: 8px;
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.17));
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
 /* Utility classes */
 .hidden {
   display: none !important;

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { BacklogDocument, BacklogDecision } from '../../lib/types';
   import { vscode, onMessage } from '../../stores/vscode.svelte';
+  import { renderMermaidAction } from '../../lib/mermaidAction';
 
   type ViewMode = 'document' | 'decision' | 'loading';
 
@@ -95,7 +96,7 @@
         </div>
       {/if}
     </div>
-    <div class="detail-body" data-testid="document-body">
+    <div class="detail-body" data-testid="document-body" use:renderMermaidAction={contentHtml}>
       {@html contentHtml}
     </div>
 
@@ -124,25 +125,25 @@
       {#if decisionSections.context}
         <div class="decision-section">
           <h2>Context</h2>
-          <div class="section-content">{@html decisionSections.context}</div>
+          <div class="section-content" use:renderMermaidAction={decisionSections.context}>{@html decisionSections.context}</div>
         </div>
       {/if}
       {#if decisionSections.decision}
         <div class="decision-section">
           <h2>Decision</h2>
-          <div class="section-content">{@html decisionSections.decision}</div>
+          <div class="section-content" use:renderMermaidAction={decisionSections.decision}>{@html decisionSections.decision}</div>
         </div>
       {/if}
       {#if decisionSections.consequences}
         <div class="decision-section">
           <h2>Consequences</h2>
-          <div class="section-content">{@html decisionSections.consequences}</div>
+          <div class="section-content" use:renderMermaidAction={decisionSections.consequences}>{@html decisionSections.consequences}</div>
         </div>
       {/if}
       {#if decisionSections.alternatives}
         <div class="decision-section">
           <h2>Alternatives</h2>
-          <div class="section-content">{@html decisionSections.alternatives}</div>
+          <div class="section-content" use:renderMermaidAction={decisionSections.alternatives}>{@html decisionSections.alternatives}</div>
         </div>
       {/if}
     </div>

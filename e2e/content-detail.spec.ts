@@ -158,6 +158,44 @@ test.describe('Document Detail', () => {
   });
 });
 
+test.describe('Document Detail - Mermaid', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupContentDetail(page);
+  });
+
+  test('renders mermaid code blocks as SVG in document body', async ({ page }) => {
+    await postMessageToWebview(page, {
+      type: 'documentData',
+      document: sampleDocument,
+      contentHtml: '<pre><code class="language-mermaid">graph TD\n  A-->B</code></pre>',
+    });
+
+    await expect(page.locator('[data-testid="document-body"] .mermaid svg')).toBeVisible({
+      timeout: 10000,
+    });
+  });
+});
+
+test.describe('Decision Detail - Mermaid', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupContentDetail(page);
+  });
+
+  test('renders mermaid code blocks as SVG in decision section', async ({ page }) => {
+    await postMessageToWebview(page, {
+      type: 'decisionData',
+      decision: sampleDecision,
+      sections: {
+        context: '<pre><code class="language-mermaid">graph TD\n  C-->D</code></pre>',
+      },
+    });
+
+    await expect(page.locator('.section-content .mermaid svg')).toBeVisible({
+      timeout: 10000,
+    });
+  });
+});
+
 test.describe('Decision Detail', () => {
   test.beforeEach(async ({ page }) => {
     await setupContentDetail(page);

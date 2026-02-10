@@ -518,6 +518,95 @@ test.describe('Task Detail', () => {
     });
   });
 
+  test.describe('Mermaid diagram rendering', () => {
+    test('renders mermaid code blocks as SVG diagrams', async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/task-detail.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          descriptionHtml: '<pre><code class="language-mermaid">graph TD\n  A-->B</code></pre>',
+        },
+      });
+
+      // Wait for mermaid to render (async + requestAnimationFrame)
+      await expect(page.locator('.mermaid svg')).toBeVisible({ timeout: 10000 });
+    });
+
+    test('shows error container for invalid mermaid syntax', async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/task-detail.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          descriptionHtml:
+            '<pre><code class="language-mermaid">this is not valid mermaid at all %%% {{{}}}}</code></pre>',
+        },
+      });
+
+      // Wait for mermaid error to appear
+      await expect(page.locator('.mermaid-error')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('.mermaid-error-title')).toHaveText('Diagram Error');
+    });
+
+    test('does not create mermaid div for non-mermaid code blocks', async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/task-detail.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          descriptionHtml:
+            '<pre><code class="language-javascript">console.log("hello")</code></pre>',
+        },
+      });
+      await page.waitForTimeout(500);
+
+      await expect(page.locator('.mermaid')).toHaveCount(0);
+      await expect(page.locator('pre code.language-javascript')).toBeVisible();
+    });
+
+    test('edit mode shows raw source, not rendered diagram', async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/task-detail.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          task: {
+            ...sampleTask,
+            description: '```mermaid\ngraph TD\n  A-->B\n```',
+          },
+          descriptionHtml: '<pre><code class="language-mermaid">graph TD\n  A-->B</code></pre>',
+        },
+      });
+
+      // Wait for mermaid to render in view mode
+      await expect(page.locator('.mermaid svg')).toBeVisible({ timeout: 10000 });
+
+      // Switch to edit mode
+      await page.locator('[data-testid="edit-description-btn"]').click();
+
+      // Textarea should contain raw markdown, not SVG
+      const textarea = page.locator('[data-testid="description-textarea"]');
+      await expect(textarea).toBeVisible();
+      await expect(textarea).toHaveValue(/```mermaid/);
+
+      // SVG should no longer be visible (view mode is hidden)
+      await expect(page.locator('.mermaid svg')).not.toBeVisible();
+    });
+  });
+
   test.describe('Angle-bracket markdown safety', () => {
     test('renders angle-bracket type strings as visible text', async ({ page }) => {
       await installVsCodeMock(page);

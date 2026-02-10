@@ -54,4 +54,54 @@ describe('sanitizeMarkdownSource', () => {
     const result = sanitizeMarkdownSource(input);
     expect(result).toBe('Map&lt;String, List&lt;Integer>>');
   });
+
+  it('preserves angle brackets inside fenced code blocks (backticks)', () => {
+    const input = '```mermaid\ngraph TD\n  A<String> --> B\n```';
+    const result = sanitizeMarkdownSource(input);
+    expect(result).toBe(input);
+  });
+
+  it('preserves angle brackets inside fenced code blocks (tildes)', () => {
+    const input = '~~~mermaid\ngraph TD\n  A<String> --> B\n~~~';
+    const result = sanitizeMarkdownSource(input);
+    expect(result).toBe(input);
+  });
+
+  it('sanitizes outside fenced blocks but preserves inside', () => {
+    const input =
+      'Use List<String> for collections.\n\n```mermaid\ngraph TD\n  A<String> --> B\n```\n\nAlso Map<Integer>.';
+    const result = sanitizeMarkdownSource(input);
+    expect(result).toBe(
+      'Use List&lt;String> for collections.\n\n```mermaid\ngraph TD\n  A<String> --> B\n```\n\nAlso Map&lt;Integer>.'
+    );
+  });
+
+  it('handles multiple fenced code blocks', () => {
+    const input =
+      '```js\nconst x = new Map<String, Int>();\n```\n\nSome <Component> text.\n\n```mermaid\nA<B> --> C\n```';
+    const result = sanitizeMarkdownSource(input);
+    expect(result).toContain('Map<String, Int>()'); // inside code block, preserved
+    expect(result).toContain('&lt;Component>'); // outside, escaped
+    expect(result).toContain('A<B> --> C'); // inside code block, preserved
+  });
+
+  it('handles unclosed fenced code block (no closing fence)', () => {
+    const input = 'Before\n```mermaid\nA<String>\nNo close';
+    const result = sanitizeMarkdownSource(input);
+    // Unclosed block means everything after opening fence is NOT protected
+    // since there's no matching closing fence — sanitize normally
+    expect(result).toContain('&lt;String>');
+  });
+
+  it('handles empty fenced code block', () => {
+    const input = '```\n```';
+    const result = sanitizeMarkdownSource(input);
+    expect(result).toBe(input);
+  });
+
+  it('handles fenced block with more backticks', () => {
+    const input = '````\nA<B>\n````';
+    const result = sanitizeMarkdownSource(input);
+    expect(result).toBe(input);
+  });
 });

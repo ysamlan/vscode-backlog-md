@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { renderMermaidAction } from '../../lib/mermaidAction';
+
   interface Props {
     description: string;
     descriptionHtml: string;
@@ -85,6 +87,7 @@
         onkeydown={(e) => e.key === 'Enter' && handleViewClick()}
         role="button"
         tabindex={isReadOnly ? -1 : 0}
+        use:renderMermaidAction={descriptionHtml}
       >
         {#if descriptionHtml}
           {@html descriptionHtml}
