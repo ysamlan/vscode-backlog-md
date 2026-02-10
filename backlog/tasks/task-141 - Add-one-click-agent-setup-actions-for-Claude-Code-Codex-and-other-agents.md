@@ -1,10 +1,10 @@
 ---
 id: TASK-141
 title: 'Add one-click agent setup actions for Claude Code, Codex, and other agents'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-10 14:40'
-updated_date: '2026-02-10 16:27'
+updated_date: '2026-02-10 18:35'
 labels: []
 dependencies:
   - TASK-136
@@ -43,3 +43,9 @@ This detection + prompt should work in two contexts:
 - [ ] #10 The integration prompt appears both after the init wizard and on activation of an existing backlog workspace with no detected integration.
 - [ ] #11 Users can permanently dismiss the integration prompt per-workspace (persisted in globalState), and the dismissal is respected on subsequent activations.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added `backlog.setupAgentIntegration` command registered in package.json and extension.ts. CLI available: opens terminal with `backlog init`. CLI not available: detects bun/npm, runs install + init. No package manager: shows info message with link to upstream docs. Banner in Tasks view triggers the command via webview message. Package manager detection prefers bun over npm.
+<!-- SECTION:FINAL_SUMMARY:END -->

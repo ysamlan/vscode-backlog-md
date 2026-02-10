@@ -187,10 +187,20 @@ body {
 
 .view-content {
   display: block;
+  animation: viewFadeIn 0.15s ease-out;
 }
 
 .view-content.hidden {
   display: none;
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Kanban Toolbar */
@@ -354,6 +364,12 @@ body {
   gap: 8px;
   min-height: 50px;
   flex: 1; /* Fill remaining column space for drop target */
+  transition: background 0.1s ease;
+}
+
+.task-list.drop-target {
+  background: color-mix(in oklab, var(--vscode-focusBorder, #007fd4) 5%, transparent);
+  border-radius: 4px;
 }
 
 .task-card {
@@ -364,6 +380,14 @@ body {
   padding: 10px;
   cursor: grab;
   transition: all 0.15s ease;
+  animation: cardAppear 0.2s ease-out;
+}
+
+@keyframes cardAppear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 .task-card:hover {
@@ -392,20 +416,21 @@ body {
 
 /* Drop indicator line */
 .drop-indicator {
-  height: 3px;
+  height: 2px;
   background: var(--vscode-focusBorder, #007acc);
   border-radius: 2px;
-  margin: 4px 0;
-  animation: pulse 1s ease-in-out infinite;
+  margin: 2px 0;
+  box-shadow: 0 0 4px var(--vscode-focusBorder, #007acc);
+  animation: dropGlow 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse {
+@keyframes dropGlow {
   0%,
   100% {
-    opacity: 1;
+    box-shadow: 0 0 4px var(--vscode-focusBorder, #007acc);
   }
   50% {
-    opacity: 0.5;
+    box-shadow: 0 0 8px var(--vscode-focusBorder, #007acc);
   }
 }
 
@@ -660,10 +685,26 @@ body {
   }
 }
 
+.task-card.just-dropped {
+  animation: cardSettle 0.2s ease-out;
+}
+
+@keyframes cardSettle {
+  from {
+    transform: scale(1.02);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  to {
+    transform: scale(1);
+    box-shadow: none;
+  }
+}
+
 /* Keyboard navigation */
 .task-card:focus-visible {
   outline: 2px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: 2px;
+  transition: outline-offset 0.1s ease;
 }
 
 .task-table tr:focus-visible {
@@ -830,14 +871,17 @@ body {
 /* List view drag states */
 .task-table tr.dragging {
   opacity: 0.4;
+  transition: opacity 0.1s ease;
 }
 
 .task-table tr.drop-before td {
   border-top: 2px solid var(--vscode-focusBorder, #007acc);
+  transition: border-color 0.1s ease;
 }
 
 .task-table tr.drop-after td {
   border-bottom: 2px solid var(--vscode-focusBorder, #007acc);
+  transition: border-color 0.1s ease;
 }
 
 .empty-state {
@@ -848,6 +892,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  animation: viewFadeIn 0.2s ease-out;
 }
 
 .empty-state-icon {
@@ -980,6 +1025,7 @@ body {
   font-size: 12px;
   z-index: 1000;
   animation: fadeInOut 3s forwards;
+  will-change: opacity, transform;
 }
 
 @keyframes fadeInOut {
@@ -1588,6 +1634,11 @@ body {
   border-color: var(--vscode-focusBorder, #007fd4);
 }
 
+.stat-card.clickable:active {
+  transform: translateY(0);
+  transition-duration: 0.05s;
+}
+
 .stat-value {
   font-size: clamp(18px, 5vw, 24px);
   font-weight: 700;
@@ -2177,6 +2228,17 @@ body {
 .agent-setup-banner .banner-dismiss-btn:hover {
   color: var(--vscode-foreground, #cccccc);
   background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04));
+}
+
+/* Reduced motion: disable animations for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Utility classes */

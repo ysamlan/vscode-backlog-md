@@ -71,6 +71,8 @@
   function handleDragEnd(e: DragEvent) {
     const card = e.currentTarget as HTMLElement | null;
     card?.classList.remove('dragging');
+    card?.classList.add('just-dropped');
+    setTimeout(() => card?.classList.remove('just-dropped'), 200);
     ondragend?.(e);
   }
 

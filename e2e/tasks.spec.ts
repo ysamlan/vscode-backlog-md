@@ -1411,6 +1411,107 @@ test.describe('Tasks View', () => {
     expect(message).toEqual({ type: 'refresh' });
   });
 
+  test.describe('Animations and Reduced Motion', () => {
+    test('reduced-motion media query disables animations and transitions', async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await setupTasksView(page);
+
+      const card = page.locator('[data-testid="task-TASK-1"]');
+      const duration = await card.evaluate((el) => {
+        const style = window.getComputedStyle(el);
+        // Parse the first transition-duration value (may be comma-separated)
+        return parseFloat(style.transitionDuration);
+      });
+      // With reduced-motion, duration should be effectively zero (0.01ms = 0.00001s)
+      expect(duration).toBeLessThanOrEqual(0.01);
+    });
+
+    test('view-content has viewFadeIn animation on mount', async ({ page }) => {
+      await setupTasksView(page);
+
+      const animationName = await page
+        .locator('#kanban-view')
+        .evaluate((el) => window.getComputedStyle(el).animationName);
+      expect(animationName).toBe('viewFadeIn');
+    });
+
+    test('drop-target CSS rule exists for column highlight', async ({ page }) => {
+      await setupTasksView(page);
+
+      // Verify the .task-list.drop-target CSS rule exists in the stylesheet
+      const hasDropTargetStyle = await page.evaluate(() => {
+        for (const sheet of document.styleSheets) {
+          try {
+            for (const rule of sheet.cssRules) {
+              if (rule instanceof CSSStyleRule && rule.selectorText === '.task-list.drop-target') {
+                return true;
+              }
+            }
+          } catch {
+            /* cross-origin */
+          }
+        }
+        return false;
+      });
+      expect(hasDropTargetStyle).toBe(true);
+    });
+
+    test('drop-indicator uses dropGlow animation', async ({ page }) => {
+      await setupTasksView(page);
+
+      // Verify the dropGlow keyframes exist in the stylesheet
+      const hasDropGlow = await page.evaluate(() => {
+        for (const sheet of document.styleSheets) {
+          try {
+            for (const rule of sheet.cssRules) {
+              if (rule instanceof CSSKeyframesRule && rule.name === 'dropGlow') {
+                return true;
+              }
+            }
+          } catch {
+            /* cross-origin */
+          }
+        }
+        return false;
+      });
+      expect(hasDropGlow).toBe(true);
+    });
+
+    test('cardSettle keyframes are defined for just-dropped animation', async ({ page }) => {
+      await setupTasksView(page);
+
+      const hasCardSettle = await page.evaluate(() => {
+        for (const sheet of document.styleSheets) {
+          try {
+            for (const rule of sheet.cssRules) {
+              if (rule instanceof CSSKeyframesRule && rule.name === 'cardSettle') {
+                return true;
+              }
+            }
+          } catch {
+            /* cross-origin */
+          }
+        }
+        return false;
+      });
+      expect(hasCardSettle).toBe(true);
+    });
+
+    test('empty state has fade-in animation', async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/tasks.html');
+      await page.waitForTimeout(100);
+
+      await postMessageToWebview(page, { type: 'noBacklogFolder' });
+      await page.waitForTimeout(50);
+
+      const animationName = await page
+        .locator('.empty-state')
+        .evaluate((el) => window.getComputedStyle(el).animationName);
+      expect(animationName).toBe('viewFadeIn');
+    });
+  });
+
   test.describe('Active Edited Task Highlight', () => {
     test('kanban view highlights the matching task card with active-edited class', async ({
       page,

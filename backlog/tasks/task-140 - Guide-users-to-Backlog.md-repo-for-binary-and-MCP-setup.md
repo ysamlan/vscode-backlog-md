@@ -1,10 +1,10 @@
 ---
 id: TASK-140
 title: Guide users to Backlog.md repo for binary and MCP setup
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-02-10 14:40'
-updated_date: '2026-02-10 16:24'
+updated_date: '2026-02-10 18:35'
 labels: []
 dependencies:
   - TASK-136
@@ -25,3 +25,9 @@ Add clear onboarding guidance in the init flow so users can install Backlog.md b
 - [ ] #5 Any affected docs/UI text are updated and verified for consistency with current extension terminology.
 - [ ] #6 #6 Guidance mentions shell completions (`backlog completion install`) as an optional post-install step for CLI users.
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Implemented agent integration detection and setup banner. AgentIntegrationDetector checks for Claude Code (.mcp.json, CLAUDE.md/AGENTS.md markers), Codex (.codex/config.toml), and general AGENTS.md guidelines. Banner shown in Tasks view when backlog exists but no integration detected, with Set Up / Install & Set Up button delegating to `backlog init` in terminal. Dismissal persisted per-workspace in globalState. 22 unit tests.
+<!-- SECTION:FINAL_SUMMARY:END -->
