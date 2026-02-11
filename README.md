@@ -5,9 +5,17 @@
 
 A VS Code extension for browsing and managing [Backlog.md](https://github.com/backlog-md/backlog) tasks directly in your editor. Backlog.md is human-friendly and machine-accessible tool for managing a project task list and backlog in Markdown format.
 
-![Kanban + Edit Task](docs/images/kanban-plus-edit.png)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/kanban-plus-edit.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/kanban-plus-edit.png">
+  <img alt="Kanban board with task detail editor" src="docs/images/dark/kanban-plus-edit.png">
+</picture>
 
-![List + Task Details](docs/images/list-plus-details.png)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/list-plus-details.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/list-plus-details.png">
+  <img alt="Task list with detail preview panel" src="docs/images/dark/list-plus-details.png">
+</picture>
 
 ## Features
 
@@ -21,9 +29,23 @@ A VS Code extension for browsing and managing [Backlog.md](https://github.com/ba
 <details>
 <summary>More screenshots</summary>
 
-![Dashboard + Add New Task](docs/images/dashboard-plus-add-new.png)
-![List + Markdown Editing](docs/images/list-plus-markdown.png)
-![List + Details + Add New Task](docs/images/list-plus-details-plus-add-new.png)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/dashboard-plus-add-new.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/dashboard-plus-add-new.png">
+  <img alt="Dashboard with create new task panel" src="docs/images/dark/dashboard-plus-add-new.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/list-plus-markdown.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/list-plus-markdown.png">
+  <img alt="Task list with raw markdown editor" src="docs/images/dark/list-plus-markdown.png">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/list-plus-details-plus-add-new.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/list-plus-details-plus-add-new.png">
+  <img alt="Task list with detail preview and create new task" src="docs/images/dark/list-plus-details-plus-add-new.png">
+</picture>
 
 </details>
 

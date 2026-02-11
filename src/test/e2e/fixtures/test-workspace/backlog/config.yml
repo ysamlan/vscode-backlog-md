@@ -1,4 +1,4 @@
-project_name: "Test Workspace"
+project_name: "Acme App"
 default_status: "To Do"
 default_assignee: "@lead"
 default_reporter: "@pm"
