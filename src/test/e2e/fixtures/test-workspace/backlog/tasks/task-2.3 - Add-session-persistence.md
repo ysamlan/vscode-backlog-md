@@ -14,4 +14,6 @@ priority: medium
 
 ## Description
 
+<!-- SECTION:DESCRIPTION:BEGIN -->
 Implement session storage so users stay logged in across browser refreshes.
+<!-- SECTION:DESCRIPTION:END -->

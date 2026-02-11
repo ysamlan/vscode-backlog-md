@@ -14,4 +14,6 @@ priority: high
 
 ## Description
 
+<!-- SECTION:DESCRIPTION:BEGIN -->
 Create POST /auth/signup and POST /auth/login API endpoints with proper validation and error handling.
+<!-- SECTION:DESCRIPTION:END -->

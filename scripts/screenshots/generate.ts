@@ -19,7 +19,7 @@ import type { ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { scenarios, themes, type ScreenshotScenario, type ThemeId } from './scenarios';
-import { addWindowChrome } from './window-chrome';
+import { addWindowChrome, addPanelFrame } from './window-chrome';
 
 // --- Configuration ---
 
@@ -495,6 +495,45 @@ async function dismissNotifications(cdp: CdpClient): Promise<void> {
   await sleep(200);
 }
 
+// --- Panel Cropping ---
+
+/** Get the bounding rectangle of a panel element for cropping */
+async function getCropBounds(
+  cdp: CdpClient,
+  crop: 'sidebar' | 'editor'
+): Promise<{ left: number; top: number; width: number; height: number } | null> {
+  const selector = crop === 'sidebar' ? '.part.sidebar' : '.editor-group-container';
+  const bounds = (await cdpEval(
+    cdp,
+    `(() => {
+      const el = document.querySelector('${selector}');
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      return { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) };
+    })()`
+  )) as { x: number; y: number; width: number; height: number } | null;
+
+  if (!bounds || bounds.width === 0 || bounds.height === 0) return null;
+
+  // Multiply by 2 for 2x DPI screenshots
+  return {
+    left: bounds.x * 2,
+    top: bounds.y * 2,
+    width: bounds.width * 2,
+    height: bounds.height * 2,
+  };
+}
+
+/** Crop a screenshot to the given bounds using sharp */
+async function cropImage(
+  imagePath: string,
+  bounds: { left: number; top: number; width: number; height: number }
+): Promise<void> {
+  const { default: sharpModule } = await import('sharp');
+  const buffer = await sharpModule(imagePath).extract(bounds).png().toBuffer();
+  fs.writeFileSync(imagePath, buffer);
+}
+
 // --- Sidebar Width ---
 
 /**
@@ -686,6 +725,218 @@ async function selectTaskInWebview(cdp: CdpClient, taskText: string): Promise<bo
   return false;
 }
 
+/**
+ * Click a button with the given text in any webview iframe.
+ * Used to click the "Edit" button in the sidebar task preview.
+ */
+async function clickButtonInWebview(cdp: CdpClient, buttonText: string): Promise<boolean> {
+  console.log(`    Clicking webview button: "${buttonText}"`);
+
+  try {
+    await cdp.send('Target.setDiscoverTargets', { discover: true });
+  } catch {
+    /* ignore */
+  }
+
+  const { targetInfos } = (await cdp.send('Target.getTargets')) as {
+    targetInfos: Array<{ targetId: string; type: string; url: string }>;
+  };
+
+  const iframeTargets = targetInfos.filter(
+    (t) => t.type === 'iframe' && t.url?.includes('vscode-webview')
+  );
+
+  for (const target of iframeTargets) {
+    let sessionId: string;
+    try {
+      const attached = (await cdp.send('Target.attachToTarget', {
+        targetId: target.targetId,
+        flatten: true,
+      })) as { sessionId: string };
+      sessionId = attached.sessionId;
+    } catch {
+      continue;
+    }
+
+    try {
+      await cdp.sendToSession(sessionId, 'Runtime.enable');
+
+      const clickResult = (await cdp.sendToSession(sessionId, 'Runtime.evaluate', {
+        expression: `(() => {
+          const iframe = document.querySelector('iframe');
+          if (!iframe) return 'no-iframe';
+          let doc, win;
+          try {
+            doc = iframe.contentDocument || iframe.contentWindow?.document;
+            win = iframe.contentWindow;
+          } catch(e) { return 'cross-origin'; }
+          if (!doc || !win) return 'no-doc';
+
+          const buttons = [...doc.querySelectorAll('button, [role="button"]')];
+          const btn = buttons.find(b => b.textContent?.trim() === ${JSON.stringify(buttonText)});
+          if (!btn) return 'not-found';
+
+          const event = new win.MouseEvent('click', {
+            bubbles: true, cancelable: true, view: win
+          });
+          btn.dispatchEvent(event);
+          return 'clicked';
+        })()`,
+        returnByValue: true,
+      })) as { result?: { value?: string } };
+
+      const result = String(clickResult?.result?.value ?? '');
+
+      try {
+        await cdp.send('Target.detachFromTarget', { sessionId });
+      } catch {
+        /* ignore */
+      }
+
+      if (result === 'clicked') {
+        console.log(`    Clicked "${buttonText}" button`);
+        return true;
+      }
+    } catch {
+      try {
+        await cdp.send('Target.detachFromTarget', { sessionId });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  console.log(`    Button "${buttonText}" not found in any webview`);
+  return false;
+}
+
+/**
+ * Collapse the DETAILS panel in the sidebar by dragging the horizontal sash
+ * to the bottom, giving the TASKS panel (kanban/list) the full sidebar height.
+ */
+async function collapseDetailsPanel(cdp: CdpClient): Promise<void> {
+  console.log('    Collapsing DETAILS panel...');
+
+  const sashInfo = (await cdpEval(
+    cdp,
+    `(() => {
+      const sidebar = document.querySelector('.part.sidebar');
+      if (!sidebar) return null;
+      // Find the horizontal sash within the sidebar (divider between TASKS and DETAILS panels)
+      const sash = sidebar.querySelector('.monaco-sash.horizontal');
+      if (!sash) return null;
+      const rect = sash.getBoundingClientRect();
+      const sidebarRect = sidebar.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        targetY: sidebarRect.bottom - 2
+      };
+    })()`
+  )) as { x: number; y: number; targetY: number } | null;
+
+  if (!sashInfo) {
+    console.log('    Could not find horizontal sash in sidebar');
+    return;
+  }
+
+  // Drag the sash to the bottom of the sidebar
+  await cdp.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: sashInfo.x,
+    y: sashInfo.y,
+    button: 'left',
+    clickCount: 1,
+  });
+  await sleep(50);
+
+  const steps = 3;
+  for (let i = 1; i <= steps; i++) {
+    const y = sashInfo.y + ((sashInfo.targetY - sashInfo.y) * i) / steps;
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: sashInfo.x,
+      y,
+      button: 'left',
+    });
+    await sleep(20);
+  }
+
+  await cdp.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: sashInfo.x,
+    y: sashInfo.targetY,
+    button: 'left',
+    clickCount: 1,
+  });
+
+  await sleep(300);
+  console.log('    DETAILS panel collapsed');
+}
+
+/**
+ * Expand the DETAILS panel to roughly half the sidebar height.
+ * Drags the horizontal sash between TASKS and DETAILS upward.
+ */
+async function expandDetailsPanel(cdp: CdpClient): Promise<void> {
+  console.log('    Expanding DETAILS panel...');
+
+  const sashInfo = (await cdpEval(
+    cdp,
+    `(() => {
+      const sidebar = document.querySelector('.part.sidebar');
+      if (!sidebar) return null;
+      const sash = sidebar.querySelector('.monaco-sash.horizontal');
+      if (!sash) return null;
+      const rect = sash.getBoundingClientRect();
+      const sidebarRect = sidebar.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        targetY: sidebarRect.top + sidebarRect.height * 0.45
+      };
+    })()`
+  )) as { x: number; y: number; targetY: number } | null;
+
+  if (!sashInfo) {
+    console.log('    Could not find horizontal sash in sidebar');
+    return;
+  }
+
+  // Drag the sash upward to give DETAILS more room
+  await cdp.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed',
+    x: sashInfo.x,
+    y: sashInfo.y,
+    button: 'left',
+    clickCount: 1,
+  });
+  await sleep(50);
+
+  const steps = 5;
+  for (let i = 1; i <= steps; i++) {
+    const y = sashInfo.y + ((sashInfo.targetY - sashInfo.y) * i) / steps;
+    await cdp.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: sashInfo.x,
+      y,
+      button: 'left',
+    });
+    await sleep(20);
+  }
+
+  await cdp.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased',
+    x: sashInfo.x,
+    y: sashInfo.targetY,
+    button: 'left',
+    clickCount: 1,
+  });
+
+  await sleep(300);
+  console.log('    DETAILS panel expanded');
+}
+
 // --- Command Palette ---
 
 async function runCommand(cdp: CdpClient, commandLabel: string): Promise<void> {
@@ -773,7 +1024,7 @@ async function executeScenario(
   instance: VsCodeInstance,
   scenario: ScreenshotScenario,
   outputPath: string
-): Promise<void> {
+): Promise<{ cropBounds?: { left: number; top: number; width: number; height: number } }> {
   const { cdp } = instance;
   console.log(`  Scenario: ${scenario.name} — ${scenario.description}`);
 
@@ -801,6 +1052,15 @@ async function executeScenario(
       case 'keyboard':
         await cdpKeyPress(cdp, step.key);
         break;
+      case 'collapseDetails':
+        await collapseDetailsPanel(cdp);
+        break;
+      case 'expandDetails':
+        await expandDetailsPanel(cdp);
+        break;
+      case 'clickWebviewButton':
+        await clickButtonInWebview(cdp, step.text);
+        break;
     }
   }
 
@@ -818,6 +1078,22 @@ async function executeScenario(
   // Capture screenshot
   console.log(`  Capturing: ${path.basename(outputPath)}`);
   await cdpScreenshot(cdp, outputPath);
+
+  // Query crop bounds while CDP is still connected
+  let cropBounds: { left: number; top: number; width: number; height: number } | undefined;
+  if (scenario.crop) {
+    const bounds = await getCropBounds(cdp, scenario.crop);
+    if (bounds) {
+      console.log(
+        `  Crop bounds (${scenario.crop}): ${bounds.width}x${bounds.height} at (${bounds.left},${bounds.top})`
+      );
+      cropBounds = bounds;
+    } else {
+      console.log(`  Warning: Could not find crop bounds for ${scenario.crop}`);
+    }
+  }
+
+  return { cropBounds };
 }
 
 // --- Optimization ---
@@ -907,6 +1183,16 @@ async function main(): Promise<void> {
       await waitForVsCodeReady(instance.cdp);
       await dismissNotifications(instance.cdp);
 
+      // Remove sash focus outlines from screenshots
+      await cdpEval(
+        instance.cdp,
+        `(() => {
+          const style = document.createElement('style');
+          style.textContent = '.monaco-sash:focus, .monaco-sash:focus-visible { outline: none !important; }';
+          document.head.appendChild(style);
+        })()`
+      );
+
       // Close the secondary sidebar (chat/copilot) BEFORE theme switch.
       // runCommand starts with Escape which would revert a pending theme preview.
       try {
@@ -948,8 +1234,44 @@ async function main(): Promise<void> {
       console.log(`  Current theme: ${currentTheme}`);
 
       if (currentTheme !== themeConfig.id) {
-        console.log(`  Switching to ${themeConfig.setting} via command palette...`);
-        await runCommand(instance.cdp, 'Preferences: Color Theme');
+        console.log(`  Switching to ${themeConfig.setting} via Ctrl+K Ctrl+T...`);
+        // Use Ctrl+K Ctrl+T keyboard chord to open the theme picker directly.
+        // This bypasses the command palette which can fuzzy-match to
+        // "Browse Color Themes in Marketplace" instead of the theme picker.
+        await cdpKeyPress(instance.cdp, 'Escape');
+        await sleep(200);
+        const mod = process.platform === 'darwin' ? 4 : 2; // meta on mac, ctrl on linux
+        // Ctrl+K (first chord)
+        await instance.cdp.send('Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          key: 'k',
+          code: 'KeyK',
+          windowsVirtualKeyCode: 75,
+          modifiers: mod,
+        });
+        await instance.cdp.send('Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          key: 'k',
+          code: 'KeyK',
+          modifiers: mod,
+        });
+        await sleep(300);
+        // Ctrl+T (second chord)
+        await instance.cdp.send('Input.dispatchKeyEvent', {
+          type: 'keyDown',
+          key: 't',
+          code: 'KeyT',
+          windowsVirtualKeyCode: 84,
+          modifiers: mod,
+        });
+        await instance.cdp.send('Input.dispatchKeyEvent', {
+          type: 'keyUp',
+          key: 't',
+          code: 'KeyT',
+          modifiers: mod,
+        });
+        await sleep(800);
+        // Type the theme name to filter
         await cdpType(instance.cdp, themeConfig.setting, 40);
         await sleep(1000);
 
@@ -1001,11 +1323,23 @@ async function main(): Promise<void> {
         const finalPath = path.join(OUTPUT_DIR, themeConfig.id, `${scenario.name}.png`);
 
         try {
-          await executeScenario(instance, scenario, rawPath);
+          const result = await executeScenario(instance, scenario, rawPath);
 
+          // Crop to panel if specified
+          if (result.cropBounds) {
+            console.log(`  Cropping to ${scenario.crop} panel...`);
+            await cropImage(rawPath, result.cropBounds);
+          }
+
+          // Apply chrome framing
           if (!opts.skipChrome) {
-            console.log(`  Adding window chrome...`);
-            await addWindowChrome(rawPath, finalPath, themeConfig.id);
+            if (scenario.chrome === 'panel') {
+              console.log(`  Adding panel frame...`);
+              await addPanelFrame(rawPath, finalPath, themeConfig.id);
+            } else {
+              console.log(`  Adding window chrome...`);
+              await addWindowChrome(rawPath, finalPath, themeConfig.id);
+            }
           } else {
             fs.copyFileSync(rawPath, finalPath);
           }

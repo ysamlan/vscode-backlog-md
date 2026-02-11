@@ -4,6 +4,9 @@
  * Adds rounded corners, title bar with traffic lights, and drop shadow
  * to raw screenshots, matching the aesthetic of manually-captured macOS windows.
  *
+ * Also provides a lighter "panel frame" variant with just rounded corners
+ * and shadow (no title bar) for cropped panel screenshots.
+ *
  * Uses sharp for image compositing.
  */
 
@@ -68,8 +71,9 @@ function createTitleBarSvg(
   config: ChromeConfig,
   isDark: boolean
 ): string {
-  const bgColor = isDark ? '#323233' : '#E8E8E8';
-  const borderColor = isDark ? '#1a1a1a' : '#d0d0d0';
+  // Title bar colors matched to the screenshot themes (Default Dark Modern / Quiet Light)
+  const bgColor = isDark ? '#1f1f1f' : '#F5F5F5';
+  const borderColor = isDark ? '#2b2b2b' : '#C9C9C9';
   const r = config.cornerRadius;
 
   // Traffic light positions (vertically centered in title bar)
@@ -210,6 +214,76 @@ export async function addWindowChrome(
     .composite([
       { input: shadowLayer, top: 0, left: 0 },
       { input: maskedWindow, top: offsetY, left: offsetX },
+    ])
+    .png()
+    .toFile(outputPath);
+}
+
+/**
+ * Add a subtle panel frame to a cropped screenshot.
+ *
+ * Unlike addWindowChrome, this adds only rounded corners and a drop shadow
+ * (no title bar or traffic lights). Used for cropped panel screenshots
+ * where the full window chrome would be misleading.
+ *
+ * @param inputPath - Path to the cropped screenshot PNG
+ * @param outputPath - Path to write the processed PNG
+ * @param theme - 'dark' or 'light' (affects shadow intensity)
+ */
+export async function addPanelFrame(
+  inputPath: string,
+  outputPath: string,
+  theme: 'dark' | 'light'
+): Promise<void> {
+  const cornerRadius = 16; // 8px at 1x, doubled for 2x
+  const shadowBlur = 40;
+  const shadowOffsetY = 6;
+  const shadowPadding = 60;
+
+  const rawImage = sharp(inputPath);
+  const metadata = await rawImage.metadata();
+  const imgWidth = metadata.width!;
+  const imgHeight = metadata.height!;
+
+  const totalWidth = imgWidth + shadowPadding * 2;
+  const totalHeight = imgHeight + shadowPadding * 2;
+
+  const shadowOpacity = theme === 'dark' ? 0.4 : 0.25;
+
+  // Step 1: Apply rounded corners to the image
+  const maskSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${imgWidth}" height="${imgHeight}">
+  <rect width="${imgWidth}" height="${imgHeight}" rx="${cornerRadius}" ry="${cornerRadius}" fill="white"/>
+</svg>`;
+
+  const maskedImage = await sharp(await rawImage.toBuffer())
+    .composite([{ input: Buffer.from(maskSvg), blend: 'dest-in' as const }])
+    .png()
+    .toBuffer();
+
+  // Step 2: Create shadow layer
+  const shadowSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${totalHeight}">
+  <defs>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="${shadowOffsetY}" stdDeviation="${shadowBlur / 2}" flood-color="rgba(0,0,0,${shadowOpacity})"/>
+    </filter>
+  </defs>
+  <rect x="${shadowPadding}" y="${shadowPadding}" width="${imgWidth}" height="${imgHeight}" rx="${cornerRadius}" ry="${cornerRadius}" fill="rgba(0,0,0,${shadowOpacity + 0.1})" filter="url(#shadow)"/>
+</svg>`;
+
+  const shadowLayer = await sharp(Buffer.from(shadowSvg)).png().toBuffer();
+
+  // Step 3: Composite onto transparent canvas
+  await sharp({
+    create: {
+      width: totalWidth,
+      height: totalHeight,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([
+      { input: shadowLayer, top: 0, left: 0 },
+      { input: maskedImage, top: shadowPadding, left: shadowPadding },
     ])
     .png()
     .toFile(outputPath);

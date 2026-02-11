@@ -1,18 +1,22 @@
 ---
+id: TASK-4
 title: Add dark mode support
 status: To Do
 priority: medium
 milestone: v2.0
 labels: [feature]
-created: 2026-02-03
+created_date: 2026-02-03
 ---
 
-# Add dark mode support
+## Description
 
+<!-- SECTION:DESCRIPTION:BEGIN -->
 Implement a dark mode theme for the application.
+<!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
-
-- [ ] Toggle between light and dark mode
-- [ ] Persist user preference
-- [ ] Respect system preference by default
+<!-- AC:BEGIN -->
+- [ ] #1 Toggle between light and dark mode
+- [ ] #2 Persist user preference
+- [ ] #3 Respect system preference by default
+<!-- AC:END -->

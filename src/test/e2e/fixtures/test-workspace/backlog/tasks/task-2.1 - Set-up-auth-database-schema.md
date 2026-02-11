@@ -13,4 +13,6 @@ priority: high
 
 ## Description
 
+<!-- SECTION:DESCRIPTION:BEGIN -->
 Create the users table with email, hashed password, and session fields.
+<!-- SECTION:DESCRIPTION:END -->

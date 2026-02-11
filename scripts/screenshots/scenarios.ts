@@ -7,12 +7,16 @@
  */
 
 export interface ScreenshotScenario {
-  /** Unique name used for the output filename (e.g., "kanban-plus-edit") */
+  /** Unique name used for the output filename (e.g., "kanban") */
   name: string;
   /** Human-readable description for logging */
   description: string;
   /** Target sidebar width in logical pixels (at 1x). Default: 380 */
   sidebarWidth?: number;
+  /** Crop to a specific panel instead of capturing full window. undefined = full window */
+  crop?: 'sidebar' | 'editor';
+  /** Chrome style: 'window' = macOS title bar + shadow, 'panel' = rounded corners + shadow only. Default: 'window' */
+  chrome?: 'window' | 'panel';
   /** Ordered list of steps to reach the desired UI state */
   steps: ScenarioStep[];
 }
@@ -22,10 +26,13 @@ export type ScenarioStep =
   | { type: 'wait'; ms: number }
   | { type: 'quickOpen'; filename: string }
   | { type: 'keyboard'; key: string }
-  | { type: 'selectTask'; text: string };
+  | { type: 'selectTask'; text: string }
+  | { type: 'collapseDetails' }
+  | { type: 'expandDetails' }
+  | { type: 'clickWebviewButton'; text: string };
 
 /**
- * All 5 screenshot scenarios matching the existing README images.
+ * 3 screenshot scenarios for README images.
  *
  * Steps use command palette commands, Quick Open, keyboard shortcuts,
  * and webview target injection (for task selection within sidebar webviews).
@@ -36,85 +43,69 @@ export type ScenarioStep =
  */
 export const scenarios: ScreenshotScenario[] = [
   {
-    name: 'kanban-plus-edit',
-    description: 'Kanban board with task detail editor open',
-    sidebarWidth: 420,
+    name: 'kanban',
+    description: 'Kanban board with task cards in multiple columns',
+    crop: 'sidebar',
+    chrome: 'panel',
+    sidebarWidth: 700,
     steps: [
       { type: 'command', command: 'Backlog: Open Kanban Board' },
       { type: 'wait', ms: 2000 },
-      // Select a task (populates sidebar preview with task details)
-      { type: 'selectTask', text: 'Implement user authentication' },
-      { type: 'wait', ms: 1000 },
-      // Open the task markdown file in the editor area
-      { type: 'quickOpen', filename: 'TASK-2 - Implement' },
-      { type: 'wait', ms: 1000 },
+      // Collapse the DETAILS panel so the kanban board fills the full sidebar height
+      { type: 'collapseDetails' },
+      { type: 'wait', ms: 500 },
     ],
   },
   {
-    name: 'list-plus-details',
-    description: 'List view with task preview panel',
+    name: 'list-detail',
+    description: 'List view with task detail in sidebar preview',
+    crop: 'sidebar',
+    chrome: 'panel',
     sidebarWidth: 500,
     steps: [
-      // Use "Switch to" commands which are more unique in the command palette
       { type: 'command', command: 'Switch to List View' },
       { type: 'wait', ms: 3000 },
-      // Select a visible task to populate the sidebar preview panel
-      { type: 'selectTask', text: 'Add dark mode support' },
-      { type: 'wait', ms: 1000 },
-    ],
-  },
-  {
-    name: 'dashboard-plus-add-new',
-    description: 'Dashboard tab with create new task panel',
-    sidebarWidth: 380,
-    steps: [
-      { type: 'command', command: 'Backlog: Open Dashboard' },
-      { type: 'wait', ms: 3000 },
-      // Open create task panel in editor area
-      { type: 'command', command: 'Backlog: Create Task' },
+      // Select a task with rich content to populate the sidebar preview panel
+      { type: 'selectTask', text: 'Implement user authentication' },
       { type: 'wait', ms: 2000 },
+      // Expand the DETAILS panel so the task preview is prominently visible
+      { type: 'expandDetails' },
+      { type: 'wait', ms: 500 },
     ],
   },
   {
-    name: 'list-plus-markdown',
-    description: 'List view with raw markdown file in editor',
+    name: 'edit',
+    description: 'Task detail editor with rich content',
+    crop: 'editor',
+    chrome: 'panel',
     sidebarWidth: 420,
     steps: [
       { type: 'command', command: 'Switch to List View' },
       { type: 'wait', ms: 3000 },
-      // Open a task markdown file in the editor area
-      { type: 'quickOpen', filename: 'TASK-2 - Implement' },
+      // Select a task to populate the sidebar preview
+      { type: 'selectTask', text: 'Refactor database layer' },
       { type: 'wait', ms: 2000 },
-    ],
-  },
-  {
-    name: 'list-plus-details-plus-add-new',
-    description: 'List view with preview panel and create new task',
-    sidebarWidth: 380,
-    steps: [
-      { type: 'command', command: 'Switch to List View' },
-      { type: 'wait', ms: 3000 },
-      // Select a task to show preview
-      { type: 'selectTask', text: 'Fix login redirect bug' },
-      { type: 'wait', ms: 1000 },
-      // Open create task panel
-      { type: 'command', command: 'Backlog: Create Task' },
-      { type: 'wait', ms: 1500 },
+      // Click "Edit" button in the sidebar preview to open full task detail in editor
+      { type: 'clickWebviewButton', text: 'Edit' },
+      { type: 'wait', ms: 2000 },
     ],
   },
 ];
 
-/** Theme configurations for screenshot generation */
+/**
+ * Theme configurations for screenshot generation.
+ * Both themes are built-in to VS Code — no extension installation needed.
+ */
 export const themes = [
   {
     id: 'dark',
-    name: 'Default Dark+',
-    setting: 'Default Dark+',
+    name: 'Default Dark Modern',
+    setting: 'Default Dark Modern',
   },
   {
     id: 'light',
-    name: 'Default Light+',
-    setting: 'Default Light+',
+    name: 'Quiet Light',
+    setting: 'Quiet Light',
   },
 ] as const;
 

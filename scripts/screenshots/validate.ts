@@ -27,9 +27,10 @@ const SOURCE_DIRS = [
 /** Minimum acceptable file size in bytes (10KB) */
 const MIN_FILE_SIZE = 10 * 1024;
 
-/** Expected image dimensions (at 2x DPI, with chrome padding) */
-const EXPECTED_WIDTH_RANGE = { min: 2800, max: 3500 };
-const EXPECTED_HEIGHT_RANGE = { min: 1800, max: 2600 };
+/** Expected image dimensions (at 2x DPI, with chrome padding).
+ * Range is wide to accommodate both full-window and cropped panel screenshots. */
+const EXPECTED_WIDTH_RANGE = { min: 1000, max: 3600 };
+const EXPECTED_HEIGHT_RANGE = { min: 1400, max: 2800 };
 
 interface ValidationResult {
   file: string;

@@ -5,15 +5,14 @@ status: In Progress
 priority: medium
 labels: [feature]
 dependencies: [TASK-3]
-created: 2026-02-04
+created_date: 2026-02-04
 updated_date: 2026-02-05
 ordinal: 2000
 ---
 
-# Refactor database layer
-
 ## Description
 
+<!-- SECTION:DESCRIPTION:BEGIN -->
 This task has no milestone assigned to test the "no milestone" case.
 
 ### Current Architecture
@@ -64,8 +63,10 @@ sequenceDiagram
     end
     R-->>S: User object
 ```
+<!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
-
-- [ ] Extract database logic into repository pattern
-- [ ] Add connection pooling
+<!-- AC:BEGIN -->
+- [ ] #1 Extract database logic into repository pattern
+- [ ] #2 Add connection pooling
+<!-- AC:END -->

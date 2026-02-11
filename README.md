@@ -6,15 +6,15 @@
 A VS Code extension for browsing and managing [Backlog.md](https://github.com/backlog-md/backlog) tasks directly in your editor. Backlog.md is human-friendly and machine-accessible tool for managing a project task list and backlog in Markdown format.
 
 <picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/kanban-plus-edit.png">
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/kanban-plus-edit.png">
-  <img alt="Kanban board with task detail editor" src="docs/images/dark/kanban-plus-edit.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/list-detail.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/list-detail.png">
+  <img alt="Task list with detail preview" src="docs/images/dark/list-detail.png">
 </picture>
 
 <picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/list-plus-details.png">
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/list-plus-details.png">
-  <img alt="Task list with detail preview panel" src="docs/images/dark/list-plus-details.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/light/kanban.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/dark/kanban.png">
+  <img alt="Kanban board with task cards" src="docs/images/light/kanban.png">
 </picture>
 
 ## Features
@@ -30,21 +30,9 @@ A VS Code extension for browsing and managing [Backlog.md](https://github.com/ba
 <summary>More screenshots</summary>
 
 <picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/dashboard-plus-add-new.png">
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/dashboard-plus-add-new.png">
-  <img alt="Dashboard with create new task panel" src="docs/images/dark/dashboard-plus-add-new.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/list-plus-markdown.png">
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/list-plus-markdown.png">
-  <img alt="Task list with raw markdown editor" src="docs/images/dark/list-plus-markdown.png">
-</picture>
-
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/list-plus-details-plus-add-new.png">
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/list-plus-details-plus-add-new.png">
-  <img alt="Task list with detail preview and create new task" src="docs/images/dark/list-plus-details-plus-add-new.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/light/edit.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dark/edit.png">
+  <img alt="Task detail editor" src="docs/images/dark/edit.png">
 </picture>
 
 </details>
