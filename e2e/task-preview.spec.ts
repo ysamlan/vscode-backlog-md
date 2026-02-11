@@ -34,6 +34,7 @@ const sampleTask: Task & { blocksTaskIds?: string[] } = {
 const samplePreviewData = {
   type: 'taskPreviewData' as const,
   task: sampleTask,
+  descriptionHtml: '<p>A detailed description of the task.</p>',
   statuses: ['To Do', 'In Progress', 'Done'],
   isReadOnly: false,
   subtaskSummaries: [

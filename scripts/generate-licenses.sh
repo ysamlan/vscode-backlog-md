@@ -8,6 +8,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 bunx generate-license-file \
   --input "$PROJECT_ROOT/package.json" \
   --output "$PROJECT_ROOT/ThirdPartyNotices.txt" \
+  --config "$PROJECT_ROOT/.generate-license-file.config.json" \
   --overwrite \
   --ci
 
