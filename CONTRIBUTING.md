@@ -143,6 +143,8 @@ What to verify in the UI for cross-branch functionality:
 
 When a GitHub release is created, the [release workflow](.github/workflows/release.yml) automatically builds, tests, packages a `.vsix`, and publishes it to both the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ysamlan.vscode-backlog-md) and [Open VSX](https://open-vsx.org/extension/ysamlan/vscode-backlog-md). The `.vsix` is also attached to the GitHub release as a download.
 
+The version in `package.json` is automatically set from the release tag (e.g., tag `v0.3.0` sets version `0.3.0`). After publishing, the workflow pushes the version bump back to `main`. You don't need to manually update `package.json` before tagging a release.
+
 ## Getting Help
 
 - Check existing [issues](https://github.com/ysamlan/vscode-backlog-md/issues)
