@@ -139,6 +139,10 @@ What to verify in the UI for cross-branch functionality:
 2. `TASK-900` appears from `feature/cross-branch-demo` and is read-only.
 3. `TASK-1` on `main` remains editable.
 
+## Releases
+
+When a GitHub release is created, the [release workflow](.github/workflows/release.yml) automatically builds, tests, packages a `.vsix`, and publishes it to both the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ysamlan.vscode-backlog-md) and [Open VSX](https://open-vsx.org/extension/ysamlan/vscode-backlog-md). The `.vsix` is also attached to the GitHub release as a download.
+
 ## Getting Help
 
 - Check existing [issues](https://github.com/ysamlan/vscode-backlog-md/issues)

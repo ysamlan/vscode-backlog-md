@@ -1,5 +1,7 @@
 # Backlog.md for VS Code
 
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/ysamlan.vscode-backlog-md?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=ysamlan.vscode-backlog-md)
+[![Open VSX](https://img.shields.io/open-vsx/v/ysamlan/vscode-backlog-md?label=Open%20VSX)](https://open-vsx.org/extension/ysamlan/vscode-backlog-md)
 [![VS Code 1.108+](https://img.shields.io/badge/VS%20Code-1.108%2B-blue.svg)](https://code.visualstudio.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -39,16 +41,18 @@ A VS Code extension for browsing and managing [Backlog.md](https://github.com/ba
 
 ## Installation
 
-### From VS Code Marketplace
+### From a Marketplace
 
-1. Open VS Code
+The extension is available on both the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ysamlan.vscode-backlog-md) and [Open VSX](https://open-vsx.org/extension/ysamlan/vscode-backlog-md).
+
+1. Open VS Code (or a compatible editor like VSCodium for Open VSX)
 2. Go to Extensions (Ctrl+Shift+X / Cmd+Shift+X)
 3. Search for "Backlog.md"
 4. Click Install
 
 ### From VSIX File
 
-1. Download the `.vsix` file from [Releases](https://github.com/ysamlan/vscode-backlog-md/releases)
+1. Download the `.vsix` file from [GitHub Releases](https://github.com/ysamlan/vscode-backlog-md/releases)
 2. In VS Code, open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
 3. Run "Extensions: Install from VSIX..."
 4. Select the downloaded file
