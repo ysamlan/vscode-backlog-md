@@ -2,7 +2,7 @@ name: Release
 
 on:
   release:
-    types: [created]
+    types: [published]
 
 jobs:
   build-vsix:
@@ -19,6 +19,16 @@ jobs:
 
       - name: Set version from tag
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
+
+      - name: Update changelog from GitHub releases
+        uses: rhysd/changelog-from-release/action@v3
+        with:
+          file: CHANGELOG.md
+          github_token: ${{ github.token }}
+          commit: false
+          push: false
+          header: |
+            # Changelog
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -60,6 +70,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json
-          git commit -m "Bump version to ${GITHUB_REF_NAME#v}"
+          git add package.json CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "No version or changelog changes to commit"
+            exit 0
+          fi
+          git commit -m "Bump version to ${GITHUB_REF_NAME#v} and update changelog"
           git push origin HEAD:main
