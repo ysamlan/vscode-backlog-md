@@ -16,7 +16,7 @@ import * as path from 'path';
 import {
   sleep,
   cdpScreenshot,
-  runCommand,
+  executeCommand,
   dismissNotifications,
   resetEditorState,
 } from './lib/cdp-helpers';
@@ -32,6 +32,7 @@ import {
   isElementFocusedInWebview,
   getInputValueInWebview,
   elementExistsInWebview,
+  clearWebviewSessionCache,
 } from './lib/webview-helpers';
 import {
   waitForExtensionReady,
@@ -80,14 +81,17 @@ describe('Cross-view CDP tests', () => {
   }, 15_000);
 
   beforeEach(async () => {
+    // Invalidate cached webview sessions (views may have refreshed)
+    clearWebviewSessionCache();
     // Reset task files to original state
     resetTestWorkspace(workspacePath);
     // Close all editors, dismiss dialogs
     await resetEditorState(instance.cdp);
     await dismissNotifications(instance.cdp);
     // Trigger a refresh so the extension re-reads the reset files
-    await runCommand(instance.cdp, 'Backlog: Refresh');
-    await sleep(2000);
+    await executeCommand(instance.cdp, 'backlog.refresh');
+    // Wait for the tasks webview to have content (signal-based, not blind sleep)
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
   }, 30_000);
 
   afterEach(async (ctx) => {
@@ -107,13 +111,12 @@ describe('Cross-view CDP tests', () => {
 
   it('clicking task in kanban updates preview panel', async () => {
     // 1. Ensure kanban is open
-    await runCommand(instance.cdp, 'Backlog: Open Kanban Board');
-    await sleep(2000);
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     // 2. Click TASK-2 card in the tasks webview
     const clicked = await clickInWebview(instance.cdp, 'tasks', '[data-task-id="TASK-2"]');
     expect(clicked).toBe(true);
-    await sleep(1000);
 
     // 3. Wait for preview webview to contain TASK-2 info
     const previewText = await waitForWebviewContent(instance.cdp, 'preview', 'TASK-2', {
@@ -127,8 +130,8 @@ describe('Cross-view CDP tests', () => {
 
   it('status change in preview panel updates kanban', async () => {
     // 1. Open kanban view, click TASK-1 to select it
-    await runCommand(instance.cdp, 'Backlog: Open Kanban Board');
-    await sleep(2000);
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     const clicked = await clickInWebview(instance.cdp, 'tasks', '[data-task-id="TASK-1"]');
     expect(clicked).toBe(true);
@@ -144,7 +147,6 @@ describe('Cross-view CDP tests', () => {
       'In Progress'
     );
     expect(changed).toBe(true);
-    await sleep(1000);
 
     // 4. Wait for the file to be updated on disk
     const taskFile = taskFilePath(workspacePath, 'task-1 - Test-task-for-e2e.md');
@@ -154,8 +156,18 @@ describe('Cross-view CDP tests', () => {
     expect(content).toContain('status: In Progress');
 
     // 5. Wait for kanban to refresh and verify TASK-1 is in "In Progress" column
-    await sleep(3000);
-    const columnCheck = await queryWebviewElement(
+    const columnCheck = await waitForWebviewContent(
+      instance.cdp,
+      'tasks',
+      (text) => {
+        // The kanban should have refreshed by the time the file is written
+        return text.includes('TASK-1');
+      },
+      { timeoutMs: 10_000 }
+    );
+    expect(columnCheck).toBeTruthy();
+
+    const column = await queryWebviewElement(
       instance.cdp,
       'tasks',
       `
@@ -167,14 +179,13 @@ describe('Cross-view CDP tests', () => {
       return header?.textContent ?? 'no-header';
       `
     );
-    // The column header should contain "In Progress"
-    expect(String(columnCheck)).toContain('In Progress');
+    expect(String(column)).toContain('In Progress');
   }, 60_000);
 
   it('view switch preserves selected task in preview', async () => {
     // 1. Open kanban, select TASK-3
-    await runCommand(instance.cdp, 'Backlog: Open Kanban Board');
-    await sleep(2000);
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     const clicked = await clickInWebview(instance.cdp, 'tasks', '[data-task-id="TASK-3"]');
     expect(clicked).toBe(true);
@@ -185,17 +196,19 @@ describe('Cross-view CDP tests', () => {
     });
     expect(previewBefore).toContain('TASK-3');
 
-    // 2. Switch to list view
-    await runCommand(instance.cdp, 'Backlog: Switch to List View');
-    await sleep(2000);
+    // 2. Switch to list view via keybinding
+    clearWebviewSessionCache();
+    await executeCommand(instance.cdp, 'backlog.showListView');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     // 3. Preview should still show TASK-3
     const previewAfter = await getWebviewTextContent(instance.cdp, 'preview');
     expect(previewAfter).toContain('TASK-3');
 
     // 4. Switch back to kanban
-    await runCommand(instance.cdp, 'Backlog: Open Kanban Board');
-    await sleep(2000);
+    clearWebviewSessionCache();
+    await executeCommand(instance.cdp, 'backlog.showKanbanView');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     // Preview should still show TASK-3
     const previewFinal = await getWebviewTextContent(instance.cdp, 'preview');
@@ -204,8 +217,8 @@ describe('Cross-view CDP tests', () => {
 
   it('drag-and-drop in kanban updates file on disk', async () => {
     // 1. Open kanban view
-    await runCommand(instance.cdp, 'Backlog: Open Kanban Board');
-    await sleep(2000);
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     // 2. Drag TASK-1 (To Do) to the "In Progress" column's task-list
     //    The drop handler is on .task-list[data-status="In Progress"]
@@ -227,8 +240,8 @@ describe('Cross-view CDP tests', () => {
 
   it('active task highlighting when detail panel opens', async () => {
     // 1. Open kanban, check TASK-1 does NOT have active-edited class
-    await runCommand(instance.cdp, 'Backlog: Open Kanban Board');
-    await sleep(2000);
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     const beforeClass = await queryWebviewElement(
       instance.cdp,
@@ -251,25 +264,19 @@ describe('Cross-view CDP tests', () => {
     // 3. Click the "Edit" button in the preview to open the full detail panel
     const editClicked = await clickButtonInWebview(instance.cdp, 'preview', 'Edit');
     expect(editClicked).toBe(true);
-    await sleep(3000);
 
-    // 4. Verify TASK-1 card now has active-edited class
-    const afterClass = await queryWebviewElement(
-      instance.cdp,
-      'tasks',
-      `
-      const card = doc.querySelector('[data-task-id="TASK-1"]');
-      if (!card) return 'card-not-found';
-      return card.classList.contains('active-edited') ? 'has-class' : 'no-class';
-      `
-    );
+    // 4. Wait for detail panel to load, then verify TASK-1 card has active-edited class
+    await waitForWebviewContent(instance.cdp, 'detail', 'TASK-1', { timeoutMs: 10_000 });
+
+    // Give the activeEditedTaskChanged message time to propagate
+    const afterClass = await waitForActiveEditedClass(instance.cdp, 'TASK-1');
     expect(afterClass).toBe('has-class');
   }, 45_000);
 
   it('switching tasks in kanban updates both preview and open detail panel', async () => {
     // 1. Open kanban, select TASK-1, open edit panel
-    await runCommand(instance.cdp, 'Backlog: Open Kanban Board');
-    await sleep(2000);
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     await clickInWebview(instance.cdp, 'tasks', '[data-task-id="TASK-1"]');
     await waitForWebviewContent(instance.cdp, 'preview', 'TASK-1', { timeoutMs: 10_000 });
@@ -286,7 +293,6 @@ describe('Cross-view CDP tests', () => {
 
     // 2. Click TASK-3 in the kanban (different task)
     await clickInWebview(instance.cdp, 'tasks', '[data-task-id="TASK-3"]');
-    await sleep(2000);
 
     // 3. Preview should update to TASK-3
     const previewAfter = await waitForWebviewContent(instance.cdp, 'preview', 'TASK-3', {
@@ -310,8 +316,8 @@ describe('Cross-view CDP tests', () => {
     // should switch to TASK-3's description (not show TASK-1's stale content).
 
     // 1. Open kanban, select TASK-1, open edit panel
-    await runCommand(instance.cdp, 'Backlog: Open Kanban Board');
-    await sleep(2000);
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     await clickInWebview(instance.cdp, 'tasks', '[data-task-id="TASK-1"]');
     await waitForWebviewContent(instance.cdp, 'preview', 'TASK-1', { timeoutMs: 10_000 });
@@ -327,15 +333,9 @@ describe('Cross-view CDP tests', () => {
       '[data-testid="edit-description-btn"]'
     );
     expect(descEditClicked).toBe(true);
-    await sleep(500);
 
-    // Verify textarea appears with TASK-1's description
-    const textareaExists = await elementExistsInWebview(
-      instance.cdp,
-      'detail',
-      '[data-testid="description-textarea"]'
-    );
-    expect(textareaExists).toBe(true);
+    // Wait for textarea to appear
+    await waitForElement(instance.cdp, 'detail', '[data-testid="description-textarea"]');
 
     // 3. Type some extra text into the textarea
     const typed = await typeInWebviewInput(
@@ -383,8 +383,8 @@ describe('Cross-view CDP tests', () => {
     // the user should remain in edit mode.
 
     // 1. Open kanban, select TASK-1, open edit panel
-    await runCommand(instance.cdp, 'Backlog: Open Kanban Board');
-    await sleep(2000);
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
 
     await clickInWebview(instance.cdp, 'tasks', '[data-task-id="TASK-1"]');
     await waitForWebviewContent(instance.cdp, 'preview', 'TASK-1', { timeoutMs: 10_000 });
@@ -400,7 +400,7 @@ describe('Cross-view CDP tests', () => {
       '[data-testid="edit-description-btn"]'
     );
     expect(descEditClicked).toBe(true);
-    await sleep(500);
+    await waitForElement(instance.cdp, 'detail', '[data-testid="description-textarea"]');
 
     // 3. Type some text into the description textarea
     const typed = await typeInWebviewInput(
@@ -411,8 +411,10 @@ describe('Cross-view CDP tests', () => {
     );
     expect(typed).toBe(true);
 
-    // 4. Wait for debounce interval (1000ms) + file write + refresh cycle (~3s total)
-    await sleep(4000);
+    // 4. Wait for debounce interval (1000ms) + file write + refresh cycle
+    //    This sleep is intentional — we're testing that the debounce save
+    //    does NOT disrupt focus, so we must wait for it to fire.
+    await sleep(3000);
 
     // 5. Verify textarea is STILL visible (edit mode was not exited)
     const textareaStillExists = await elementExistsInWebview(
@@ -439,3 +441,50 @@ describe('Cross-view CDP tests', () => {
     expect(value).toContain('New description content for testing debounce');
   }, 60_000);
 });
+
+/**
+ * Wait for the active-edited class to appear on a task card in the kanban.
+ * Polls because the message propagation from detail -> tasks is async.
+ */
+async function waitForActiveEditedClass(
+  cdp: CdpClient,
+  taskId: string,
+  timeoutMs = 10_000
+): Promise<string> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const result = await queryWebviewElement(
+      cdp,
+      'tasks',
+      `
+      const card = doc.querySelector('[data-task-id="${taskId}"]');
+      if (!card) return 'card-not-found';
+      return card.classList.contains('active-edited') ? 'has-class' : 'no-class';
+      `
+    );
+    if (result === 'has-class') return 'has-class';
+    await sleep(200);
+  }
+  return 'no-class';
+}
+
+/**
+ * Wait for an element to exist in a webview.
+ */
+async function waitForElement(
+  cdp: CdpClient,
+  role: import('./lib/webview-helpers').WebviewRole,
+  selector: string,
+  timeoutMs = 5_000
+): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const exists = await elementExistsInWebview(cdp, role, selector);
+    if (exists) return;
+    await sleep(200);
+  }
+  throw new Error(`Element "${selector}" not found in webview "${role}" within ${timeoutMs}ms`);
+}
+
+// Re-export CdpClient type for inline helpers
+type CdpClient = import('./lib/CdpClient').CdpClient;

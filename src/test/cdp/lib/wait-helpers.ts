@@ -3,7 +3,7 @@
  */
 
 import { CdpClient } from './CdpClient';
-import { cdpEval, sleep, dismissNotifications, runCommand } from './cdp-helpers';
+import { cdpEval, sleep, dismissNotifications, executeCommand } from './cdp-helpers';
 import { getWebviewTextContent, type WebviewRole } from './webview-helpers';
 
 interface RetryOptions {
@@ -44,7 +44,7 @@ export async function waitForWorkbench(cdp: CdpClient, timeoutMs = 30_000): Prom
       `!!document.querySelector('.monaco-workbench') && !!document.querySelector('.activitybar')`
     );
     if (ready) return;
-    await sleep(500);
+    await sleep(300);
   }
   throw new Error(`Workbench not ready after ${timeoutMs}ms`);
 }
@@ -68,15 +68,12 @@ export async function waitForExtensionReady(cdp: CdpClient, timeoutMs = 60_000):
       }
     })()`
   );
-  await sleep(500);
+  await sleep(300);
 
   // Focus the Backlog sidebar by clicking its activity bar icon.
-  // In a fresh user-data-dir, the Explorer sidebar is active by default.
-  // We need to switch to the Backlog view container.
   await cdpEval(
     cdp,
     `(() => {
-      // Find the Backlog activity bar item by its title or codicon
       const items = document.querySelectorAll('.activitybar .action-item a');
       for (const item of items) {
         const label = item.getAttribute('aria-label') || item.getAttribute('title') || '';
@@ -88,34 +85,30 @@ export async function waitForExtensionReady(cdp: CdpClient, timeoutMs = 60_000):
       return false;
     })()`
   );
-  await sleep(2000);
 
-  // Fallback: try opening the kanban board via command palette
-  // This also triggers extension activation if not already active.
-  await runCommand(cdp, 'Backlog: Open Kanban Board');
-  await sleep(3000);
+  // Open kanban via keybinding (much faster than command palette)
+  await sleep(500);
+  await executeCommand(cdp, 'backlog.openKanban');
 
-  // Wait for extension to load tasks in the sidebar
+  // Wait for extension to load tasks in the sidebar or webview
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    // Check both the sidebar pane-body and the webview iframe targets
     const hasContent = await cdpEval(
       cdp,
       `document.querySelector('.pane-body')?.textContent?.includes('TASK-') ?? false`
     );
     if (hasContent) {
-      await sleep(2000);
+      await sleep(500);
       return;
     }
 
-    // Also check if any webview iframe has task content
     const hasWebviewContent = await getWebviewTextContent(cdp, 'tasks').catch(() => null);
     if (hasWebviewContent?.includes('TASK-')) {
-      await sleep(2000);
+      await sleep(500);
       return;
     }
 
-    await sleep(1000);
+    await sleep(300);
   }
   throw new Error(`Extension did not activate within ${timeoutMs}ms`);
 }
@@ -129,7 +122,7 @@ export async function waitForWebviewContent(
   matcher: string | ((text: string) => boolean),
   opts: { timeoutMs?: number; pollMs?: number } = {}
 ): Promise<string> {
-  const { timeoutMs = 15_000, pollMs = 500 } = opts;
+  const { timeoutMs = 15_000, pollMs = 200 } = opts;
   const matchFn = typeof matcher === 'string' ? (t: string) => t.includes(matcher) : matcher;
 
   const start = Date.now();
@@ -149,7 +142,7 @@ export async function waitForFileContent(
   matcher: string | ((content: string) => boolean),
   opts: { timeoutMs?: number; pollMs?: number } = {}
 ): Promise<string> {
-  const { timeoutMs = 15_000, pollMs = 500 } = opts;
+  const { timeoutMs = 15_000, pollMs = 200 } = opts;
   const matchFn = typeof matcher === 'string' ? (t: string) => t.includes(matcher) : matcher;
   const fs = await import('fs');
 

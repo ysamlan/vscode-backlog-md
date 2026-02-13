@@ -95,6 +95,55 @@ export async function cdpScreenshot(cdp: CdpClient, outputPath: string): Promise
   fs.writeFileSync(outputPath, buffer);
 }
 
+/** Send a key combo with modifier keys via CDP */
+export async function cdpKeyCombo(cdp: CdpClient, key: string, modifiers: number): Promise<void> {
+  // modifiers: 1=Alt, 2=Ctrl, 4=Meta, 8=Shift
+  const code = key.length === 1 ? `Key${key.toUpperCase()}` : key;
+  const keyCode = key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0;
+  await cdp.send('Input.dispatchKeyEvent', {
+    type: 'keyDown',
+    key,
+    code,
+    windowsVirtualKeyCode: keyCode,
+    nativeVirtualKeyCode: keyCode,
+    modifiers,
+  });
+  await cdp.send('Input.dispatchKeyEvent', {
+    type: 'keyUp',
+    key,
+    code,
+    windowsVirtualKeyCode: keyCode,
+    nativeVirtualKeyCode: keyCode,
+    modifiers,
+  });
+}
+
+/**
+ * Keybinding map for backlog commands (registered in keybindings.json by the launcher).
+ * Ctrl=2, Shift=8, Alt=1 → Ctrl+Shift+Alt = 11
+ */
+const COMMAND_KEYBINDINGS: Record<string, { key: string; modifiers: number }> = {
+  'backlog.openKanban': { key: 'k', modifiers: 11 },
+  'backlog.refresh': { key: 'r', modifiers: 11 },
+  'backlog.showListView': { key: 'l', modifiers: 11 },
+  'backlog.showKanbanView': { key: 'b', modifiers: 11 },
+};
+
+/**
+ * Execute a VS Code command by its ID using a pre-registered keybinding.
+ * Much faster than runCommand() which types through the command palette.
+ */
+export async function executeCommand(cdp: CdpClient, commandId: string): Promise<void> {
+  const binding = COMMAND_KEYBINDINGS[commandId];
+  if (!binding) {
+    throw new Error(
+      `No keybinding registered for command "${commandId}". ` +
+        `Available: ${Object.keys(COMMAND_KEYBINDINGS).join(', ')}`
+    );
+  }
+  await cdpKeyCombo(cdp, binding.key, binding.modifiers);
+}
+
 /** Open command palette (F1), type a command label, and press Enter */
 export async function runCommand(cdp: CdpClient, commandLabel: string): Promise<void> {
   // Dismiss any existing command palette or dialog
@@ -102,13 +151,13 @@ export async function runCommand(cdp: CdpClient, commandLabel: string): Promise<
   await sleep(200);
   // Open the command palette
   await cdpKeyPress(cdp, 'F1');
-  await sleep(800);
+  await sleep(500);
   // Type the command name
-  await cdpType(cdp, commandLabel, 40);
-  await sleep(800);
+  await cdpType(cdp, commandLabel, 30);
+  await sleep(500);
   // Select the first match
   await cdpKeyPress(cdp, 'Enter');
-  await sleep(1000);
+  await sleep(500);
 }
 
 /** Dismiss any notification toasts */

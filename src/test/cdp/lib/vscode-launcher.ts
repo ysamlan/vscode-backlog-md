@@ -93,7 +93,7 @@ export async function launchVsCode(opts: LaunchOptions): Promise<VsCodeInstance>
     fs.rmSync(userDataDir, { recursive: true, force: true });
   }
 
-  // Write minimal settings
+  // Write minimal settings and keybindings
   const userDir = path.join(userDataDir, 'User');
   fs.mkdirSync(userDir, { recursive: true });
   fs.writeFileSync(
@@ -112,6 +112,21 @@ export async function launchVsCode(opts: LaunchOptions): Promise<VsCodeInstance>
         'chat.editor.enabled': false,
         'extensions.ignoreRecommendations': true,
       },
+      null,
+      2
+    )
+  );
+
+  // Register keybindings for commands used in tests (avoids slow command palette typing)
+  fs.writeFileSync(
+    path.join(userDir, 'keybindings.json'),
+    JSON.stringify(
+      [
+        { key: 'ctrl+shift+alt+k', command: 'backlog.openKanban' },
+        { key: 'ctrl+shift+alt+r', command: 'backlog.refresh' },
+        { key: 'ctrl+shift+alt+l', command: 'backlog.showListView' },
+        { key: 'ctrl+shift+alt+b', command: 'backlog.showKanbanView' },
+      ],
       null,
       2
     )

@@ -22,6 +22,17 @@ const ROLE_CLASS_MAP: Record<WebviewRole, string> = {
   detail: 'task-detail-page',
 };
 
+/**
+ * Session cache: keeps webview sessions alive between operations to avoid
+ * the overhead of re-discovering and re-attaching on every call.
+ */
+const sessionCache = new Map<WebviewRole, string>();
+
+/** Clear the session cache (call between tests or after webview refresh). */
+export function clearWebviewSessionCache(): void {
+  sessionCache.clear();
+}
+
 /** Discover all vscode-webview iframe targets */
 export async function discoverWebviewTargets(cdp: CdpClient): Promise<
   Array<{
@@ -89,9 +100,23 @@ export async function evaluateInWebview(
 
 /**
  * Find a webview by its role (body class).
+ * Uses a session cache to avoid re-discovery on every call.
  * Returns the session ID for the matching webview, or null.
  */
 export async function findWebviewByRole(cdp: CdpClient, role: WebviewRole): Promise<string | null> {
+  // Check cache: verify the session is still alive
+  const cached = sessionCache.get(role);
+  if (cached) {
+    try {
+      const alive = await evaluateInWebview(cdp, cached, 'return true;');
+      if (alive === true) return cached;
+    } catch {
+      // Session died — fall through to rediscovery
+    }
+    sessionCache.delete(role);
+  }
+
+  // Discover and attach
   const targets = await discoverWebviewTargets(cdp);
   const bodyClass = ROLE_CLASS_MAP[role];
 
@@ -111,6 +136,7 @@ export async function findWebviewByRole(cdp: CdpClient, role: WebviewRole): Prom
       );
 
       if (hasClass) {
+        sessionCache.set(role, sessionId);
         return sessionId;
       }
     } catch {
@@ -135,24 +161,20 @@ export async function clickInWebview(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return false;
 
-  try {
-    const result = await evaluateInWebview(
-      cdp,
-      sessionId,
-      `
-      const el = doc.querySelector(${JSON.stringify(selector)});
-      if (!el) return 'not-found';
-      const event = new win.MouseEvent('click', {
-        bubbles: true, cancelable: true, view: win
-      });
-      el.dispatchEvent(event);
-      return 'clicked';
-      `
-    );
-    return result === 'clicked';
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const el = doc.querySelector(${JSON.stringify(selector)});
+    if (!el) return 'not-found';
+    const event = new win.MouseEvent('click', {
+      bubbles: true, cancelable: true, view: win
+    });
+    el.dispatchEvent(event);
+    return 'clicked';
+    `
+  );
+  return result === 'clicked';
 }
 
 /**
@@ -168,28 +190,24 @@ export async function clickElementByTextInWebview(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return false;
 
-  try {
-    const result = await evaluateInWebview(
-      cdp,
-      sessionId,
-      `
-      const elements = doc.querySelectorAll(${JSON.stringify(selector)});
-      for (const el of elements) {
-        if (el.textContent?.includes(${JSON.stringify(text)})) {
-          const event = new win.MouseEvent('click', {
-            bubbles: true, cancelable: true, view: win
-          });
-          el.dispatchEvent(event);
-          return 'clicked';
-        }
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const elements = doc.querySelectorAll(${JSON.stringify(selector)});
+    for (const el of elements) {
+      if (el.textContent?.includes(${JSON.stringify(text)})) {
+        const event = new win.MouseEvent('click', {
+          bubbles: true, cancelable: true, view: win
+        });
+        el.dispatchEvent(event);
+        return 'clicked';
       }
-      return 'not-found';
-      `
-    );
-    return result === 'clicked';
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+    }
+    return 'not-found';
+    `
+  );
+  return result === 'clicked';
 }
 
 /**
@@ -202,12 +220,8 @@ export async function getWebviewTextContent(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return null;
 
-  try {
-    const text = await evaluateInWebview(cdp, sessionId, `return doc.body?.textContent ?? '';`);
-    return typeof text === 'string' ? text : null;
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+  const text = await evaluateInWebview(cdp, sessionId, `return doc.body?.textContent ?? '';`);
+  return typeof text === 'string' ? text : null;
 }
 
 /**
@@ -221,11 +235,7 @@ export async function queryWebviewElement(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return undefined;
 
-  try {
-    return await evaluateInWebview(cdp, sessionId, expression);
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+  return await evaluateInWebview(cdp, sessionId, expression);
 }
 
 /**
@@ -240,23 +250,19 @@ export async function setSelectValueInWebview(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return false;
 
-  try {
-    const result = await evaluateInWebview(
-      cdp,
-      sessionId,
-      `
-      const select = doc.querySelector(${JSON.stringify(selector)});
-      if (!select) return 'not-found';
-      select.value = ${JSON.stringify(value)};
-      const event = new win.Event('change', { bubbles: true });
-      select.dispatchEvent(event);
-      return 'changed';
-      `
-    );
-    return result === 'changed';
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const select = doc.querySelector(${JSON.stringify(selector)});
+    if (!select) return 'not-found';
+    select.value = ${JSON.stringify(value)};
+    const event = new win.Event('change', { bubbles: true });
+    select.dispatchEvent(event);
+    return 'changed';
+    `
+  );
+  return result === 'changed';
 }
 
 /**
@@ -270,25 +276,21 @@ export async function clickButtonInWebview(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return false;
 
-  try {
-    const result = await evaluateInWebview(
-      cdp,
-      sessionId,
-      `
-      const buttons = [...doc.querySelectorAll('button, [role="button"], a')];
-      const btn = buttons.find(b => b.textContent?.trim() === ${JSON.stringify(buttonText)});
-      if (!btn) return 'not-found';
-      const event = new win.MouseEvent('click', {
-        bubbles: true, cancelable: true, view: win
-      });
-      btn.dispatchEvent(event);
-      return 'clicked';
-      `
-    );
-    return result === 'clicked';
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const buttons = [...doc.querySelectorAll('button, [role="button"], a')];
+    const btn = buttons.find(b => b.textContent?.trim() === ${JSON.stringify(buttonText)});
+    if (!btn) return 'not-found';
+    const event = new win.MouseEvent('click', {
+      bubbles: true, cancelable: true, view: win
+    });
+    btn.dispatchEvent(event);
+    return 'clicked';
+    `
+  );
+  return result === 'clicked';
 }
 
 /**
@@ -313,62 +315,58 @@ export async function dragAndDropInWebview(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return false;
 
-  try {
-    const result = await evaluateInWebview(
-      cdp,
-      sessionId,
-      `
-      const source = doc.querySelector(${JSON.stringify(sourceSelector)});
-      const target = doc.querySelector(${JSON.stringify(targetSelector)});
-      if (!source) return 'source-not-found';
-      if (!target) return 'target-not-found';
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const source = doc.querySelector(${JSON.stringify(sourceSelector)});
+    const target = doc.querySelector(${JSON.stringify(targetSelector)});
+    if (!source) return 'source-not-found';
+    if (!target) return 'target-not-found';
 
-      // Create DataTransfer and set task ID data
-      const dt = new win.DataTransfer();
-      const taskId = source.getAttribute('data-task-id') || '';
+    // Create DataTransfer and set task ID data
+    const dt = new win.DataTransfer();
+    const taskId = source.getAttribute('data-task-id') || '';
 
-      // 1. Dispatch dragstart on the card
-      const dragStartEvent = new win.DragEvent('dragstart', {
-        bubbles: true, cancelable: true, dataTransfer: dt
-      });
-      source.dispatchEvent(dragStartEvent);
+    // 1. Dispatch dragstart on the card
+    const dragStartEvent = new win.DragEvent('dragstart', {
+      bubbles: true, cancelable: true, dataTransfer: dt
+    });
+    source.dispatchEvent(dragStartEvent);
 
-      // The TaskCard handler calls dt.setData('text/plain', taskId)
-      // But DataTransfer in DragEvent constructor may be read-only.
-      // Manually add the dragging class and set data as fallback.
-      source.classList.add('dragging');
-      try { dt.setData('text/plain', taskId); } catch(e) { /* ok */ }
+    // The TaskCard handler calls dt.setData('text/plain', taskId)
+    // But DataTransfer in DragEvent constructor may be read-only.
+    // Manually add the dragging class and set data as fallback.
+    source.classList.add('dragging');
+    try { dt.setData('text/plain', taskId); } catch(e) { /* ok */ }
 
-      // 2. Dispatch dragover on target task-list
-      const targetRect = target.getBoundingClientRect();
-      const dragOverEvent = new win.DragEvent('dragover', {
-        bubbles: true, cancelable: true, dataTransfer: dt,
-        clientX: targetRect.left + targetRect.width / 2,
-        clientY: targetRect.top + 10
-      });
-      target.dispatchEvent(dragOverEvent);
+    // 2. Dispatch dragover on target task-list
+    const targetRect = target.getBoundingClientRect();
+    const dragOverEvent = new win.DragEvent('dragover', {
+      bubbles: true, cancelable: true, dataTransfer: dt,
+      clientX: targetRect.left + targetRect.width / 2,
+      clientY: targetRect.top + 10
+    });
+    target.dispatchEvent(dragOverEvent);
 
-      // 3. Dispatch drop on target task-list
-      const dropEvent = new win.DragEvent('drop', {
-        bubbles: true, cancelable: true, dataTransfer: dt,
-        clientX: targetRect.left + targetRect.width / 2,
-        clientY: targetRect.top + 10
-      });
-      target.dispatchEvent(dropEvent);
+    // 3. Dispatch drop on target task-list
+    const dropEvent = new win.DragEvent('drop', {
+      bubbles: true, cancelable: true, dataTransfer: dt,
+      clientX: targetRect.left + targetRect.width / 2,
+      clientY: targetRect.top + 10
+    });
+    target.dispatchEvent(dropEvent);
 
-      // 4. Dispatch dragend on source card
-      source.dispatchEvent(new win.DragEvent('dragend', {
-        bubbles: true, cancelable: true, dataTransfer: dt
-      }));
-      source.classList.remove('dragging');
+    // 4. Dispatch dragend on source card
+    source.dispatchEvent(new win.DragEvent('dragend', {
+      bubbles: true, cancelable: true, dataTransfer: dt
+    }));
+    source.classList.remove('dragging');
 
-      return 'dropped';
-      `
-    );
-    return result === 'dropped';
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+    return 'dropped';
+    `
+  );
+  return result === 'dropped';
 }
 
 /**
@@ -389,41 +387,37 @@ export async function typeInWebviewInput(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return false;
 
-  try {
-    // First, focus and optionally clear the element
-    const prepared = await evaluateInWebview(
+  // First, focus and optionally clear the element
+  const prepared = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const el = doc.querySelector(${JSON.stringify(selector)});
+    if (!el) return 'not-found';
+    el.focus();
+    ${clearFirst ? 'el.value = "";' : ''}
+    return 'ready';
+    `
+  );
+  if (prepared !== 'ready') return false;
+
+  // Type each character, dispatching input events
+  for (const char of text) {
+    await evaluateInWebview(
       cdp,
       sessionId,
       `
       const el = doc.querySelector(${JSON.stringify(selector)});
-      if (!el) return 'not-found';
-      el.focus();
-      ${clearFirst ? 'el.value = "";' : ''}
-      return 'ready';
+      if (!el) return;
+      el.value += ${JSON.stringify(char)};
+      el.dispatchEvent(new win.Event('input', { bubbles: true }));
       `
     );
-    if (prepared !== 'ready') return false;
-
-    // Type each character, dispatching input events
-    for (const char of text) {
-      await evaluateInWebview(
-        cdp,
-        sessionId,
-        `
-        const el = doc.querySelector(${JSON.stringify(selector)});
-        if (!el) return;
-        el.value += ${JSON.stringify(char)};
-        el.dispatchEvent(new win.Event('input', { bubbles: true }));
-        `
-      );
-      if (delayMs > 0) {
-        await new Promise((r) => setTimeout(r, delayMs));
-      }
+    if (delayMs > 0) {
+      await new Promise((r) => setTimeout(r, delayMs));
     }
-    return true;
-  } finally {
-    await detachFromWebview(cdp, sessionId);
   }
+  return true;
 }
 
 /**
@@ -437,20 +431,16 @@ export async function isElementFocusedInWebview(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return false;
 
-  try {
-    const result = await evaluateInWebview(
-      cdp,
-      sessionId,
-      `
-      const el = doc.querySelector(${JSON.stringify(selector)});
-      if (!el) return false;
-      return doc.activeElement === el;
-      `
-    );
-    return result === true;
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const el = doc.querySelector(${JSON.stringify(selector)});
+    if (!el) return false;
+    return doc.activeElement === el;
+    `
+  );
+  return result === true;
 }
 
 /**
@@ -464,19 +454,15 @@ export async function getInputValueInWebview(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return null;
 
-  try {
-    const result = await evaluateInWebview(
-      cdp,
-      sessionId,
-      `
-      const el = doc.querySelector(${JSON.stringify(selector)});
-      return el?.value ?? null;
-      `
-    );
-    return typeof result === 'string' ? result : null;
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const el = doc.querySelector(${JSON.stringify(selector)});
+    return el?.value ?? null;
+    `
+  );
+  return typeof result === 'string' ? result : null;
 }
 
 /**
@@ -490,14 +476,10 @@ export async function elementExistsInWebview(
   const sessionId = await findWebviewByRole(cdp, role);
   if (!sessionId) return false;
 
-  try {
-    const result = await evaluateInWebview(
-      cdp,
-      sessionId,
-      `return !!doc.querySelector(${JSON.stringify(selector)});`
-    );
-    return result === true;
-  } finally {
-    await detachFromWebview(cdp, sessionId);
-  }
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `return !!doc.querySelector(${JSON.stringify(selector)});`
+  );
+  return result === true;
 }
