@@ -57,6 +57,28 @@ const sampleTaskDataWithMissingDependency = {
   missingDependencyIds: ['TASK-2'],
 };
 
+// A second task for testing task-switch behavior
+const secondTask: Task = {
+  id: 'TASK-99',
+  title: 'Second Task Title',
+  status: 'To Do',
+  priority: 'high',
+  description: 'Completely different description for the second task.',
+  labels: ['feature'],
+  assignee: ['@bob'],
+  milestone: 'v2.0',
+  dependencies: [],
+  acceptanceCriteria: [],
+  definitionOfDone: [],
+  filePath: '/test/backlog/tasks/task-99.md',
+};
+
+const secondTaskData = {
+  ...sampleTaskData,
+  task: secondTask,
+  descriptionHtml: '<p>Completely different description for the second task.</p>',
+};
+
 const readOnlyTaskData = {
   ...sampleTaskData,
   task: {
@@ -359,6 +381,51 @@ test.describe('Task Detail', () => {
         field: 'description',
         value: 'New description',
       });
+    });
+
+    test('exits edit mode and shows new description when switching tasks', async ({ page }) => {
+      // Enter edit mode on TASK-1
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      await expect(page.locator('[data-testid="description-textarea"]')).toBeVisible();
+
+      // Switch to a different task
+      await postMessageToWebview(page, { type: 'taskData', data: secondTaskData });
+      await page.waitForTimeout(50);
+
+      // Should exit edit mode and show the new task's description
+      await expect(page.locator('[data-testid="description-view"]')).toBeVisible();
+      await expect(page.locator('[data-testid="description-textarea"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="description-view"]')).toContainText(
+        'Completely different description'
+      );
+      // Button should say "Edit" not "Done"
+      await expect(page.locator('[data-testid="edit-description-btn"]')).toHaveText('Edit');
+    });
+
+    test('stays in edit mode when description is echoed back after save', async ({ page }) => {
+      // Enter edit mode
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      const textarea = page.locator('[data-testid="description-textarea"]');
+      await expect(textarea).toBeVisible();
+
+      // Type something new
+      await textarea.fill('Updated description text');
+
+      // Simulate the extension echoing back the saved description (same task ID)
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          task: { ...sampleTask, description: 'Updated description text' },
+          descriptionHtml: '<p>Updated description text</p>',
+        },
+      });
+      await page.waitForTimeout(50);
+
+      // Should still be in edit mode with the textarea visible
+      await expect(textarea).toBeVisible();
+      await expect(page.locator('[data-testid="description-view"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="edit-description-btn"]')).toHaveText('Done');
     });
   });
 

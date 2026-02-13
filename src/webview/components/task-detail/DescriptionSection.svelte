@@ -14,14 +14,19 @@
   let isEditing = $state(false);
   let textareaValue = $state('');
   let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
+  let prevTaskId = '';
 
-  // Reset edit mode and sync description when switching to a different task
+  // Reset edit mode when switching to a different task.
+  // Uses a plain variable (not $state) for comparison so it doesn't
+  // become a tracked dependency — the effect only depends on taskId.
   $effect(() => {
-    void taskId;
-    isEditing = false;
-    if (debounceTimeout) {
-      clearTimeout(debounceTimeout);
-      debounceTimeout = null;
+    if (taskId !== prevTaskId) {
+      prevTaskId = taskId;
+      isEditing = false;
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
+        debounceTimeout = null;
+      }
     }
   });
 
