@@ -225,6 +225,7 @@
   {/if}
 
   <DescriptionSection
+    taskId={task.id}
     description={task.description || ''}
     {descriptionHtml}
     onUpdate={handleUpdateDescription}

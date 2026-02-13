@@ -2,25 +2,34 @@
   import { renderMermaidAction } from '../../lib/mermaidAction';
 
   interface Props {
+    taskId: string;
     description: string;
     descriptionHtml: string;
     onUpdate: (value: string) => void;
     isReadOnly?: boolean;
   }
 
-  let { description, descriptionHtml, onUpdate, isReadOnly = false }: Props = $props();
+  let { taskId, description, descriptionHtml, onUpdate, isReadOnly = false }: Props = $props();
 
   let isEditing = $state(false);
   let textareaValue = $state('');
   let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Sync textarea value when description prop changes (new task loaded or after save)
+  // Reset edit mode and sync description when switching to a different task
   $effect(() => {
-    textareaValue = description;
+    void taskId;
     isEditing = false;
     if (debounceTimeout) {
       clearTimeout(debounceTimeout);
       debounceTimeout = null;
+    }
+  });
+
+  // Sync textarea value when description prop changes, but not while actively editing
+  // (avoids the debounce save round-trip from kicking the user out of the textarea)
+  $effect(() => {
+    if (!isEditing) {
+      textareaValue = description;
     }
   });
 
