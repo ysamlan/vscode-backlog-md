@@ -45,7 +45,7 @@ src/
 
 ## Testing
 
-We use a three-tier testing strategy:
+We use a four-tier testing strategy:
 
 ```bash
 # Unit tests - Vitest for parser, writer, and business logic
@@ -59,6 +59,9 @@ bun run test:playwright:ui
 
 # Extension e2e tests - Full VS Code integration
 bun run test:e2e
+
+# CDP cross-view tests - Cross-panel coordination in a real VS Code instance
+bun run test:cdp
 ```
 
 Run all tests:

@@ -41,6 +41,19 @@ jobs:
       - name: Playwright tests
         run: bun run test:playwright
 
+      - name: Download VS Code for CDP tests
+        run: |
+          mkdir -p .vscode-test
+          curl -fsSL "https://update.code.visualstudio.com/latest/linux-x64/stable" -o /tmp/vscode.tar.gz
+          tar -xzf /tmp/vscode.tar.gz -C .vscode-test
+          rm /tmp/vscode.tar.gz
+
+      - name: CDP cross-view tests
+        run: |
+          sudo apt-get install -y xvfb
+          xvfb-run -a --server-args="-screen 0 1920x1080x24" \
+            bunx vitest run --config vitest.cdp.config.ts
+
       - name: Verify licenses are up to date
         run: |
           bun run licenses:generate

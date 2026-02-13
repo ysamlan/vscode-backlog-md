@@ -168,6 +168,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "bun run build && tsc -p tsconfig.e2e.json && bash scripts/run-e2e.sh",
+    "test:cdp": "bun run build && bash scripts/run-cdp-tests.sh",
     "test:playwright": "playwright test",
     "test:playwright:ui": "playwright test --ui",
     "demo:cross-branch-setup": "bash scripts/setup-cross-branch-demo.sh",

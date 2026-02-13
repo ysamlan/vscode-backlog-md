@@ -90,17 +90,19 @@ bun add --dev <package>     # dev dependency
 - `bun run test:playwright` - Run Playwright webview UI tests
 - `bun run test:playwright:ui` - Open Playwright interactive UI mode
 - `bun run test:e2e` - Run VS Code extension e2e tests
+- `bun run test:cdp` - Run CDP cross-view integration tests (requires xvfb on headless Linux)
 - `bun run lint` - ESLint check
 - `bun run format` - Format with Prettier
 - `bun run typecheck` - TypeScript type checking
 
 ### Testing Strategy
 
-**Three-tier approach:**
+**Four-tier approach:**
 
 1. **Unit tests** (`bun run test`) - Vitest with vscode API mocking for core logic
 2. **Webview UI tests** (`bun run test:playwright`) - Playwright for webview interactions
 3. **Extension e2e tests** (`bun run test:e2e`) - vscode-extension-tester for extension activation
+4. **CDP cross-view tests** (`bun run test:cdp`) - CDP-over-WebSocket for cross-view coordination in a real VS Code instance
 
 **Webview testing pattern:**
 
@@ -124,6 +126,18 @@ Signs you need Playwright instead of (or in addition to) unit tests:
 - You're testing "what message gets sent when user does X"
 - The logic depends on DOM element order or coordinates
 - You need to verify visual feedback (classes added, elements inserted)
+
+**When to use CDP cross-view tests:**
+
+CDP tests (`bun run test:cdp`) are for verifying **cross-view coordination** — interactions that span multiple webview panels in a real VS Code instance:
+
+- Clicking a task in kanban updates the preview panel
+- Status changes in one view propagate to other views and to disk
+- Drag-and-drop in kanban writes updated status to the task file
+- Active task highlighting across kanban and detail panels
+- Regression tests for focus retention, debounce saves, and task-switch state resets
+
+The test library lives in `src/test/cdp/lib/` and uses Chrome DevTools Protocol over WebSocket to drive VS Code and interact with webview iframe content. Tests run sequentially (one VS Code instance) with `vitest.cdp.config.ts`.
 
 **Test fixture pattern:**
 
