@@ -9,6 +9,7 @@ import {
   postMessageToWebview,
   getLastPostedMessage,
   clearPostedMessages,
+  getPostedMessages,
 } from './fixtures/vscode-mock';
 import type { Task } from '../src/webview/lib/types';
 
@@ -40,6 +41,11 @@ const sampleTaskData = {
   milestones: ['v1.0', 'v2.0'],
   blocksTaskIds: ['TASK-3'],
   isBlocked: true,
+  linkableTasks: [
+    { id: 'TASK-2', title: 'Existing dependency', status: 'To Do' },
+    { id: 'TASK-3', title: 'Task blocked by current', status: 'In Progress' },
+    { id: 'TASK-4', title: 'Unrelated task', status: 'To Do' },
+  ],
   descriptionHtml:
     '<p>This is a sample task description with <strong>markdown</strong> formatting.</p>',
 };
@@ -55,6 +61,23 @@ const sampleTaskDataWithSubtasks = {
 const sampleTaskDataWithMissingDependency = {
   ...sampleTaskData,
   missingDependencyIds: ['TASK-2'],
+};
+
+const sampleTaskDataWithEmptyRelationships = {
+  ...sampleTaskData,
+  task: {
+    ...sampleTask,
+    dependencies: [],
+  },
+  blocksTaskIds: [],
+};
+
+const sampleTaskDataWithManyLinkableTasks = {
+  ...sampleTaskDataWithEmptyRelationships,
+  linkableTasks: Array.from({ length: 20 }, (_, i) => {
+    const id = `TASK-${i + 10}`;
+    return { id, title: `Candidate ${i + 10}`, status: 'To Do' };
+  }),
 };
 
 // A second task for testing task-switch behavior
@@ -501,6 +524,70 @@ test.describe('Task Detail', () => {
   });
 
   test.describe('Dependencies', () => {
+    test('does not show "None" placeholders for empty blocked-by/blocks in editable mode', async ({
+      page,
+    }) => {
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: sampleTaskDataWithEmptyRelationships,
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="blocked-by"] .empty-value')).toHaveCount(0);
+      await expect(page.locator('[data-testid="blocks"] .empty-value')).toHaveCount(0);
+    });
+
+    test('limits visible dependency suggestions to 10 items', async ({ page }) => {
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: sampleTaskDataWithManyLinkableTasks,
+      });
+      await page.waitForTimeout(50);
+
+      await page.locator('[data-testid="add-blocked-by-input"]').focus();
+      await expect(page.locator('[data-testid="blocked-by-suggestions"]')).toBeVisible();
+      await expect(page.locator('[data-testid^="blocked-by-suggestion-"]')).toHaveCount(10);
+    });
+
+    test('adds blocked-by link from picker and posts addBlockedByLink', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      const addBlockedByInput = page.locator('[data-testid="add-blocked-by-input"]');
+      await addBlockedByInput.fill('TASK-4');
+      await addBlockedByInput.press('Enter');
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'addBlockedByLink',
+        taskId: 'TASK-4',
+      });
+    });
+
+    test('adds blocks link from picker and posts addBlocksLink', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      const addBlocksInput = page.locator('[data-testid="add-blocks-input"]');
+      await addBlocksInput.fill('TASK-4');
+      await page.locator('[data-testid="add-blocks-btn"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'addBlocksLink',
+        taskId: 'TASK-4',
+      });
+    });
+
+    test('prevents duplicate blocked-by link submissions', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      const addBlockedByInput = page.locator('[data-testid="add-blocked-by-input"]');
+      await addBlockedByInput.fill('TASK-2');
+      await addBlockedByInput.press('Enter');
+
+      const messages = await getPostedMessages(page);
+      expect(messages).toHaveLength(0);
+    });
+
     test('sends openTask message when clicking a blocked-by link', async ({ page }) => {
       await clearPostedMessages(page);
 
@@ -580,6 +667,8 @@ test.describe('Task Detail', () => {
       await expect(page.locator('[data-testid="status-select"]')).toBeDisabled();
       await expect(page.locator('[data-testid="priority-select"]')).toBeDisabled();
       await expect(page.locator('[data-testid="add-label-input"]')).toBeDisabled();
+      await expect(page.locator('[data-testid="add-blocked-by-input"]')).toBeDisabled();
+      await expect(page.locator('[data-testid="add-blocks-input"]')).toBeDisabled();
       await expect(page.locator('[data-testid="archive-btn"]')).toHaveCount(0);
       await expect(page.locator('[data-testid="add-subtask-btn"]')).toBeDisabled();
     });

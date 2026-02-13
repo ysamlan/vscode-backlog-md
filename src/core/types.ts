@@ -233,6 +233,8 @@ export type WebviewMessage =
   | { type: 'discardDraft'; taskId: string }
   | { type: 'requestCompletedTasks' }
   | { type: 'createSubtask'; parentTaskId: string }
+  | { type: 'addBlockedByLink'; taskId: string }
+  | { type: 'addBlocksLink'; taskId: string }
   | { type: 'restoreTask'; taskId: string }
   | { type: 'deleteTask'; taskId: string }
   | {

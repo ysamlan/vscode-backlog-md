@@ -65,6 +65,7 @@ export interface TaskDetailData {
   uniqueAssignees: string[];
   milestones: string[];
   blocksTaskIds: string[];
+  linkableTasks: Array<{ id: string; title: string; status: string }>;
   isBlocked: boolean;
   missingDependencyIds?: string[];
   descriptionHtml: string;

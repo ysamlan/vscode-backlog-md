@@ -30,6 +30,7 @@ interface TaskDetailData {
   uniqueAssignees: string[];
   milestones: string[];
   blocksTaskIds: string[];
+  linkableTasks: Array<{ id: string; title: string; status: string }>;
   isBlocked: boolean;
   missingDependencyIds?: string[];
   descriptionHtml: string;
@@ -311,6 +312,7 @@ export class TaskDetailProvider {
         configMilestones,
         completedTasks,
         archivedTasks,
+        localTasks,
       ] = await Promise.all([
         this.parser.getStatuses(),
         this.parser.getUniqueLabels(),
@@ -318,6 +320,7 @@ export class TaskDetailProvider {
         this.parser.getMilestones(),
         this.parser.getCompletedTasks(),
         this.parser.getArchivedTasks(),
+        this.parser.getTasks(),
       ]);
 
       // Combine config milestones with unique milestones from tasks
@@ -331,6 +334,17 @@ export class TaskDetailProvider {
       const blocksTaskIds = contextTasks
         .filter((candidateTask) => candidateTask.dependencies.includes(contextTask.id))
         .map((candidateTask) => candidateTask.id);
+
+      const linkableTasks = localTasks
+        .filter(
+          (candidateTask) => candidateTask.id !== contextTask.id && candidateTask.folder === 'tasks'
+        )
+        .map((candidateTask) => ({
+          id: candidateTask.id,
+          title: candidateTask.title,
+          status: candidateTask.status,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 
       // Check if task is blocked by active dependencies and track unresolved links
       const doneStatus = statuses.length > 0 ? statuses[statuses.length - 1] : 'Done';
@@ -394,6 +408,7 @@ export class TaskDetailProvider {
         uniqueAssignees,
         milestones,
         blocksTaskIds,
+        linkableTasks,
         isBlocked,
         missingDependencyIds: missingDependencyIds.length > 0 ? missingDependencyIds : undefined,
         descriptionHtml,
@@ -697,6 +712,82 @@ export class TaskDetailProvider {
           await this.openTask(result.id);
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to create subtask: ${error}`);
+        }
+        break;
+      }
+
+      case 'addBlockedByLink': {
+        if (!message.taskId || !this.parser || !TaskDetailProvider.currentTaskId) break;
+        const currentTask = await this.getCurrentTaskFromContext();
+        if (this.blockReadOnlyMutation(currentTask, 'add blocked-by links')) break;
+        if (!currentTask) break;
+        if (message.taskId === currentTask.id) {
+          vscode.window.showErrorMessage('A task cannot be blocked by itself.');
+          break;
+        }
+
+        const localTasks = await this.parser.getTasks();
+        const linkedTask = localTasks.find((task) => task.id === message.taskId);
+        if (!linkedTask) {
+          vscode.window.showErrorMessage(`Cannot link task ${message.taskId}: task not found.`);
+          break;
+        }
+
+        if (currentTask.dependencies.includes(message.taskId)) break;
+
+        try {
+          await this.writer.updateTask(
+            currentTask.id,
+            { dependencies: [...currentTask.dependencies, message.taskId] },
+            this.parser,
+            TaskDetailProvider.currentFileHash
+          );
+          if (currentTask.filePath && fs.existsSync(currentTask.filePath)) {
+            const newContent = fs.readFileSync(currentTask.filePath, 'utf-8');
+            TaskDetailProvider.currentFileHash = computeContentHash(newContent);
+          }
+          await this.openTask(
+            TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId },
+            { preserveFocus: true }
+          );
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to link dependency: ${error}`);
+        }
+        break;
+      }
+
+      case 'addBlocksLink': {
+        if (!message.taskId || !this.parser || !TaskDetailProvider.currentTaskId) break;
+        const currentTask = await this.getCurrentTaskFromContext();
+        if (this.blockReadOnlyMutation(currentTask, 'add blocks links')) break;
+        if (!currentTask) break;
+        if (message.taskId === currentTask.id) {
+          vscode.window.showErrorMessage('A task cannot block itself.');
+          break;
+        }
+
+        const localTasks = await this.parser.getTasks();
+        const targetTask = localTasks.find((task) => task.id === message.taskId);
+        if (!targetTask) {
+          vscode.window.showErrorMessage(`Cannot link task ${message.taskId}: task not found.`);
+          break;
+        }
+        if (this.blockReadOnlyMutation(targetTask, 'add blocks links')) break;
+
+        if (targetTask.dependencies.includes(currentTask.id)) break;
+
+        try {
+          await this.writer.updateTask(
+            targetTask.id,
+            { dependencies: [...targetTask.dependencies, currentTask.id] },
+            this.parser
+          );
+          await this.openTask(
+            TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId },
+            { preserveFocus: true }
+          );
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to update blocked task: ${error}`);
         }
         break;
       }

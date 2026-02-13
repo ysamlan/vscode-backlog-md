@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { onMessage, vscode } from '../../stores/vscode.svelte';
   import type { TaskDetailData, Task } from '../../lib/types';
   import TaskHeader from './TaskHeader.svelte';
@@ -20,6 +21,7 @@
   let uniqueAssignees: string[] = $state([]);
   let milestones: string[] = $state([]);
   let blocksTaskIds: string[] = $state([]);
+  let linkableTasks: Array<{ id: string; title: string; status: string }> = $state([]);
   let isBlocked = $state(false);
   let missingDependencyIds: string[] = $state([]);
   let descriptionHtml = $state('');
@@ -42,6 +44,7 @@
           uniqueAssignees = data.uniqueAssignees;
           milestones = data.milestones;
           blocksTaskIds = data.blocksTaskIds;
+          linkableTasks = data.linkableTasks ?? [];
           isBlocked = data.isBlocked;
           missingDependencyIds = data.missingDependencyIds ?? [];
           descriptionHtml = data.descriptionHtml;
@@ -63,7 +66,7 @@
   });
 
   // Request task data on mount
-  $effect(() => {
+  onMount(() => {
     vscode.postMessage({ type: 'refresh' });
   });
 
@@ -102,6 +105,14 @@
 
   function handleOpenTask(taskId: string) {
     vscode.postMessage({ type: 'openTask', taskId });
+  }
+
+  function handleAddBlockedByLink(taskId: string) {
+    vscode.postMessage({ type: 'addBlockedByLink', taskId });
+  }
+
+  function handleAddBlocksLink(taskId: string) {
+    vscode.postMessage({ type: 'addBlocksLink', taskId });
   }
 
   function handleFilterByLabel(label: string) {
@@ -195,24 +206,29 @@
     </div>
   {/if}
 
-  <MetaSection
-    labels={task.labels}
-    assignees={task.assignee}
-    milestone={task.milestone}
-    dependencies={task.dependencies}
-    {blocksTaskIds}
-    {missingDependencyIds}
-    {uniqueLabels}
-    {uniqueAssignees}
-    {milestones}
-    {parentTask}
-    onUpdateLabels={handleUpdateLabels}
-    onUpdateAssignees={handleUpdateAssignees}
-    onUpdateMilestone={handleUpdateMilestone}
-    onOpenTask={handleOpenTask}
-    onFilterByLabel={handleFilterByLabel}
-    {isReadOnly}
-  />
+  {#key task.id}
+    <MetaSection
+      labels={task.labels}
+      assignees={task.assignee}
+      milestone={task.milestone}
+      dependencies={task.dependencies}
+      {blocksTaskIds}
+      {missingDependencyIds}
+      {uniqueLabels}
+      {uniqueAssignees}
+      {milestones}
+      {linkableTasks}
+      {parentTask}
+      onUpdateLabels={handleUpdateLabels}
+      onUpdateAssignees={handleUpdateAssignees}
+      onUpdateMilestone={handleUpdateMilestone}
+      onOpenTask={handleOpenTask}
+      onAddBlockedByLink={handleAddBlockedByLink}
+      onAddBlocksLink={handleAddBlocksLink}
+      onFilterByLabel={handleFilterByLabel}
+      {isReadOnly}
+    />
+  {/key}
 
   {#if subtaskSummaries && subtaskSummaries.length > 0}
     <SubtasksSection

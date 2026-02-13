@@ -6,6 +6,7 @@
     dependencies: string[];
     blocksTaskIds: string[];
     missingDependencyIds?: string[];
+    linkableTasks: Array<{ id: string; title: string; status: string }>;
     uniqueLabels: string[];
     uniqueAssignees: string[];
     milestones: string[];
@@ -15,6 +16,8 @@
     onUpdateAssignees: (assignees: string[]) => void;
     onUpdateMilestone: (milestone: string | undefined) => void;
     onOpenTask: (taskId: string) => void;
+    onAddBlockedByLink: (taskId: string) => void;
+    onAddBlocksLink: (taskId: string) => void;
     onFilterByLabel: (label: string) => void;
   }
 
@@ -25,6 +28,7 @@
     dependencies,
     blocksTaskIds,
     missingDependencyIds = [],
+    linkableTasks,
     uniqueLabels,
     uniqueAssignees,
     milestones,
@@ -34,19 +38,25 @@
     onUpdateAssignees,
     onUpdateMilestone,
     onOpenTask,
+    onAddBlockedByLink,
+    onAddBlocksLink,
     onFilterByLabel,
   }: Props = $props();
 
   let labelInput = $state('');
   let assigneeInput = $state('');
+  let blockedByInput = $state('');
+  let blocksInput = $state('');
+  let blockedByPickerOpen = $state(false);
+  let blocksPickerOpen = $state(false);
+  const MAX_VISIBLE_SUGGESTIONS = 10;
 
-  // Clear text inputs when switching tasks (labels/assignees props change)
-  $effect(() => {
-    void labels;
-    void assignees;
-    labelInput = '';
-    assigneeInput = '';
-  });
+  const blockedBySuggestions = $derived(
+    getSuggestions(blockedByInput, new Set(dependencies), MAX_VISIBLE_SUGGESTIONS)
+  );
+  const blocksSuggestions = $derived(
+    getSuggestions(blocksInput, new Set(blocksTaskIds), MAX_VISIBLE_SUGGESTIONS)
+  );
 
   function handleAddLabel(e: KeyboardEvent) {
     if (isReadOnly) return;
@@ -90,6 +100,102 @@
     if (isReadOnly) return;
     const value = (e.target as HTMLSelectElement).value || undefined;
     onUpdateMilestone(value);
+  }
+
+  function resolveLinkTaskId(
+    inputValue: string,
+    suggestions: Array<{ id: string; title: string; status: string }>
+  ): string | undefined {
+    const normalized = inputValue.trim().toUpperCase();
+    if (!normalized) return undefined;
+    const match = linkableTasks.find((task) => task.id.toUpperCase() === normalized);
+    return match?.id ?? suggestions[0]?.id;
+  }
+
+  function getSuggestions(
+    query: string,
+    excludedIds: Set<string>,
+    limit: number
+  ): Array<{ id: string; title: string; status: string }> {
+    const normalized = query.trim().toUpperCase();
+    const filtered = linkableTasks.filter((task) => {
+      if (excludedIds.has(task.id)) return false;
+      if (!normalized) return true;
+      return (
+        task.id.toUpperCase().includes(normalized) || task.title.toUpperCase().includes(normalized)
+      );
+    });
+    return filtered.slice(0, limit);
+  }
+
+  function submitBlockedByLink() {
+    if (isReadOnly) return;
+    const taskId = resolveLinkTaskId(blockedByInput, blockedBySuggestions);
+    if (!taskId || dependencies.includes(taskId)) {
+      blockedByInput = '';
+      blockedByPickerOpen = false;
+      return;
+    }
+    onAddBlockedByLink(taskId);
+    blockedByInput = '';
+    blockedByPickerOpen = false;
+  }
+
+  function submitBlocksLink() {
+    if (isReadOnly) return;
+    const taskId = resolveLinkTaskId(blocksInput, blocksSuggestions);
+    if (!taskId || blocksTaskIds.includes(taskId)) {
+      blocksInput = '';
+      blocksPickerOpen = false;
+      return;
+    }
+    onAddBlocksLink(taskId);
+    blocksInput = '';
+    blocksPickerOpen = false;
+  }
+
+  function handleBlockedByKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitBlockedByLink();
+    } else if (e.key === 'Escape') {
+      blockedByInput = '';
+      (e.target as HTMLInputElement).blur();
+    }
+  }
+
+  function handleBlocksKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitBlocksLink();
+    } else if (e.key === 'Escape') {
+      blocksInput = '';
+      (e.target as HTMLInputElement).blur();
+    }
+  }
+
+  function selectBlockedBySuggestion(taskId: string) {
+    if (isReadOnly) return;
+    blockedByInput = taskId;
+    submitBlockedByLink();
+  }
+
+  function selectBlocksSuggestion(taskId: string) {
+    if (isReadOnly) return;
+    blocksInput = taskId;
+    submitBlocksLink();
+  }
+
+  function scheduleCloseBlockedByPicker() {
+    setTimeout(() => {
+      blockedByPickerOpen = false;
+    }, 100);
+  }
+
+  function scheduleCloseBlocksPicker() {
+    setTimeout(() => {
+      blocksPickerOpen = false;
+    }, 100);
   }
 </script>
 
@@ -237,9 +343,53 @@
               </span>
             {/if}
           {/each}
-        {:else}
+        {:else if isReadOnly}
           <span class="empty-value">None</span>
         {/if}
+        <div class="dependency-picker">
+          <div class="dependency-add-row">
+            <input
+              type="text"
+              class="dependency-add-input"
+              data-testid="add-blocked-by-input"
+              placeholder="+ Link task ID"
+              bind:value={blockedByInput}
+              disabled={isReadOnly}
+              onfocus={() => {
+                if (!isReadOnly) blockedByPickerOpen = true;
+              }}
+              onblur={scheduleCloseBlockedByPicker}
+              onkeydown={handleBlockedByKeydown}
+            />
+            <button
+              type="button"
+              class="dependency-add-button"
+              data-testid="add-blocked-by-btn"
+              onclick={submitBlockedByLink}
+              disabled={isReadOnly}
+            >
+              Add
+            </button>
+          </div>
+          {#if blockedByPickerOpen && blockedBySuggestions.length > 0}
+            <div class="dependency-suggestions" data-testid="blocked-by-suggestions" role="listbox">
+              {#each blockedBySuggestions as suggestion (suggestion.id)}
+                <button
+                  type="button"
+                  class="dependency-suggestion-item"
+                  data-testid="blocked-by-suggestion-{suggestion.id}"
+                  onmousedown={(e) => {
+                    e.preventDefault();
+                    selectBlockedBySuggestion(suggestion.id);
+                  }}
+                >
+                  <span class="dependency-suggestion-id">{suggestion.id}</span>
+                  <span class="dependency-suggestion-title">{suggestion.title}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
 
@@ -260,9 +410,53 @@
               {taskId}
             </button>
           {/each}
-        {:else}
+        {:else if isReadOnly}
           <span class="empty-value">None</span>
         {/if}
+        <div class="dependency-picker">
+          <div class="dependency-add-row">
+            <input
+              type="text"
+              class="dependency-add-input"
+              data-testid="add-blocks-input"
+              placeholder="+ Link task ID"
+              bind:value={blocksInput}
+              disabled={isReadOnly}
+              onfocus={() => {
+                if (!isReadOnly) blocksPickerOpen = true;
+              }}
+              onblur={scheduleCloseBlocksPicker}
+              onkeydown={handleBlocksKeydown}
+            />
+            <button
+              type="button"
+              class="dependency-add-button"
+              data-testid="add-blocks-btn"
+              onclick={submitBlocksLink}
+              disabled={isReadOnly}
+            >
+              Add
+            </button>
+          </div>
+          {#if blocksPickerOpen && blocksSuggestions.length > 0}
+            <div class="dependency-suggestions" data-testid="blocks-suggestions" role="listbox">
+              {#each blocksSuggestions as suggestion (suggestion.id)}
+                <button
+                  type="button"
+                  class="dependency-suggestion-item"
+                  data-testid="blocks-suggestion-{suggestion.id}"
+                  onmousedown={(e) => {
+                    e.preventDefault();
+                    selectBlocksSuggestion(suggestion.id);
+                  }}
+                >
+                  <span class="dependency-suggestion-id">{suggestion.id}</span>
+                  <span class="dependency-suggestion-title">{suggestion.title}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
   </div>

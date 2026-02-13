@@ -1181,6 +1181,108 @@ body {
   font-style: italic;
 }
 
+.dependency-add-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.dependency-picker {
+  position: relative;
+}
+
+.dependency-add-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.dependency-add-input:focus {
+  outline: none;
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.dependency-add-button {
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.dependency-add-button:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+
+.dependency-add-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dependency-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  border: 1px solid var(--vscode-widget-border, #454545);
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, #252526);
+  color: var(--vscode-editorWidget-foreground, #cccccc);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 20;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.dependency-suggestion-item {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--vscode-widget-border, #303031);
+  background: transparent;
+  color: inherit;
+  padding: 7px 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.dependency-suggestion-item:last-child {
+  border-bottom: 0;
+}
+
+.dependency-suggestion-item:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.dependency-suggestion-item:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+}
+
+.dependency-suggestion-id {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.dependency-suggestion-title {
+  color: var(--vscode-editorWidget-foreground, #cccccc);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Editable title textarea */
 .editable-title {
   font-size: 18px;
