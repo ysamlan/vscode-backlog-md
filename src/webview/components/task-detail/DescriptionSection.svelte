@@ -14,10 +14,13 @@
   let textareaValue = $state('');
   let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Sync textarea value when description prop changes (on load and after save)
+  // Sync textarea value when description prop changes (new task loaded or after save)
   $effect(() => {
-    if (!isEditing) {
-      textareaValue = description;
+    textareaValue = description;
+    isEditing = false;
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = null;
     }
   });
 

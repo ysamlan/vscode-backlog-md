@@ -40,6 +40,14 @@
   let labelInput = $state('');
   let assigneeInput = $state('');
 
+  // Clear text inputs when switching tasks (labels/assignees props change)
+  $effect(() => {
+    void labels;
+    void assignees;
+    labelInput = '';
+    assigneeInput = '';
+  });
+
   function handleAddLabel(e: KeyboardEvent) {
     if (isReadOnly) return;
     if (e.key === 'Enter') {
