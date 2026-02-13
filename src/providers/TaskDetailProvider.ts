@@ -120,7 +120,7 @@ export class TaskDetailProvider {
         return;
       }
 
-      provider.openTask(this.currentTaskRef ?? this.currentTaskId);
+      provider.openTask(this.currentTaskRef ?? this.currentTaskId, { preserveFocus: true });
     }
   }
 
@@ -520,7 +520,8 @@ export class TaskDetailProvider {
               this.parser
             );
             await this.openTask(
-              TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId }
+              TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId },
+              { preserveFocus: true }
             );
           } catch (error) {
             vscode.window.showErrorMessage(`Failed to toggle checklist item: ${error}`);
@@ -556,7 +557,8 @@ export class TaskDetailProvider {
             const newContent = fs.readFileSync(task.filePath, 'utf-8');
             TaskDetailProvider.currentFileHash = computeContentHash(newContent);
             await this.openTask(
-              TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId }
+              TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId },
+              { preserveFocus: true }
             );
           } catch (error) {
             if (error instanceof FileConflictError) {
