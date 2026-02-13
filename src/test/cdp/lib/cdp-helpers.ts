@@ -122,7 +122,7 @@ export async function cdpKeyCombo(cdp: CdpClient, key: string, modifiers: number
  * Keybinding map for backlog commands (registered in keybindings.json by the launcher).
  * Ctrl=2, Shift=8, Alt=1 → Ctrl+Shift+Alt = 11
  */
-const COMMAND_KEYBINDINGS: Record<string, { key: string; modifiers: number }> = {
+export const COMMAND_KEYBINDINGS: Record<string, { key: string; modifiers: number }> = {
   'backlog.openKanban': { key: 'k', modifiers: 11 },
   'backlog.refresh': { key: 'r', modifiers: 11 },
   'backlog.showListView': { key: 'l', modifiers: 11 },
@@ -213,4 +213,42 @@ export async function resetEditorState(cdp: CdpClient): Promise<void> {
     modifiers: mod,
   });
   await sleep(500);
+}
+
+/** VS Code keybindings.json entries derived from COMMAND_KEYBINDINGS */
+export const KEYBINDINGS_JSON: Array<{ key: string; command: string }> = Object.entries(
+  COMMAND_KEYBINDINGS
+).map(([command, { key, modifiers }]) => {
+  const parts: string[] = [];
+  if (modifiers & 2) parts.push('ctrl');
+  if (modifiers & 8) parts.push('shift');
+  if (modifiers & 1) parts.push('alt');
+  if (modifiers & 4) parts.push('meta');
+  parts.push(key);
+  return { key: parts.join('+'), command };
+});
+
+/** Map from command palette labels to command IDs for keybinding lookup */
+export const COMMAND_LABEL_TO_ID: Record<string, string> = {
+  'Backlog: Open Kanban Board': 'backlog.openKanban',
+  'Backlog: Refresh': 'backlog.refresh',
+  'Switch to List View': 'backlog.showListView',
+  'Switch to Kanban View': 'backlog.showKanbanView',
+};
+
+/**
+ * Execute a VS Code command by its command palette label.
+ * Uses a pre-registered keybinding if available (~50ms), otherwise
+ * falls back to the command palette (~2s).
+ */
+export async function executeCommandByLabel(cdp: CdpClient, label: string): Promise<void> {
+  const commandId = COMMAND_LABEL_TO_ID[label];
+  if (commandId) {
+    const binding = COMMAND_KEYBINDINGS[commandId];
+    if (binding) {
+      await cdpKeyCombo(cdp, binding.key, binding.modifiers);
+      return;
+    }
+  }
+  await runCommand(cdp, label);
 }

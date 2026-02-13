@@ -10,6 +10,9 @@
  * Uses direct CDP instead of Playwright's electron.launch() because VS Code's
  * Electron build strips the --remote-debugging-pipe flag that Playwright needs.
  *
+ * CDP primitives (CdpClient, cdpEval, cdpKeyPress, etc.) are imported from the
+ * shared library at src/test/cdp/lib/ to avoid duplication with the CDP tests.
+ *
  * Usage:
  *   bun scripts/screenshots/generate.ts [--theme dark|light|all] [--scenario name] [--skip-chrome] [--skip-optimize]
  */
@@ -20,6 +23,24 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { scenarios, themes, type ScreenshotScenario, type ThemeId } from './scenarios';
 import { addWindowChrome, addPanelFrame } from './window-chrome';
+import { CdpClient } from '../../src/test/cdp/lib/CdpClient';
+import {
+  sleep,
+  cdpEval,
+  cdpKeyPress,
+  cdpType,
+  cdpScreenshot,
+  executeCommandByLabel,
+  dismissNotifications,
+  resetEditorState,
+  KEYBINDINGS_JSON,
+} from '../../src/test/cdp/lib/cdp-helpers';
+import {
+  clickElementByTextInWebview,
+  clickButtonInWebview,
+  clearWebviewSessionCache,
+  getWebviewTextContent,
+} from '../../src/test/cdp/lib/webview-helpers';
 
 // --- Configuration ---
 
@@ -162,76 +183,12 @@ function writeSettings(themeId: string, themeSetting: string): void {
   };
 
   fs.writeFileSync(path.join(userDataDir, 'settings.json'), JSON.stringify(settings, null, 2));
-}
 
-// --- CDP (Chrome DevTools Protocol) Client ---
-
-/** Minimal CDP client over WebSocket, with session support for iframe targets */
-class CdpClient {
-  private ws: WebSocket | null = null;
-  private nextId = 1;
-  private pending = new Map<
-    number,
-    { resolve: (v: unknown) => void; reject: (e: Error) => void }
-  >();
-
-  async connect(wsUrl: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(wsUrl);
-      this.ws = ws;
-      ws.onopen = () => resolve();
-      ws.onerror = () => reject(new Error(`WebSocket connection failed: ${wsUrl}`));
-      ws.onmessage = (event) => {
-        const data = JSON.parse(typeof event.data === 'string' ? event.data : '{}');
-        if (data.id && this.pending.has(data.id)) {
-          const { resolve, reject } = this.pending.get(data.id)!;
-          this.pending.delete(data.id);
-          if (data.error) reject(new Error(data.error.message));
-          else resolve(data.result);
-        }
-      };
-    });
-  }
-
-  async send(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    if (!this.ws) throw new Error('Not connected');
-    const id = this.nextId++;
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.ws!.send(JSON.stringify({ id, method, params }));
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          reject(new Error(`CDP command timeout: ${method}`));
-        }
-      }, 15000);
-    });
-  }
-
-  /** Send a CDP command to an attached session (for iframe targets) */
-  async sendToSession(
-    sessionId: string,
-    method: string,
-    params: Record<string, unknown> = {}
-  ): Promise<unknown> {
-    if (!this.ws) throw new Error('Not connected');
-    const id = this.nextId++;
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.ws!.send(JSON.stringify({ id, method, params, sessionId }));
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          reject(new Error(`CDP session command timeout: ${method}`));
-        }
-      }, 15000);
-    });
-  }
-
-  close(): void {
-    this.ws?.close();
-    this.ws = null;
-  }
+  // Register keybindings for faster command execution (avoids slow command palette typing)
+  fs.writeFileSync(
+    path.join(userDataDir, 'keybindings.json'),
+    JSON.stringify(KEYBINDINGS_JSON, null, 2)
+  );
 }
 
 // --- VS Code Launch & CDP Connection ---
@@ -322,89 +279,7 @@ function closeVsCode(instance: VsCodeInstance): void {
   instance.proc.kill();
 }
 
-// --- CDP Helpers ---
-
-async function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-async function cdpEval(cdp: CdpClient, expression: string): Promise<unknown> {
-  const result = (await cdp.send('Runtime.evaluate', {
-    expression,
-    returnByValue: true,
-    awaitPromise: true,
-  })) as { result?: { value?: unknown }; exceptionDetails?: unknown };
-  return result?.result?.value;
-}
-
-/** Send a key press via CDP Input.dispatchKeyEvent */
-async function cdpKeyPress(cdp: CdpClient, key: string): Promise<void> {
-  const keyMap: Record<string, { key: string; code: string; keyCode: number }> = {
-    F1: { key: 'F1', code: 'F1', keyCode: 112 },
-    Enter: { key: 'Enter', code: 'Enter', keyCode: 13 },
-    Escape: { key: 'Escape', code: 'Escape', keyCode: 27 },
-    Tab: { key: 'Tab', code: 'Tab', keyCode: 9 },
-  };
-
-  const mapped = keyMap[key];
-  if (mapped) {
-    await cdp.send('Input.dispatchKeyEvent', {
-      type: 'keyDown',
-      key: mapped.key,
-      code: mapped.code,
-      windowsVirtualKeyCode: mapped.keyCode,
-      nativeVirtualKeyCode: mapped.keyCode,
-    });
-    await cdp.send('Input.dispatchKeyEvent', {
-      type: 'keyUp',
-      key: mapped.key,
-      code: mapped.code,
-      windowsVirtualKeyCode: mapped.keyCode,
-      nativeVirtualKeyCode: mapped.keyCode,
-    });
-  } else if (key.length === 1) {
-    await cdp.send('Input.dispatchKeyEvent', {
-      type: 'keyDown',
-      key,
-      text: key,
-      unmodifiedText: key,
-      windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0),
-    });
-    await cdp.send('Input.dispatchKeyEvent', {
-      type: 'keyUp',
-      key,
-      windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0),
-    });
-  }
-}
-
-/** Type a string character by character via CDP */
-async function cdpType(cdp: CdpClient, text: string, delayMs = 30): Promise<void> {
-  for (const char of text) {
-    await cdp.send('Input.dispatchKeyEvent', {
-      type: 'keyDown',
-      key: char,
-      text: char,
-      unmodifiedText: char,
-    });
-    await cdp.send('Input.dispatchKeyEvent', {
-      type: 'keyUp',
-      key: char,
-    });
-    await sleep(delayMs);
-  }
-}
-
-/** Take a screenshot via CDP and save as PNG */
-async function cdpScreenshot(cdp: CdpClient, outputPath: string): Promise<void> {
-  const result = (await cdp.send('Page.captureScreenshot', {
-    format: 'png',
-    captureBeyondViewport: false,
-  })) as { data: string };
-
-  const buffer = Buffer.from(result.data, 'base64');
-  fs.writeFileSync(outputPath, buffer);
-}
+// --- Viewport & Readiness ---
 
 /** Set the browser window size via JS fallback */
 async function cdpSetViewport(cdp: CdpClient): Promise<void> {
@@ -437,62 +312,52 @@ async function waitForVsCodeReady(cdp: CdpClient): Promise<void> {
     await sleep(500);
   }
 
-  // Wait for extension to fully activate (tasks need to be parsed)
-  console.log('  Waiting for extension to activate...');
-  const extStart = Date.now();
-  while (Date.now() - extStart < 20000) {
-    // Check if the Backlog sidebar has task content
-    const hasContent = await cdpEval(
-      cdp,
-      `document.querySelector('.pane-body')?.textContent?.includes('TASK-') ?? false`
-    );
-    if (hasContent) {
-      console.log(`  Extension activated (${Date.now() - extStart}ms).`);
-      break;
-    }
-    await sleep(500);
-  }
-
   // Close the secondary sidebar (chat/copilot panel) if open
-  // Check if any secondary sidebar / auxiliary bar is visible and close it via DOM
   await cdpEval(
     cdp,
     `(() => {
-      // Try to close the auxiliary bar (Copilot/Chat) by clicking its close button
       const auxBar = document.querySelector('.part.auxiliarybar');
       if (auxBar && getComputedStyle(auxBar).display !== 'none') {
-        // Click the toggle button in the activity bar to hide it
         const toggleBtn = document.querySelector('.codicon-layout-sidebar-right-off, .codicon-layout-sidebar-right');
         if (toggleBtn) toggleBtn.closest('.action-item')?.querySelector('a')?.click();
       }
     })()`
   );
+  await sleep(300);
+
+  // Focus the Backlog sidebar by clicking its activity bar icon
+  await cdpEval(
+    cdp,
+    `(() => {
+      const items = document.querySelectorAll('.activitybar .action-item a');
+      for (const item of items) {
+        const label = item.getAttribute('aria-label') || item.getAttribute('title') || '';
+        if (label.includes('Backlog')) { item.click(); return true; }
+      }
+      return false;
+    })()`
+  );
   await sleep(500);
 
-  // Extra settle time for webview rendering
-  await sleep(2000);
-}
+  // Open kanban to trigger extension activation and task parsing
+  await executeCommandByLabel(cdp, 'Backlog: Open Kanban Board');
+  await sleep(500);
 
-/** Dismiss any notification toasts (like "extensions disabled") */
-async function dismissNotifications(cdp: CdpClient): Promise<void> {
-  // Close individual notification toasts
-  await cdpEval(
-    cdp,
-    `document.querySelectorAll('.notification-toast .codicon-close, .notifications-toasts .codicon-notifications-clear-all').forEach(el => el.click())`
-  );
-  await sleep(300);
-  // Also try notification center items
-  await cdpEval(
-    cdp,
-    `document.querySelectorAll('.notification-list-item .codicon-close').forEach(el => el.click())`
-  );
-  await sleep(300);
-  // Hide the notification center if visible
-  await cdpEval(
-    cdp,
-    `document.querySelectorAll('.notifications-center .codicon-close').forEach(el => el.click())`
-  );
-  await sleep(200);
+  // Wait for tasks to actually render in the webview iframe
+  // (the old .pane-body textContent check never worked — content is inside iframes)
+  console.log('  Waiting for extension to activate...');
+  const extStart = Date.now();
+  while (Date.now() - extStart < 20000) {
+    const text = await getWebviewTextContent(cdp, 'tasks').catch(() => null);
+    if (text?.includes('TASK-')) {
+      console.log(`  Extension activated (${Date.now() - extStart}ms).`);
+      break;
+    }
+    await sleep(300);
+  }
+
+  // Brief settle time for webview rendering
+  await sleep(500);
 }
 
 // --- Panel Cropping ---
@@ -606,209 +471,7 @@ async function widenSidebar(cdp: CdpClient, targetWidthLogical: number): Promise
   await sleep(300);
 }
 
-// --- Webview Interaction via CDP ---
-
-/**
- * Select a task in the webview by clicking on an element containing the given text.
- *
- * VS Code webviews have a layered iframe architecture:
- *   Main page → vscode-webview:// outer frame → inner content iframe (our Svelte app)
- *
- * The outer frame is a CDP iframe target. The inner iframe is same-origin and
- * accessible via iframe.contentDocument from the outer frame.
- */
-async function selectTaskInWebview(cdp: CdpClient, taskText: string): Promise<boolean> {
-  console.log(`    Attempting task selection: "${taskText}"`);
-
-  // Discover iframe targets
-  try {
-    await cdp.send('Target.setDiscoverTargets', { discover: true });
-  } catch {
-    /* ignore */
-  }
-
-  const { targetInfos } = (await cdp.send('Target.getTargets')) as {
-    targetInfos: Array<{ targetId: string; type: string; url: string }>;
-  };
-
-  const iframeTargets = targetInfos.filter(
-    (t) => t.type === 'iframe' && t.url?.includes('vscode-webview')
-  );
-
-  if (iframeTargets.length === 0) {
-    console.log('    No webview iframe targets found');
-    return false;
-  }
-
-  for (const target of iframeTargets) {
-    let sessionId: string;
-    try {
-      const attached = (await cdp.send('Target.attachToTarget', {
-        targetId: target.targetId,
-        flatten: true,
-      })) as { sessionId: string };
-      sessionId = attached.sessionId;
-    } catch {
-      continue;
-    }
-
-    try {
-      await cdp.sendToSession(sessionId, 'Runtime.enable');
-
-      // Access the inner iframe's contentDocument (same-origin) and click the task.
-      // We must create the MouseEvent using the inner frame's constructor so that
-      // Svelte event handlers (attached in the inner frame's JS context) fire correctly.
-      const clickResult = (await cdp.sendToSession(sessionId, 'Runtime.evaluate', {
-        expression: `(() => {
-          const iframe = document.querySelector('iframe');
-          if (!iframe) return 'no-iframe';
-          let doc, win;
-          try {
-            doc = iframe.contentDocument || iframe.contentWindow?.document;
-            win = iframe.contentWindow;
-          } catch(e) { return 'cross-origin'; }
-          if (!doc || !win) return 'no-doc';
-
-          // Check if this webview has task content
-          if (!doc.body?.textContent?.includes('TASK-')) return 'no-tasks';
-
-          // Try to find the task element using specific selectors
-          // TaskCard.svelte: .task-card[data-task-id="TASK-X"]
-          // ListView.svelte: tr[data-task-id="TASK-X"]
-          const selectors = ['.task-card', 'tr[data-task-id]'];
-          for (const sel of selectors) {
-            for (const el of doc.querySelectorAll(sel)) {
-              if (el.textContent?.includes(${JSON.stringify(taskText)})) {
-                // Create the click event in the INNER frame's context
-                const event = new win.MouseEvent('click', {
-                  bubbles: true, cancelable: true, view: win
-                });
-                el.dispatchEvent(event);
-                return 'clicked:' + sel + ':' + (el.getAttribute('data-task-id') || '');
-              }
-            }
-          }
-          return 'task-not-found:' + doc.body.textContent.substring(0, 80);
-        })()`,
-        returnByValue: true,
-      })) as { result?: { value?: string } };
-
-      const result = String(clickResult?.result?.value ?? '');
-
-      try {
-        await cdp.send('Target.detachFromTarget', { sessionId });
-      } catch {
-        /* ignore */
-      }
-
-      if (result.startsWith('clicked:')) {
-        console.log(`    Selected task via ${result.split(':')[1]}`);
-        return true;
-      }
-
-      // Continue to next target if this one didn't have the task
-      if (result === 'no-tasks' || result === 'no-iframe') continue;
-      if (result.startsWith('task-not-found:')) {
-        console.log(`    Task not in this frame: ${result.substring(15, 80)}...`);
-        continue;
-      }
-    } catch {
-      try {
-        await cdp.send('Target.detachFromTarget', { sessionId });
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
-  console.log(`    Task "${taskText}" not found in any webview`);
-  return false;
-}
-
-/**
- * Click a button with the given text in any webview iframe.
- * Used to click the "Edit" button in the sidebar task preview.
- */
-async function clickButtonInWebview(cdp: CdpClient, buttonText: string): Promise<boolean> {
-  console.log(`    Clicking webview button: "${buttonText}"`);
-
-  try {
-    await cdp.send('Target.setDiscoverTargets', { discover: true });
-  } catch {
-    /* ignore */
-  }
-
-  const { targetInfos } = (await cdp.send('Target.getTargets')) as {
-    targetInfos: Array<{ targetId: string; type: string; url: string }>;
-  };
-
-  const iframeTargets = targetInfos.filter(
-    (t) => t.type === 'iframe' && t.url?.includes('vscode-webview')
-  );
-
-  for (const target of iframeTargets) {
-    let sessionId: string;
-    try {
-      const attached = (await cdp.send('Target.attachToTarget', {
-        targetId: target.targetId,
-        flatten: true,
-      })) as { sessionId: string };
-      sessionId = attached.sessionId;
-    } catch {
-      continue;
-    }
-
-    try {
-      await cdp.sendToSession(sessionId, 'Runtime.enable');
-
-      const clickResult = (await cdp.sendToSession(sessionId, 'Runtime.evaluate', {
-        expression: `(() => {
-          const iframe = document.querySelector('iframe');
-          if (!iframe) return 'no-iframe';
-          let doc, win;
-          try {
-            doc = iframe.contentDocument || iframe.contentWindow?.document;
-            win = iframe.contentWindow;
-          } catch(e) { return 'cross-origin'; }
-          if (!doc || !win) return 'no-doc';
-
-          const buttons = [...doc.querySelectorAll('button, [role="button"]')];
-          const btn = buttons.find(b => b.textContent?.trim() === ${JSON.stringify(buttonText)});
-          if (!btn) return 'not-found';
-
-          const event = new win.MouseEvent('click', {
-            bubbles: true, cancelable: true, view: win
-          });
-          btn.dispatchEvent(event);
-          return 'clicked';
-        })()`,
-        returnByValue: true,
-      })) as { result?: { value?: string } };
-
-      const result = String(clickResult?.result?.value ?? '');
-
-      try {
-        await cdp.send('Target.detachFromTarget', { sessionId });
-      } catch {
-        /* ignore */
-      }
-
-      if (result === 'clicked') {
-        console.log(`    Clicked "${buttonText}" button`);
-        return true;
-      }
-    } catch {
-      try {
-        await cdp.send('Target.detachFromTarget', { sessionId });
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
-  console.log(`    Button "${buttonText}" not found in any webview`);
-  return false;
-}
+// --- Panel Layout ---
 
 /**
  * Collapse the DETAILS panel in the sidebar by dragging the horizontal sash
@@ -937,62 +600,7 @@ async function expandDetailsPanel(cdp: CdpClient): Promise<void> {
   console.log('    DETAILS panel expanded');
 }
 
-// --- Command Palette ---
-
-async function runCommand(cdp: CdpClient, commandLabel: string): Promise<void> {
-  console.log(`    Running command: ${commandLabel}`);
-  // Dismiss any existing command palette or dialog
-  await cdpKeyPress(cdp, 'Escape');
-  await sleep(200);
-  // Open the command palette
-  await cdpKeyPress(cdp, 'F1');
-  await sleep(800);
-  // Type the command name
-  await cdpType(cdp, commandLabel, 40);
-  await sleep(800);
-  // Select the first match
-  await cdpKeyPress(cdp, 'Enter');
-  await sleep(1000);
-}
-
-/** Reset the editor state between scenarios */
-async function resetEditorState(cdp: CdpClient): Promise<void> {
-  // Close all open editors
-  await cdpKeyPress(cdp, 'Escape');
-  await sleep(200);
-  // Use keyboard shortcut: Ctrl+K then Ctrl+W to close all editors
-  const mod = process.platform === 'darwin' ? 4 : 2; // meta on mac, ctrl on linux
-  // Ctrl+K
-  await cdp.send('Input.dispatchKeyEvent', {
-    type: 'keyDown',
-    key: 'k',
-    code: 'KeyK',
-    windowsVirtualKeyCode: 75,
-    modifiers: mod,
-  });
-  await cdp.send('Input.dispatchKeyEvent', {
-    type: 'keyUp',
-    key: 'k',
-    code: 'KeyK',
-    modifiers: mod,
-  });
-  await sleep(200);
-  // Ctrl+W
-  await cdp.send('Input.dispatchKeyEvent', {
-    type: 'keyDown',
-    key: 'w',
-    code: 'KeyW',
-    windowsVirtualKeyCode: 87,
-    modifiers: mod,
-  });
-  await cdp.send('Input.dispatchKeyEvent', {
-    type: 'keyUp',
-    key: 'w',
-    code: 'KeyW',
-    modifiers: mod,
-  });
-  await sleep(500);
-}
+// --- Quick Open ---
 
 /** Open a file via Quick Open (Ctrl+P / Cmd+P) */
 async function quickOpenFile(cdp: CdpClient, filename: string): Promise<void> {
@@ -1028,6 +636,9 @@ async function executeScenario(
   const { cdp } = instance;
   console.log(`  Scenario: ${scenario.name} — ${scenario.description}`);
 
+  // Clear cached webview sessions between scenarios (views may reload)
+  clearWebviewSessionCache();
+
   // Reset editor state between scenarios
   await resetEditorState(cdp);
 
@@ -1038,7 +649,8 @@ async function executeScenario(
   for (const step of scenario.steps) {
     switch (step.type) {
       case 'command':
-        await runCommand(cdp, step.command);
+        console.log(`    Running command: ${step.command}`);
+        await executeCommandByLabel(cdp, step.command);
         break;
       case 'wait':
         await sleep(step.ms);
@@ -1047,7 +659,8 @@ async function executeScenario(
         await quickOpenFile(cdp, step.filename);
         break;
       case 'selectTask':
-        await selectTaskInWebview(cdp, step.text);
+        console.log(`    Selecting task: "${step.text}"`);
+        await clickElementByTextInWebview(cdp, 'tasks', '.task-card, tr[data-task-id]', step.text);
         break;
       case 'keyboard':
         await cdpKeyPress(cdp, step.key);
@@ -1059,7 +672,8 @@ async function executeScenario(
         await expandDetailsPanel(cdp);
         break;
       case 'clickWebviewButton':
-        await clickButtonInWebview(cdp, step.text);
+        console.log(`    Clicking webview button: "${step.text}"`);
+        await clickButtonInWebview(cdp, 'preview', step.text);
         break;
     }
   }
@@ -1194,9 +808,10 @@ async function main(): Promise<void> {
       );
 
       // Close the secondary sidebar (chat/copilot) BEFORE theme switch.
-      // runCommand starts with Escape which would revert a pending theme preview.
+      // executeCommandByLabel starts with Escape (via runCommand fallback) which
+      // would revert a pending theme preview.
       try {
-        await runCommand(instance.cdp, 'View: Close Secondary Side Bar');
+        await executeCommandByLabel(instance.cdp, 'View: Close Secondary Side Bar');
         await sleep(300);
         await cdpKeyPress(instance.cdp, 'Escape');
         await sleep(200);

@@ -90,24 +90,16 @@ export async function waitForExtensionReady(cdp: CdpClient, timeoutMs = 60_000):
   await sleep(500);
   await executeCommand(cdp, 'backlog.openKanban');
 
-  // Wait for extension to load tasks in the sidebar or webview
+  // Wait for tasks to render in the webview iframe.
+  // Note: the old .pane-body textContent check never worked because webview
+  // content lives inside iframes, not the main frame DOM.
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const hasContent = await cdpEval(
-      cdp,
-      `document.querySelector('.pane-body')?.textContent?.includes('TASK-') ?? false`
-    );
-    if (hasContent) {
-      await sleep(500);
+    const text = await getWebviewTextContent(cdp, 'tasks').catch(() => null);
+    if (text?.includes('TASK-')) {
+      await sleep(300);
       return;
     }
-
-    const hasWebviewContent = await getWebviewTextContent(cdp, 'tasks').catch(() => null);
-    if (hasWebviewContent?.includes('TASK-')) {
-      await sleep(500);
-      return;
-    }
-
     await sleep(300);
   }
   throw new Error(`Extension did not activate within ${timeoutMs}ms`);

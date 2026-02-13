@@ -40,6 +40,9 @@ export type ScenarioStep =
  * Command names must be specific enough to uniquely match in the command palette.
  * Use "Switch to List View" / "Switch to Kanban View" for view toggling (more reliable
  * than "Backlog: Open Task List" which can fuzzy-match to "Backlog: Open Task Detail").
+ *
+ * Post-command waits are reduced because known backlog commands now execute
+ * instantly via keybindings (~50ms) instead of the command palette (~2s).
  */
 export const scenarios: ScreenshotScenario[] = [
   {
@@ -50,7 +53,7 @@ export const scenarios: ScreenshotScenario[] = [
     sidebarWidth: 700,
     steps: [
       { type: 'command', command: 'Backlog: Open Kanban Board' },
-      { type: 'wait', ms: 2000 },
+      { type: 'wait', ms: 1000 },
       // Collapse the DETAILS panel so the kanban board fills the full sidebar height
       { type: 'collapseDetails' },
       { type: 'wait', ms: 500 },
@@ -64,10 +67,10 @@ export const scenarios: ScreenshotScenario[] = [
     sidebarWidth: 500,
     steps: [
       { type: 'command', command: 'Switch to List View' },
-      { type: 'wait', ms: 3000 },
+      { type: 'wait', ms: 1500 },
       // Select a task with rich content to populate the sidebar preview panel
       { type: 'selectTask', text: 'Implement user authentication' },
-      { type: 'wait', ms: 2000 },
+      { type: 'wait', ms: 1000 },
       // Expand the DETAILS panel so the task preview is prominently visible
       { type: 'expandDetails' },
       { type: 'wait', ms: 500 },
@@ -81,13 +84,13 @@ export const scenarios: ScreenshotScenario[] = [
     sidebarWidth: 420,
     steps: [
       { type: 'command', command: 'Switch to List View' },
-      { type: 'wait', ms: 3000 },
+      { type: 'wait', ms: 1500 },
       // Select a task to populate the sidebar preview
       { type: 'selectTask', text: 'Refactor database layer' },
-      { type: 'wait', ms: 2000 },
+      { type: 'wait', ms: 1000 },
       // Click "Edit" button in the sidebar preview to open full task detail in editor
       { type: 'clickWebviewButton', text: 'Edit' },
-      { type: 'wait', ms: 2000 },
+      { type: 'wait', ms: 1000 },
     ],
   },
 ];
