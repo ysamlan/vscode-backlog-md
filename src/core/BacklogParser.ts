@@ -204,8 +204,24 @@ export class BacklogParser {
       }
     }
 
-    console.log(`[Backlog.md Parser] Successfully parsed ${tasks.length} tasks from ${folderName}`);
-    return tasks;
+    // Deduplicate by task ID (keep last occurrence — matches upstream ContentStore behavior)
+    const seenIds = new Map<string, number>();
+    for (let i = 0; i < tasks.length; i++) {
+      const prevIdx = seenIds.get(tasks[i].id);
+      if (prevIdx !== undefined) {
+        console.warn(
+          `[Backlog.md Parser] Duplicate task ID "${tasks[i].id}" in ${folderName}/, keeping latest file`
+        );
+      }
+      seenIds.set(tasks[i].id, i);
+    }
+    const dedupedTasks =
+      seenIds.size === tasks.length ? tasks : [...seenIds.values()].map((idx) => tasks[idx]);
+
+    console.log(
+      `[Backlog.md Parser] Successfully parsed ${dedupedTasks.length} tasks from ${folderName}`
+    );
+    return dedupedTasks;
   }
 
   /**

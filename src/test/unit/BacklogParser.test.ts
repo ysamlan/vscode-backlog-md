@@ -1901,6 +1901,46 @@ status: Draft
         expect(tasks).toHaveLength(1);
         expect(tasks[0].folder).toBe('drafts');
       });
+
+      it('should deduplicate tasks with the same ID, keeping the last file', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue([
+          'back-239 - Feature-Auto-link-old.md',
+          'back-239 - Feature-Auto-link-new.md',
+        ]);
+        vi.mocked(fs.readFileSync).mockImplementation((filePath: unknown) => {
+          if (String(filePath).includes('old')) {
+            return `---\nid: BACK-239\ntitle: Old version\nstatus: To Do\n---\n`;
+          }
+          return `---\nid: BACK-239\ntitle: New version\nstatus: In Progress\n---\n`;
+        });
+
+        const parser = new BacklogParser('/fake/backlog');
+        const tasks = await parser.getTasksFromFolder('tasks');
+
+        expect(tasks).toHaveLength(1);
+        expect(tasks[0].id).toBe('BACK-239');
+        expect(tasks[0].title).toBe('New version');
+      });
+
+      it('should not deduplicate tasks with distinct IDs', async () => {
+        vi.mocked(fs.existsSync).mockReturnValue(true);
+        (fs.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue([
+          'task-1 - First.md',
+          'task-2 - Second.md',
+        ]);
+        vi.mocked(fs.readFileSync).mockImplementation((filePath: unknown) => {
+          if (String(filePath).includes('task-1')) {
+            return `---\nid: TASK-1\ntitle: First\nstatus: To Do\n---\n`;
+          }
+          return `---\nid: TASK-2\ntitle: Second\nstatus: To Do\n---\n`;
+        });
+
+        const parser = new BacklogParser('/fake/backlog');
+        const tasks = await parser.getTasksFromFolder('tasks');
+
+        expect(tasks).toHaveLength(2);
+      });
     });
 
     describe('getDrafts', () => {
