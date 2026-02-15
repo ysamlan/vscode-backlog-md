@@ -1448,33 +1448,33 @@ body {
   border-bottom: none;
 }
 
-.checklist-item {
-  transition: background 0.15s;
-}
-
 .checklist-item:hover {
   background: var(--vscode-list-hoverBackground, #2a2d2e);
   margin: 0 -8px;
   padding-left: 8px;
   padding-right: 8px;
+  transition: background 0.15s;
 }
 
-/* Checklist toggle button - takes full width, resets button defaults */
-.checklist-toggle {
+/* Checklist item layout */
+.checklist-item {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 0;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.checklist-checkbox {
   background: none;
   border: none;
   color: inherit;
   font: inherit;
-  text-align: left;
   cursor: pointer;
+  padding: 4px 4px 4px 0;
+  flex-shrink: 0;
 }
 
-.checklist-toggle:focus {
+.checklist-checkbox:focus {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: -1px;
 }
@@ -1494,6 +1494,91 @@ body {
 
 .checklist-text {
   flex: 1;
+  padding: 4px 0;
+}
+
+.checklist-text.editable {
+  cursor: text;
+  border-radius: 3px;
+}
+
+.checklist-text.editable:hover {
+  background: var(--vscode-input-background, #3c3c3c);
+}
+
+.checklist-item-input {
+  flex: 1;
+  padding: 3px 6px;
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 1px solid var(--vscode-focusBorder, #007fd4);
+  border-radius: 3px;
+  font: inherit;
+  outline: none;
+}
+
+.checklist-delete-btn {
+  background: none;
+  border: none;
+  color: var(--vscode-descriptionForeground, #858585);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.checklist-item:hover .checklist-delete-btn {
+  opacity: 1;
+}
+
+.checklist-delete-btn:hover {
+  color: var(--vscode-errorForeground, #f48771);
+  background: var(--vscode-toolbar-hoverBackground, #5a5d5e50);
+}
+
+/* Add item row */
+.checklist-add {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.checklist-add-input {
+  flex: 1;
+  padding: 4px 8px;
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.checklist-add-input:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.checklist-add-btn {
+  padding: 4px 10px;
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.checklist-add-btn:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+
+.checklist-add-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .progress-indicator {

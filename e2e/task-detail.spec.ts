@@ -624,10 +624,10 @@ test.describe('Task Detail', () => {
       );
     });
 
-    test('sends message when clicking a checklist item', async ({ page }) => {
+    test('sends toggle message when clicking checkbox', async ({ page }) => {
       await clearPostedMessages(page);
 
-      await page.locator('[data-testid="acceptanceCriteria-item-2"] button').click();
+      await page.locator('[data-testid="acceptanceCriteria-toggle-2"]').click();
 
       const message = await getLastPostedMessage(page);
       expect(message).toEqual({
@@ -637,41 +637,74 @@ test.describe('Task Detail', () => {
       });
     });
 
-    test('Edit button shows markdown editor for editing', async ({ page }) => {
-      await page.locator('[data-testid="acceptanceCriteria-edit-btn"]').click();
+    test('clicking item text enters inline edit mode', async ({ page }) => {
+      await page.locator('[data-testid="acceptanceCriteria-item-2"] .checklist-text').click();
 
-      await expect(page.locator('[data-testid="markdown-editor"]')).toBeVisible();
-      await expect(page.locator('[data-testid="acceptanceCriteria-edit-btn"]')).toHaveText('Done');
-      // Checklist items should be hidden in edit mode
-      await expect(page.locator('[data-testid="acceptanceCriteria-item-1"]')).not.toBeVisible();
+      const input = page.locator('[data-testid="acceptanceCriteria-item-input-2"]');
+      await expect(input).toBeVisible();
+      await expect(input).toHaveValue('Second acceptance criterion');
     });
 
-    test('sends updateField message when editing and clicking Done', async ({ page }) => {
-      await page.locator('[data-testid="acceptanceCriteria-edit-btn"]').click();
-      const tinyMDE = page.locator('.TinyMDE');
-      await expect(tinyMDE).toBeVisible();
-      await tinyMDE.click();
-      await page.keyboard.press('Control+A');
-      await page.keyboard.type('- [ ] #1 New criterion');
+    test('saves edited item text on blur and sends updateField', async ({ page }) => {
+      await page.locator('[data-testid="acceptanceCriteria-item-2"] .checklist-text').click();
+      const input = page.locator('[data-testid="acceptanceCriteria-item-input-2"]');
+      await input.clear();
+      await input.fill('Updated criterion');
       await clearPostedMessages(page);
-      await page.locator('[data-testid="acceptanceCriteria-edit-btn"]').click();
+      await input.blur();
 
       const message = await getLastPostedMessage(page);
       expect(message).toEqual({
         type: 'updateField',
         field: 'acceptanceCriteria',
-        value: '- [ ] #1 New criterion',
+        value: '- [x] #1 First acceptance criterion\n- [ ] #2 Updated criterion',
       });
     });
 
-    test('Escape in edit mode exits without saving changes', async ({ page }) => {
-      await page.locator('[data-testid="acceptanceCriteria-edit-btn"]').click();
-      await expect(page.locator('.TinyMDE')).toBeVisible();
-      await page.keyboard.press('Escape');
+    test('cancels edit on Escape without saving', async ({ page }) => {
+      await page.locator('[data-testid="acceptanceCriteria-item-2"] .checklist-text').click();
+      const input = page.locator('[data-testid="acceptanceCriteria-item-input-2"]');
+      await input.clear();
+      await input.fill('Should not save');
+      await clearPostedMessages(page);
+      await input.press('Escape');
 
-      // Should exit edit mode and show checklist items
-      await expect(page.locator('[data-testid="markdown-editor"]')).not.toBeVisible();
-      await expect(page.locator('[data-testid="acceptanceCriteria-item-1"]')).toBeVisible();
+      // Input should be gone, original text shown
+      await expect(input).not.toBeVisible();
+      await expect(
+        page.locator('[data-testid="acceptanceCriteria-item-2"] .checklist-text')
+      ).toHaveText('Second acceptance criterion');
+      // No message sent
+      const messages = await getPostedMessages(page);
+      expect(messages).toHaveLength(0);
+    });
+
+    test('adds new item via add input', async ({ page }) => {
+      const addInput = page.locator('[data-testid="acceptanceCriteria-add-input"]');
+      await addInput.fill('Third criterion');
+      await clearPostedMessages(page);
+      await addInput.press('Enter');
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateField',
+        field: 'acceptanceCriteria',
+        value:
+          '- [x] #1 First acceptance criterion\n- [ ] #2 Second acceptance criterion\n- [ ] #3 Third criterion',
+      });
+    });
+
+    test('deletes item and renumbers remaining', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      await page.locator('[data-testid="acceptanceCriteria-delete-1"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateField',
+        field: 'acceptanceCriteria',
+        value: '- [ ] #1 Second acceptance criterion',
+      });
     });
   });
 
@@ -682,10 +715,10 @@ test.describe('Task Detail', () => {
       );
     });
 
-    test('sends message when clicking a checklist item', async ({ page }) => {
+    test('sends toggle message when clicking checkbox', async ({ page }) => {
       await clearPostedMessages(page);
 
-      await page.locator('[data-testid="definitionOfDone-item-1"] button').click();
+      await page.locator('[data-testid="definitionOfDone-toggle-1"]').click();
 
       const message = await getLastPostedMessage(page);
       expect(message).toEqual({
@@ -695,28 +728,17 @@ test.describe('Task Detail', () => {
       });
     });
 
-    test('Edit button shows markdown editor for editing', async ({ page }) => {
-      await page.locator('[data-testid="definitionOfDone-edit-btn"]').click();
-
-      await expect(page.locator('[data-testid="markdown-editor"]')).toBeVisible();
-      await expect(page.locator('[data-testid="definitionOfDone-edit-btn"]')).toHaveText('Done');
-    });
-
-    test('sends updateField message when editing and clicking Done', async ({ page }) => {
-      await page.locator('[data-testid="definitionOfDone-edit-btn"]').click();
-      const tinyMDE = page.locator('.TinyMDE');
-      await expect(tinyMDE).toBeVisible();
-      await tinyMDE.click();
-      await page.keyboard.press('Control+A');
-      await page.keyboard.type('- [x] #1 Tests pass');
+    test('adds new item via add input', async ({ page }) => {
+      const addInput = page.locator('[data-testid="definitionOfDone-add-input"]');
+      await addInput.fill('Code reviewed');
       await clearPostedMessages(page);
-      await page.locator('[data-testid="definitionOfDone-edit-btn"]').click();
+      await addInput.press('Enter');
 
       const message = await getLastPostedMessage(page);
       expect(message).toEqual({
         type: 'updateField',
         field: 'definitionOfDone',
-        value: '- [x] #1 Tests pass',
+        value: '- [ ] #1 Tests pass\n- [ ] #2 Code reviewed',
       });
     });
   });

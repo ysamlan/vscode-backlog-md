@@ -302,6 +302,8 @@ Completed with approach Z.
 - Checklist items: `- [x] #N Text` or `- [ ] #N Text` (1-based index)
 - Legacy checklists without markers are also parsed (backward compat)
 
+**AC/DoD data model constraint:** Upstream treats Acceptance Criteria and Definition of Done as **strictly checklist arrays** (`AcceptanceCriterion[]` with `{index, text, checked}`). Non-checklist markdown (headings, paragraphs) may exist between items in the file and is preserved during updates, but is **not part of the structured data model** — only `- [x] #N text` lines are parsed. The UI should provide structured checklist editing (add/edit/delete/toggle items), not freeform markdown editing, for these sections.
+
 #### Folder Structure
 
 ```
