@@ -58,6 +58,15 @@
           '|',
           'ul',
           'ol',
+          {
+            name: 'checklist',
+            title: 'Checklist item (- [ ])',
+            innerHTML: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>`,
+            action: (e: import('tiny-markdown-editor').Editor) => {
+              e.paste('- [ ] ');
+            },
+            enabled: () => false,
+          },
           '|',
           'code',
           '|',
@@ -73,6 +82,47 @@
         hasPendingChanges = false;
         onUpdate(e.content);
       }, 1000);
+    });
+
+    // Auto-continue checklist items on Enter.
+    // TinyMDE continues bullet lists (- ) but doesn't know about checklist
+    // syntax (- [ ] ), so we patch the new line after TinyMDE processes it.
+    editor.e?.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || !editor) return;
+      const sel = editor.getSelection();
+      if (!sel) return;
+      const prevLine = editor.lines[sel.row];
+      // Only act on checklist lines: "- [ ] text" or "- [x] text"
+      const checklistMatch = /^( {0,3})- \[[ x]\] (.*)$/i.exec(prevLine);
+      if (!checklistMatch) return;
+      const isEmpty = checklistMatch[2].trim() === '';
+      // After TinyMDE handles Enter (synchronously in beforeinput), patch the result.
+      // Use setTimeout to ensure we run after TinyMDE's beforeinput handler.
+      setTimeout(() => {
+        if (!editor) return;
+        const newSel = editor.getSelection();
+        if (!newSel) return;
+        const newLine = editor.lines[newSel.row];
+        // Only patch if TinyMDE added just a bullet prefix
+        if (!/^ {0,3}- $/.test(newLine)) return;
+        if (isEmpty) {
+          // Empty checklist item: clear previous line and new continuation
+          // (same behavior as TinyMDE for empty bullet items)
+          editor.lines[newSel.row - 1] = '';
+          editor.lineDirty[newSel.row - 1] = true;
+          editor.lines[newSel.row] = '';
+          editor.lineDirty[newSel.row] = true;
+          editor.updateFormatting();
+          editor.setSelection({ row: newSel.row, col: 0 });
+        } else {
+          // Extend "- " to "- [ ] "
+          const patched = newLine.replace(/^( {0,3}- )$/, '$1[ ] ');
+          editor.lines[newSel.row] = patched;
+          editor.lineDirty[newSel.row] = true;
+          editor.updateFormatting();
+          editor.setSelection({ row: newSel.row, col: patched.length });
+        }
+      });
     });
 
     // Focus the editor

@@ -21,6 +21,10 @@
     isReadOnly = false,
   }: Props = $props();
 
+  function autofocusAction(node: HTMLElement) {
+    node.focus();
+  }
+
   let editingItemId: number | null = $state(null);
   let editingText = $state('');
   let newItemText = $state('');
@@ -142,19 +146,24 @@
               onblur={saveEdit}
               onkeydown={handleEditKeydown}
               data-testid="{listType}-item-input-{item.id}"
-              autofocus
+              use:autofocusAction
             />
           {:else}
-            <span
-              class="checklist-text"
-              class:editable={!!onUpdateText && !isReadOnly}
-              onclick={() => startEditing(item)}
-              onkeydown={(e) => e.key === 'Enter' && startEditing(item)}
-              role={onUpdateText && !isReadOnly ? 'button' : undefined}
-              tabindex={onUpdateText && !isReadOnly ? 0 : -1}
-            >
-              {item.text}
-            </span>
+            {#if onUpdateText && !isReadOnly}
+              <span
+                class="checklist-text editable"
+                onclick={() => startEditing(item)}
+                onkeydown={(e) => e.key === 'Enter' && startEditing(item)}
+                role="button"
+                tabindex={0}
+              >
+                {item.text}
+              </span>
+            {:else}
+              <span class="checklist-text">
+                {item.text}
+              </span>
+            {/if}
           {/if}
           {#if onUpdateText && !isReadOnly}
             <button

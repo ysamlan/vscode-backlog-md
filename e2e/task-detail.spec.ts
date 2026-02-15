@@ -608,6 +608,111 @@ test.describe('Task Detail', () => {
     });
   });
 
+  test.describe('Markdown editor checklist continuation', () => {
+    test('continues checklist items when pressing Enter', async ({ page }) => {
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+      await tinyMDE.click();
+
+      // Clear existing content and type a checklist item
+      await page.keyboard.press('Control+A');
+      await page.keyboard.type('- [ ] first item');
+      await page.keyboard.press('Enter');
+      // Wait for the setTimeout to fire
+      await page.waitForTimeout(50);
+
+      // The new line should auto-continue with "- [ ] "
+      await page.keyboard.type('second item');
+
+      const content = await tinyMDE.textContent();
+      // TinyMDE renders each line as a div, so textContent concatenates without newlines.
+      // Check that both checklist items appear.
+      expect(content).toContain('first item');
+      expect(content).toContain('second item');
+
+      // Verify the actual editor content has checklist syntax on both lines
+      const rawContent = await page.evaluate(() => {
+        const editorEl = document.querySelector('.TinyMDE') as HTMLElement;
+        const lines = editorEl?.querySelectorAll(':scope > div');
+        return Array.from(lines || []).map((l) => l.textContent);
+      });
+      expect(rawContent).toContain('- [ ] first item');
+      expect(rawContent).toContain('- [ ] second item');
+    });
+
+    test('clears empty checklist item on Enter (same as bullet behavior)', async ({ page }) => {
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+      await tinyMDE.click();
+
+      // Type a checklist item, press Enter to continue, then Enter again on empty
+      await page.keyboard.press('Control+A');
+      await page.keyboard.type('- [ ] only item');
+      await page.keyboard.press('Enter');
+      // Wait for checklist continuation patch
+      await page.waitForTimeout(50);
+      // Now we're on a new "- [ ] " line — press Enter again without typing
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(50);
+
+      // The empty checklist continuation should be cleared
+      const rawContent = await page.evaluate(() => {
+        const editorEl = document.querySelector('.TinyMDE') as HTMLElement;
+        const lines = editorEl?.querySelectorAll(':scope > div');
+        return Array.from(lines || []).map((l) => l.textContent);
+      });
+      expect(rawContent).toContain('- [ ] only item');
+      // The empty checklist line should have been cleared to just ""
+      expect(rawContent).not.toContain('- [ ] ');
+    });
+
+    test('regular bullet list continuation still works', async ({ page }) => {
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+      await tinyMDE.click();
+
+      // Type a regular bullet list item
+      await page.keyboard.press('Control+A');
+      await page.keyboard.type('- regular item');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('another item');
+
+      const rawContent = await page.evaluate(() => {
+        const editorEl = document.querySelector('.TinyMDE') as HTMLElement;
+        const lines = editorEl?.querySelectorAll(':scope > div');
+        return Array.from(lines || []).map((l) => l.textContent);
+      });
+      expect(rawContent).toContain('- regular item');
+      expect(rawContent).toContain('- another item');
+      // Should NOT have checklist syntax
+      expect(rawContent).not.toContain('- [ ]');
+    });
+
+    test('plain text Enter does not add bullets', async ({ page }) => {
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+      await tinyMDE.click();
+
+      await page.keyboard.press('Control+A');
+      await page.keyboard.type('plain text');
+      await page.keyboard.press('Enter');
+      await page.keyboard.type('more text');
+
+      const rawContent = await page.evaluate(() => {
+        const editorEl = document.querySelector('.TinyMDE') as HTMLElement;
+        const lines = editorEl?.querySelectorAll(':scope > div');
+        return Array.from(lines || []).map((l) => l.textContent);
+      });
+      expect(rawContent).toContain('plain text');
+      expect(rawContent).toContain('more text');
+      expect(rawContent).not.toContain('- ');
+    });
+  });
+
   test.describe('Acceptance Criteria', () => {
     test('displays progress indicator', async ({ page }) => {
       await expect(page.locator('[data-testid="acceptanceCriteria-progress"]')).toContainText(
