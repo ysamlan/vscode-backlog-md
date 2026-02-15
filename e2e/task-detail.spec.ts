@@ -374,27 +374,44 @@ test.describe('Task Detail', () => {
       await page.locator('[data-testid="edit-description-btn"]').click();
 
       await expect(page.locator('[data-testid="description-view"]')).not.toBeVisible();
-      await expect(page.locator('[data-testid="description-textarea"]')).toBeVisible();
+      await expect(page.locator('[data-testid="markdown-editor"]')).toBeVisible();
       await expect(page.locator('[data-testid="edit-description-btn"]')).toHaveText('Done');
     });
 
     test('toggles to edit mode when clicking description', async ({ page }) => {
       await page.locator('[data-testid="description-view"]').click();
 
-      await expect(page.locator('[data-testid="description-textarea"]')).toBeVisible();
+      await expect(page.locator('[data-testid="markdown-editor"]')).toBeVisible();
     });
 
     test('returns to view mode on Escape', async ({ page }) => {
       await page.locator('[data-testid="edit-description-btn"]').click();
-      await page.locator('[data-testid="description-textarea"]').press('Escape');
+      await expect(page.locator('.TinyMDE')).toBeVisible();
+      await page.keyboard.press('Escape');
 
       await expect(page.locator('[data-testid="description-view"]')).toBeVisible();
-      await expect(page.locator('[data-testid="description-textarea"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="markdown-editor"]')).not.toBeVisible();
+    });
+
+    test('exits edit mode when clicking outside the editor', async ({ page }) => {
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      await expect(page.locator('[data-testid="markdown-editor"]')).toBeVisible();
+
+      // Click outside the editor (on the task ID in the header)
+      await page.locator('[data-testid="task-id"]').click();
+
+      await expect(page.locator('[data-testid="description-view"]')).toBeVisible();
+      await expect(page.locator('[data-testid="markdown-editor"]')).not.toBeVisible();
     });
 
     test('sends message when clicking Done', async ({ page }) => {
       await page.locator('[data-testid="edit-description-btn"]').click();
-      await page.locator('[data-testid="description-textarea"]').fill('New description');
+      // Wait for TinyMDE to initialize and type into it
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+      await tinyMDE.click();
+      await page.keyboard.press('Control+A');
+      await page.keyboard.type('New description');
       await clearPostedMessages(page);
       await page.locator('[data-testid="edit-description-btn"]').click();
 
@@ -409,7 +426,7 @@ test.describe('Task Detail', () => {
     test('exits edit mode and shows new description when switching tasks', async ({ page }) => {
       // Enter edit mode on TASK-1
       await page.locator('[data-testid="edit-description-btn"]').click();
-      await expect(page.locator('[data-testid="description-textarea"]')).toBeVisible();
+      await expect(page.locator('[data-testid="markdown-editor"]')).toBeVisible();
 
       // Switch to a different task
       await postMessageToWebview(page, { type: 'taskData', data: secondTaskData });
@@ -417,7 +434,7 @@ test.describe('Task Detail', () => {
 
       // Should exit edit mode and show the new task's description
       await expect(page.locator('[data-testid="description-view"]')).toBeVisible();
-      await expect(page.locator('[data-testid="description-textarea"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="markdown-editor"]')).not.toBeVisible();
       await expect(page.locator('[data-testid="description-view"]')).toContainText(
         'Completely different description'
       );
@@ -428,11 +445,14 @@ test.describe('Task Detail', () => {
     test('stays in edit mode when description is echoed back after save', async ({ page }) => {
       // Enter edit mode
       await page.locator('[data-testid="edit-description-btn"]').click();
-      const textarea = page.locator('[data-testid="description-textarea"]');
-      await expect(textarea).toBeVisible();
+      const editorContainer = page.locator('[data-testid="markdown-editor"]');
+      await expect(editorContainer).toBeVisible();
 
-      // Type something new
-      await textarea.fill('Updated description text');
+      // Type something new in TinyMDE
+      const tinyMDE = page.locator('.TinyMDE');
+      await tinyMDE.click();
+      await page.keyboard.press('Control+A');
+      await page.keyboard.type('Updated description text');
 
       // Simulate the extension echoing back the saved description (same task ID)
       await postMessageToWebview(page, {
@@ -445,10 +465,146 @@ test.describe('Task Detail', () => {
       });
       await page.waitForTimeout(50);
 
-      // Should still be in edit mode with the textarea visible
-      await expect(textarea).toBeVisible();
+      // Should still be in edit mode with the editor visible
+      await expect(editorContainer).toBeVisible();
       await expect(page.locator('[data-testid="description-view"]')).not.toBeVisible();
       await expect(page.locator('[data-testid="edit-description-btn"]')).toHaveText('Done');
+    });
+
+    test('editor content is NOT reset when extension echoes back saved content', async ({
+      page,
+    }) => {
+      // This reproduces a cursor-jump / content-reset bug:
+      // 1. User types in editor
+      // 2. Debounce fires (1000ms), sends updateField to extension
+      // 3. Extension writes file, re-parses, sends taskData back
+      // 4. content prop changes → $effect.pre fires → editor.setContent() resets cursor
+
+      // Enter edit mode
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+
+      // Type appended text at the end (don't replace all)
+      await tinyMDE.click();
+      await page.keyboard.press('End');
+      await page.keyboard.type(' APPENDED_TEXT');
+
+      // Read the editor content BEFORE echo-back
+      const contentBefore = await tinyMDE.textContent();
+      expect(contentBefore).toContain('APPENDED_TEXT');
+
+      // Wait for debounce to fire (1000ms + buffer)
+      await page.waitForTimeout(1200);
+
+      // Verify debounce fired by checking for updateField message
+      const messages = await getPostedMessages(page);
+      const updateMsg = messages.find((m) => m.type === 'updateField' && m.field === 'description');
+      expect(updateMsg).toBeTruthy();
+
+      // NOW simulate extension echoing back the saved content
+      const echoedDescription = updateMsg!.value as string;
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          task: { ...sampleTask, description: echoedDescription },
+          descriptionHtml: `<p>${echoedDescription}</p>`,
+        },
+      });
+      await page.waitForTimeout(100);
+
+      // CRITICAL: The editor content must still contain APPENDED_TEXT
+      const contentAfter = await tinyMDE.textContent();
+      expect(contentAfter).toContain('APPENDED_TEXT');
+
+      // Now type MORE text — it should append where the cursor was, not at the top
+      await page.keyboard.type(' AND_MORE');
+      const contentFinal = await tinyMDE.textContent();
+
+      // If cursor was reset to top, "AND_MORE" would appear before the original text
+      // If cursor stayed at end, it appears after APPENDED_TEXT
+      expect(contentFinal).toContain('APPENDED_TEXT AND_MORE');
+    });
+
+    test('toolbar button click does not reset cursor position', async ({ page }) => {
+      // Toolbar buttons apply formatting then fire a change event.
+      // Verifies that clicking a toolbar button doesn't cause cursor to jump
+      // after the debounce fires and the extension echoes back content.
+
+      // Enter edit mode
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+
+      // Type text at the end
+      await tinyMDE.click();
+      await page.keyboard.press('End');
+      await page.keyboard.type(' MARKER');
+      await page.waitForTimeout(50);
+
+      // Click a toolbar button (bold). This applies formatting at cursor.
+      const boldButton = page.locator('.TMCommandButton').first();
+      await boldButton.click();
+      await page.waitForTimeout(50);
+
+      // IMPORTANT: Click back into the editor to restore focus (toolbar took it),
+      // but do NOT press End — just click at the end of the text.
+      // Actually, after clicking bold, type directly to see where cursor lands.
+      // First, re-focus the editor content area:
+      await tinyMDE.click();
+      // Don't press End — we want to see where the cursor naturally is
+
+      // Wait for debounce to fire
+      await page.waitForTimeout(1200);
+
+      // Simulate extension echo-back
+      const messages = await getPostedMessages(page);
+      const updateMsg = messages.find((m) => m.type === 'updateField' && m.field === 'description');
+      if (updateMsg) {
+        await postMessageToWebview(page, {
+          type: 'taskData',
+          data: {
+            ...sampleTaskData,
+            task: { ...sampleTask, description: updateMsg.value as string },
+            descriptionHtml: `<p>${updateMsg.value}</p>`,
+          },
+        });
+        await page.waitForTimeout(100);
+      }
+
+      // Type more without re-establishing cursor — just type directly
+      await page.keyboard.type('PROBE');
+      const contentFinal = await tinyMDE.textContent();
+
+      // The PROBE text should NOT appear at the very start (cursor jumped to top)
+      expect(contentFinal).not.toMatch(/^PROBE/);
+      // Content should still have our original text
+      expect(contentFinal).toContain('MARKER');
+      expect(contentFinal).toContain('PROBE');
+    });
+
+    test('debounce firing does not reset cursor position', async ({ page }) => {
+      // Verifies that when the debounce callback fires (updating lastSetContent
+      // and calling onUpdate), it does NOT trigger $effect.pre or reset the cursor.
+
+      // Enter edit mode
+      await page.locator('[data-testid="edit-description-btn"]').click();
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+
+      // Type text at the end
+      await tinyMDE.click();
+      await page.keyboard.press('End');
+      await page.keyboard.type(' TYPED');
+
+      // Wait for debounce to fire
+      await page.waitForTimeout(1200);
+
+      // Type more text — should appear right after " TYPED", not at the top
+      await page.keyboard.type('_AFTER');
+      const content = await tinyMDE.textContent();
+      expect(content).toContain('TYPED_AFTER');
     });
   });
 
@@ -480,6 +636,43 @@ test.describe('Task Detail', () => {
         itemId: 2,
       });
     });
+
+    test('Edit button shows markdown editor for editing', async ({ page }) => {
+      await page.locator('[data-testid="acceptanceCriteria-edit-btn"]').click();
+
+      await expect(page.locator('[data-testid="markdown-editor"]')).toBeVisible();
+      await expect(page.locator('[data-testid="acceptanceCriteria-edit-btn"]')).toHaveText('Done');
+      // Checklist items should be hidden in edit mode
+      await expect(page.locator('[data-testid="acceptanceCriteria-item-1"]')).not.toBeVisible();
+    });
+
+    test('sends updateField message when editing and clicking Done', async ({ page }) => {
+      await page.locator('[data-testid="acceptanceCriteria-edit-btn"]').click();
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+      await tinyMDE.click();
+      await page.keyboard.press('Control+A');
+      await page.keyboard.type('- [ ] #1 New criterion');
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="acceptanceCriteria-edit-btn"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateField',
+        field: 'acceptanceCriteria',
+        value: '- [ ] #1 New criterion',
+      });
+    });
+
+    test('Escape in edit mode exits without saving changes', async ({ page }) => {
+      await page.locator('[data-testid="acceptanceCriteria-edit-btn"]').click();
+      await expect(page.locator('.TinyMDE')).toBeVisible();
+      await page.keyboard.press('Escape');
+
+      // Should exit edit mode and show checklist items
+      await expect(page.locator('[data-testid="markdown-editor"]')).not.toBeVisible();
+      await expect(page.locator('[data-testid="acceptanceCriteria-item-1"]')).toBeVisible();
+    });
   });
 
   test.describe('Definition of Done', () => {
@@ -499,6 +692,31 @@ test.describe('Task Detail', () => {
         type: 'toggleChecklistItem',
         listType: 'definitionOfDone',
         itemId: 1,
+      });
+    });
+
+    test('Edit button shows markdown editor for editing', async ({ page }) => {
+      await page.locator('[data-testid="definitionOfDone-edit-btn"]').click();
+
+      await expect(page.locator('[data-testid="markdown-editor"]')).toBeVisible();
+      await expect(page.locator('[data-testid="definitionOfDone-edit-btn"]')).toHaveText('Done');
+    });
+
+    test('sends updateField message when editing and clicking Done', async ({ page }) => {
+      await page.locator('[data-testid="definitionOfDone-edit-btn"]').click();
+      const tinyMDE = page.locator('.TinyMDE');
+      await expect(tinyMDE).toBeVisible();
+      await tinyMDE.click();
+      await page.keyboard.press('Control+A');
+      await page.keyboard.type('- [x] #1 Tests pass');
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="definitionOfDone-edit-btn"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateField',
+        field: 'definitionOfDone',
+        value: '- [x] #1 Tests pass',
       });
     });
   });
@@ -753,10 +971,11 @@ test.describe('Task Detail', () => {
       // Switch to edit mode
       await page.locator('[data-testid="edit-description-btn"]').click();
 
-      // Textarea should contain raw markdown, not SVG
-      const textarea = page.locator('[data-testid="description-textarea"]');
-      await expect(textarea).toBeVisible();
-      await expect(textarea).toHaveValue(/```mermaid/);
+      // TinyMDE editor should contain raw markdown, not SVG
+      const editor = page.locator('.TinyMDE');
+      await expect(editor).toBeVisible();
+      await expect(editor).toContainText('mermaid');
+      await expect(editor).toContainText('A-->B');
 
       // SVG should no longer be visible (view mode is hidden)
       await expect(page.locator('.mermaid svg')).not.toBeVisible();

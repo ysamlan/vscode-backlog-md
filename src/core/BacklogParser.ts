@@ -532,9 +532,13 @@ export class BacklogParser {
 
       // Handle section content
       if (currentSection === 'description') {
-        if (inDescriptionBlock && trimmedLine) {
+        if (inDescriptionBlock && (trimmedLine || descriptionLines.length > 0)) {
           descriptionLines.push(line);
-        } else if (!inDescriptionBlock && trimmedLine && !trimmedLine.startsWith('<!--')) {
+        } else if (
+          !inDescriptionBlock &&
+          (trimmedLine || descriptionLines.length > 0) &&
+          !trimmedLine.startsWith('<!--')
+        ) {
           descriptionLines.push(line);
         }
       } else if (currentSection === 'acceptance') {
@@ -547,11 +551,23 @@ export class BacklogParser {
         if (checkItem) {
           task.definitionOfDone.push(checkItem);
         }
-      } else if (currentSection === 'notes' && trimmedLine && !trimmedLine.startsWith('<!--')) {
+      } else if (
+        currentSection === 'notes' &&
+        (trimmedLine || notesLines.length > 0) &&
+        !trimmedLine.startsWith('<!--')
+      ) {
         notesLines.push(line);
-      } else if (currentSection === 'summary' && trimmedLine && !trimmedLine.startsWith('<!--')) {
+      } else if (
+        currentSection === 'summary' &&
+        (trimmedLine || summaryLines.length > 0) &&
+        !trimmedLine.startsWith('<!--')
+      ) {
         summaryLines.push(line);
-      } else if (currentSection === 'plan' && trimmedLine && !trimmedLine.startsWith('<!--')) {
+      } else if (
+        currentSection === 'plan' &&
+        (trimmedLine || planLines.length > 0) &&
+        !trimmedLine.startsWith('<!--')
+      ) {
         planLines.push(line);
       }
     }

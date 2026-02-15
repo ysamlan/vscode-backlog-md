@@ -222,6 +222,7 @@
     "js-yaml": "^4.1.1",
     "marked": "^17.0.1",
     "mermaid": "^11.12.2",
-    "svelte": "^5.50.1"
+    "svelte": "^5.50.1",
+    "tiny-markdown-editor": "^0.2.19"
   }
 }

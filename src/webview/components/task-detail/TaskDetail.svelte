@@ -103,6 +103,14 @@
     vscode.postMessage({ type: 'toggleChecklistItem', listType, itemId });
   }
 
+  function handleUpdateAcceptanceCriteria(text: string) {
+    vscode.postMessage({ type: 'updateField', field: 'acceptanceCriteria', value: text });
+  }
+
+  function handleUpdateDefinitionOfDone(text: string) {
+    vscode.postMessage({ type: 'updateField', field: 'definitionOfDone', value: text });
+  }
+
   function handleOpenTask(taskId: string) {
     vscode.postMessage({ type: 'openTask', taskId });
   }
@@ -252,7 +260,9 @@
     title="Acceptance Criteria"
     items={task.acceptanceCriteria}
     listType="acceptanceCriteria"
+    taskId={task.id}
     onToggle={handleToggleChecklist}
+    onUpdateText={handleUpdateAcceptanceCriteria}
     {isReadOnly}
   />
 
@@ -260,7 +270,9 @@
     title="Definition of Done"
     items={task.definitionOfDone}
     listType="definitionOfDone"
+    taskId={task.id}
     onToggle={handleToggleChecklist}
+    onUpdateText={handleUpdateDefinitionOfDone}
     {isReadOnly}
   />
 

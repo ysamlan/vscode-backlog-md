@@ -272,10 +272,24 @@ export class BacklogWriter {
     // Update the updated_date
     frontmatter.updated_date = new Date().toISOString().split('T')[0];
 
-    // Handle description update (stored in body, not frontmatter)
+    // Handle body updates (description, AC, DoD are stored in body, not frontmatter)
     let updatedBody = body;
     if (updates.description !== undefined) {
-      updatedBody = this.updateDescriptionInBody(body, updates.description);
+      updatedBody = this.updateDescriptionInBody(updatedBody, updates.description);
+    }
+    if ((updates as Record<string, unknown>).acceptanceCriteria !== undefined) {
+      updatedBody = this.updateChecklistInBody(
+        updatedBody,
+        'acceptanceCriteria',
+        String((updates as Record<string, unknown>).acceptanceCriteria)
+      );
+    }
+    if ((updates as Record<string, unknown>).definitionOfDone !== undefined) {
+      updatedBody = this.updateChecklistInBody(
+        updatedBody,
+        'definitionOfDone',
+        String((updates as Record<string, unknown>).definitionOfDone)
+      );
     }
 
     // Reconstruct the file
@@ -578,6 +592,51 @@ export class BacklogWriter {
 
     // No description section - add one after frontmatter
     return `\n## Description\n\n${beginMarker}\n${newDescription}\n${endMarker}\n${body}`;
+  }
+
+  /**
+   * Update checklist content (AC or DoD) in the markdown body
+   */
+  private updateChecklistInBody(
+    body: string,
+    listType: 'acceptanceCriteria' | 'definitionOfDone',
+    newContent: string
+  ): string {
+    const isAC = listType === 'acceptanceCriteria';
+    const beginMarker = isAC ? '<!-- AC:BEGIN -->' : '<!-- DOD:BEGIN -->';
+    const endMarker = isAC ? '<!-- AC:END -->' : '<!-- DOD:END -->';
+    const sectionHeader = isAC ? '## Acceptance Criteria' : '## Definition of Done';
+
+    const beginIndex = body.indexOf(beginMarker);
+    const endIndex = body.indexOf(endMarker);
+
+    if (beginIndex !== -1 && endIndex !== -1 && endIndex > beginIndex) {
+      // Replace content between markers
+      const before = body.substring(0, beginIndex + beginMarker.length);
+      const after = body.substring(endIndex);
+      return `${before}\n${newContent}\n${after}`;
+    }
+
+    // No markers found — look for section header and add markers
+    const headerRegex = new RegExp(
+      `^${sectionHeader.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
+      'm'
+    );
+    const match = body.match(headerRegex);
+
+    if (match && match.index !== undefined) {
+      const afterHeader = body.substring(match.index + match[0].length);
+      const nextSectionMatch = afterHeader.match(/^## /m);
+      const nextSectionIndex = nextSectionMatch?.index ?? afterHeader.length;
+
+      const before = body.substring(0, match.index + match[0].length);
+      const after = body.substring(match.index + match[0].length + nextSectionIndex);
+
+      return `${before}\n${beginMarker}\n${newContent}\n${endMarker}\n${after}`;
+    }
+
+    // No section header — append new section
+    return `${body}\n${sectionHeader}\n${beginMarker}\n${newContent}\n${endMarker}\n`;
   }
 
   /**

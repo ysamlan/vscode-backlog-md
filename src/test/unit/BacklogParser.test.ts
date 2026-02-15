@@ -3105,4 +3105,121 @@ Some content
       expect(task?.title).toBe('My Task Title From Heading');
     });
   });
+
+  describe('blank line preservation', () => {
+    it('should preserve blank lines between paragraphs in description with markers', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+First paragraph.
+
+Second paragraph.
+
+Third paragraph.
+<!-- SECTION:DESCRIPTION:END -->
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.description).toBe('First paragraph.\n\nSecond paragraph.\n\nThird paragraph.');
+    });
+
+    it('should preserve blank lines between paragraphs in description without markers', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+First paragraph.
+
+Second paragraph.
+
+## Acceptance Criteria
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.description).toBe('First paragraph.\n\nSecond paragraph.');
+    });
+
+    it('should preserve blank lines in implementation notes', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Implementation Notes
+
+First note.
+
+Second note.
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.implementationNotes).toBe('First note.\n\nSecond note.');
+    });
+
+    it('should preserve blank lines in plan', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Implementation Plan
+
+Step 1.
+
+Step 2.
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.plan).toBe('Step 1.\n\nStep 2.');
+    });
+
+    it('should preserve blank lines in final summary', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Final Summary
+
+Para one.
+
+Para two.
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.finalSummary).toBe('Para one.\n\nPara two.');
+    });
+
+    it('should not start collecting blank lines before first content line', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+
+Actual content starts here.
+<!-- SECTION:DESCRIPTION:END -->
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.description).toBe('Actual content starts here.');
+    });
+  });
 });

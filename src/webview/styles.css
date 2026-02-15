@@ -2332,6 +2332,131 @@ body {
   background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.04));
 }
 
+/* ============================================
+   TinyMDE Markdown Editor Theming
+   ============================================ */
+
+.TinyMDE {
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 0 0 6px 6px;
+  padding: 8px 12px;
+  font-family: var(--vscode-editor-font-family, 'Consolas, monospace');
+  font-size: var(--vscode-editor-font-size, 13px);
+  line-height: 1.5;
+  min-height: 120px;
+  outline: none;
+}
+
+.TinyMDE:focus-within {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+.markdown-editor-toolbar .TMCommandBar {
+  background: var(--vscode-editor-background, #1e1e1e);
+  border: 1px solid var(--vscode-widget-border, #303031);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.markdown-editor-toolbar .TMCommandButton {
+  color: var(--vscode-foreground, #cccccc);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.markdown-editor-toolbar .TMCommandButton svg {
+  fill: currentColor;
+}
+
+.markdown-editor-toolbar .TMCommandButton:hover {
+  background: var(--vscode-toolbar-hoverBackground, #5a5d5e50);
+}
+
+.markdown-editor-toolbar .TMCommandButton.TMCommandButton_Active {
+  background: var(--vscode-toolbar-activeBackground, rgba(99, 102, 106, 0.31));
+  color: var(--vscode-foreground, #cccccc);
+}
+
+.markdown-editor-toolbar .TMCommandDivider {
+  width: 1px;
+  background: var(--vscode-widget-border, #303031);
+  margin: 2px 4px;
+  align-self: stretch;
+}
+
+/* TinyMDE inline formatting styles */
+.TinyMDE .TinyMDE_bold {
+  font-weight: bold;
+}
+
+.TinyMDE .TinyMDE_italic {
+  font-style: italic;
+}
+
+.TinyMDE .TinyMDE_strikethrough {
+  text-decoration: line-through;
+}
+
+.TinyMDE .TinyMDE_code {
+  background: var(--vscode-textCodeBlock-background, #0a0a0a);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.TinyMDE .TinyMDE_h1,
+.TinyMDE .TinyMDE_h2,
+.TinyMDE .TinyMDE_h3 {
+  font-weight: 600;
+}
+
+.TinyMDE .TinyMDE_h1 {
+  font-size: 1.4em;
+}
+
+.TinyMDE .TinyMDE_h2 {
+  font-size: 1.2em;
+}
+
+.TinyMDE .TinyMDE_h3 {
+  font-size: 1.1em;
+}
+
+.TinyMDE .TinyMDE_mark {
+  color: var(--vscode-descriptionForeground, #858585);
+}
+
+.TinyMDE .TinyMDE_url {
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.TinyMDE .TinyMDE_blockquote_mark,
+.TinyMDE .TinyMDE_blockquote_content {
+  color: var(--vscode-textBlockQuote-foreground, #cccccc);
+}
+
+.TinyMDE .TinyMDE_line_blockquote {
+  border-left: 3px solid var(--vscode-textBlockQuote-border, #007acc);
+  padding-left: 8px;
+}
+
+/* No toolbar variant — give the editor full rounding */
+.markdown-editor-container:not(:has(.markdown-editor-toolbar .TMCommandBar)) .TinyMDE {
+  border-radius: 6px;
+}
+
 /* Reduced motion: disable animations for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
   *,

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { renderMermaidAction } from '../../lib/mermaidAction';
+  import MarkdownEditor from '../shared/MarkdownEditor.svelte';
 
   interface Props {
     taskId: string;
@@ -12,59 +13,19 @@
   let { taskId, description, descriptionHtml, onUpdate, isReadOnly = false }: Props = $props();
 
   let isEditing = $state(false);
-  let textareaValue = $state('');
-  let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
   let prevTaskId = '';
 
   // Reset edit mode when switching to a different task.
-  // Uses a plain variable (not $state) for comparison so it doesn't
-  // become a tracked dependency — the effect only depends on taskId.
   $effect(() => {
     if (taskId !== prevTaskId) {
       prevTaskId = taskId;
       isEditing = false;
-      if (debounceTimeout) {
-        clearTimeout(debounceTimeout);
-        debounceTimeout = null;
-      }
-    }
-  });
-
-  // Sync textarea value when description prop changes, but not while actively editing
-  // (avoids the debounce save round-trip from kicking the user out of the textarea)
-  $effect(() => {
-    if (!isEditing) {
-      textareaValue = description;
     }
   });
 
   function toggleEdit() {
     if (isReadOnly) return;
-    if (isEditing) {
-      // Save and switch to view mode
-      onUpdate(textareaValue);
-      isEditing = false;
-    } else {
-      isEditing = true;
-    }
-  }
-
-  function handleInput(e: Event) {
-    const target = e.target as HTMLTextAreaElement;
-    textareaValue = target.value;
-
-    // Debounce auto-save
-    if (debounceTimeout) clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(() => {
-      onUpdate(textareaValue);
-    }, 1000);
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      isEditing = false;
-      textareaValue = description; // Revert changes
-    }
+    isEditing = !isEditing;
   }
 
   function handleViewClick() {
@@ -80,6 +41,7 @@
       class="edit-btn"
       data-testid="edit-description-btn"
       onclick={toggleEdit}
+      onpointerdown={(e) => isEditing && e.stopPropagation()}
       disabled={isReadOnly}
     >
       {isEditing ? 'Done' : 'Edit'}
@@ -87,15 +49,13 @@
   </div>
   <div class="description-container">
     {#if isEditing}
-      <textarea
-        class="description-textarea"
-        data-testid="description-textarea"
+      <MarkdownEditor
+        content={description}
         placeholder="Add a description..."
-        bind:value={textareaValue}
-        disabled={isReadOnly}
-        oninput={handleInput}
-        onkeydown={handleKeydown}
-      ></textarea>
+        {onUpdate}
+        onExit={() => (isEditing = false)}
+        {isReadOnly}
+      />
     {:else}
       <div
         class="markdown-content description-view"
