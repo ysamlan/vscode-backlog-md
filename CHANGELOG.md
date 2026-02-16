@@ -1,54 +1,90 @@
 # Changelog
 
-All notable changes to the Backlog.md VS Code extension will be documented in this file.
+<a id="v0.3.0"></a>
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+# [v0.3.0](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.0) - 2026-02-16
 
-## [Unreleased]
+### What's New
 
-## [0.2.3] - 2026-02-13
+- Markdown editor for descriptions — Task descriptions now use a rich inline markdown editor with toolbar support for bold, italic, headers, lists, checklists, code blocks, and links. Click to edit, Escape to revert.
+- Structured checklist editing for Acceptance Criteria and Definition of Done now use inline item editing with add, edit, and delete per item.
+
+### Bug Fixes
+
+- Fixed parser stripping blank lines between paragraphs in task body sections.
+
+**Full Changelog**: https://github.com/ysamlan/vscode-backlog-md/compare/0.2.3...v0.3.0
+
+[Changes][v0.3.0]
+
+<a id="0.2.3"></a>
+
+# [v0.2.3](https://github.com/ysamlan/vscode-backlog-md/releases/tag/0.2.3) - 2026-02-13
 
 ### Added
 
-- **Editable dependency linking in Task Detail** - You can now add and edit task dependencies directly in the task detail view.
+- Editable dependency linking in Task Detail: you can now add/edit task dependencies directly from the
+  task detail view.
 
 ### Fixed
 
-- Fixed a bug where switching tasks while editing the description could show the previous task's description.
+- Fixed a bug where switching tasks while editing the description would show a the previous task's description.
 - Fixed a crash when viewing backlogs containing multiple files with the same IDs.
 
-## [0.2.2] - 2026-02-12
+**Full Changelog**: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.2...0.2.3
 
-### Added
+[Changes][0.2.3]
 
-- Published to Open VSX for VSCodium and other compatible editors: https://open-vsx.org/extension/ysamlan/vscode-backlog-md
+<a id="v0.2.2"></a>
 
-### Fixed
+# [v0.2.2](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.2.2) - 2026-02-12
 
-- Fixed README images not rendering on the Open VSX listing.
-- Reduced extension package size by excluding screenshot assets from the `.vsix`.
+- Now available on https://open-vsx.org/extension/ysamlan/vscode-backlog-md for VSCodium and other compatible editors
+- Fixed README images not rendering on the Open VSX listing
+- Reduced extension package size by excluding screenshot assets from the .vsix
 
-## [0.2.0] - 2026-02-10
+**Full Changelog**: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.0...v0.2.2
 
-### Added
+[Changes][v0.2.2]
 
-- Multi-root workspace support via `Backlog: Select Backlog` to switch between folders in multi-backlog workspaces.
-- Backlog init wizard to initialize a new `backlog/` folder directly from the extension.
-- Backlog.md binary and agent integration setup with banner/actions for installing `backlog.md` and agent configs.
-- Mermaid diagram rendering from fenced `mermaid` code blocks (feature parity with backlog.md).
+<a id="v0.2.0"></a>
 
-### Fixed
+# [v0.2.0](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.2.0) - 2026-02-11
 
-- Checklist duplicate ID crash: fixed a Svelte `each_key_duplicate` crash when checklist items lacked `#N` prefixes by assigning sequential 1-based index IDs matching backlog.md behavior.
+### New Features
 
-## [0.1.0] - 2026-02-03
+- Multi-root workspace support — `Backlog: Select Backlog` command to switch between folders when using a workspace with multiple backlogs.
+- Backlog init wizard — Initialize a new backlog/ folder directly from the extension.
+- Backlog.md binary and agent integration setup — Banner/actions for installing backlog.md and for installing agent configs via `backlog init` if none is detected
+- Mermaid diagram rendering from fenced mermaid code blocks (parity for existing backlog.md capabilities)
 
-### Added
+### Bug Fixes
 
-- Initial release of the Backlog.md VS Code extension.
+- Checklist duplicate ID crash — Fixed a Svelte each_key_duplicate crash when checklist items lacked #N prefixes. Items now get sequential 1-based index IDs matching backlog.md behavior.
 
-[Unreleased]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.3...HEAD
-[0.2.3]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.0...v0.2.2
-[0.2.0]: https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.2.0
-[0.1.0]: https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.1.0
+[Changes][v0.2.0]
+
+<a id="v0.1.1"></a>
+
+# [v0.1.1](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.1.1) - 2026-02-10
+
+fix images not showing in vsix
+
+[Changes][v0.1.1]
+
+<a id="v0.1.0"></a>
+
+# [v0.1.0](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.1.0) - 2026-02-10
+
+Initial public release.
+
+[Changes][v0.1.0]
+
+[v0.3.0]: https://github.com/ysamlan/vscode-backlog-md/compare/0.2.3...v0.3.0
+[0.2.3]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.2...0.2.3
+[v0.2.2]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.0...v0.2.2
+[v0.2.0]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.1.1...v0.2.0
+[v0.1.1]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.1.0...v0.1.1
+[v0.1.0]: https://github.com/ysamlan/vscode-backlog-md/tree/v0.1.0
+
+<!-- Generated by https://github.com/rhysd/changelog-from-release v3.9.1 -->
