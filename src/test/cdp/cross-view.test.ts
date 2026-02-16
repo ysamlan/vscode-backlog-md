@@ -392,18 +392,18 @@ describe('Cross-view CDP tests', () => {
     expect(editClicked).toBe(true);
     await waitForWebviewContent(instance.cdp, 'detail', 'TASK-1', { timeoutMs: 10_000 });
 
-    // 3. Change the title input value
+    // 3. Change the title textarea value and blur to trigger save
     const newTitle = 'Updated title from detail panel';
     await queryWebviewElement(
       instance.cdp,
       'detail',
       `
-      const input = doc.querySelector('[data-testid="task-title-input"]');
-      if (!input) return 'input-not-found';
-      const nativeSetter = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value').set;
-      nativeSetter.call(input, '${newTitle}');
-      input.dispatchEvent(new win.Event('input', { bubbles: true }));
-      input.dispatchEvent(new win.Event('change', { bubbles: true }));
+      const textarea = doc.querySelector('[data-testid="title-input"]');
+      if (!textarea) return 'textarea-not-found';
+      const nativeSetter = Object.getOwnPropertyDescriptor(win.HTMLTextAreaElement.prototype, 'value').set;
+      nativeSetter.call(textarea, '${newTitle}');
+      textarea.dispatchEvent(new win.Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new win.FocusEvent('blur', { bubbles: true }));
       return 'ok';
       `
     );
