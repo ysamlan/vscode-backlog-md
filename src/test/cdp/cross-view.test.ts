@@ -379,6 +379,76 @@ describe('Cross-view CDP tests', () => {
     expect(viewExists).toBe(true);
   }, 60_000);
 
+  it('editing title in detail panel updates preview panel', async () => {
+    // 1. Open kanban, click TASK-1 to show preview
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
+
+    await clickInWebview(instance.cdp, 'tasks', '[data-task-id="TASK-1"]');
+    await waitForWebviewContent(instance.cdp, 'preview', 'TASK-1', { timeoutMs: 10_000 });
+
+    // 2. Open the full detail panel via the "Edit" button
+    const editClicked = await clickButtonInWebview(instance.cdp, 'preview', 'Edit');
+    expect(editClicked).toBe(true);
+    await waitForWebviewContent(instance.cdp, 'detail', 'TASK-1', { timeoutMs: 10_000 });
+
+    // 3. Change the title input value
+    const newTitle = 'Updated title from detail panel';
+    await queryWebviewElement(
+      instance.cdp,
+      'detail',
+      `
+      const input = doc.querySelector('[data-testid="task-title-input"]');
+      if (!input) return 'input-not-found';
+      const nativeSetter = Object.getOwnPropertyDescriptor(win.HTMLInputElement.prototype, 'value').set;
+      nativeSetter.call(input, '${newTitle}');
+      input.dispatchEvent(new win.Event('input', { bubbles: true }));
+      input.dispatchEvent(new win.Event('change', { bubbles: true }));
+      return 'ok';
+      `
+    );
+
+    // 4. Wait for file to be updated on disk
+    const taskFile = taskFilePath(workspacePath, 'task-1 - Test-task-for-e2e.md');
+    await waitForFileContent(taskFile, newTitle, { timeoutMs: 15_000 });
+
+    // 5. Wait for preview panel to show the new title
+    const previewText = await waitForWebviewContent(instance.cdp, 'preview', newTitle, {
+      timeoutMs: 10_000,
+    });
+    expect(previewText).toContain(newTitle);
+  }, 60_000);
+
+  it('external file edit updates preview panel', async () => {
+    // 1. Open kanban, click TASK-1 to show preview
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
+
+    await clickInWebview(instance.cdp, 'tasks', '[data-task-id="TASK-1"]');
+    const previewBefore = await waitForWebviewContent(instance.cdp, 'preview', 'TASK-1', {
+      timeoutMs: 10_000,
+    });
+    expect(previewBefore).toContain('sample task used for e2e testing');
+
+    // 2. Externally modify the task file description
+    const taskFile = taskFilePath(workspacePath, 'task-1 - Test-task-for-e2e.md');
+    const originalContent = fs.readFileSync(taskFile, 'utf-8');
+    const updatedContent = originalContent.replace(
+      'sample task used for e2e testing',
+      'externally modified description for preview test'
+    );
+    fs.writeFileSync(taskFile, updatedContent);
+
+    // 3. Wait for preview panel to show the updated description
+    const previewAfter = await waitForWebviewContent(
+      instance.cdp,
+      'preview',
+      'externally modified description for preview test',
+      { timeoutMs: 15_000 }
+    );
+    expect(previewAfter).toContain('externally modified description for preview test');
+  }, 45_000);
+
   it('description textarea retains focus after debounce save (regression)', async () => {
     // Regression test for 5a1c20e:
     // While typing in the description textarea, the debounce auto-save (1000ms)

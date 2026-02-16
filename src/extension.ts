@@ -145,6 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
     const debouncedRefresh = createDebouncedHandler((uri: vscode.Uri) => {
       console.log('[Backlog.md] Debounced refresh triggered');
       tasksProvider.refresh();
+      taskPreviewProvider.refresh();
       TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
     }, 300);
     fileWatcher.onDidChange((uri) => {
@@ -638,6 +639,7 @@ export function activate(context: vscode.ExtensionContext) {
     const debouncedRefresh = createDebouncedHandler((uri: vscode.Uri) => {
       console.log('[Backlog.md] Debounced refresh triggered');
       tasksProvider.refresh();
+      taskPreviewProvider.refresh();
       TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
     }, 300);
     fileWatcher.onDidChange((uri) => {
