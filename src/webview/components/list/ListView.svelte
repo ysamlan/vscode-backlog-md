@@ -110,6 +110,7 @@
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (t) =>
+          t.id.toLowerCase().includes(query) ||
           t.title.toLowerCase().includes(query) ||
           (t.description && t.description.toLowerCase().includes(query))
       );

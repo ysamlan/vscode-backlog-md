@@ -502,6 +502,14 @@ test.describe('Tasks View', () => {
       await expect(rows).toHaveCount(1);
     });
 
+    test('search by task ID filters tasks', async ({ page }) => {
+      await page.locator('[data-testid="search-input"]').fill('TASK-2');
+      await page.waitForTimeout(50);
+      const rows = page.locator('tbody tr');
+      await expect(rows).toHaveCount(1);
+      await expect(rows).toContainText('Task 2');
+    });
+
     test('search and status filters work with cross-branch style duplicate IDs', async ({
       page,
     }) => {
