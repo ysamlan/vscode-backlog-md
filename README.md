@@ -5,7 +5,11 @@
 [![VS Code 1.108+](https://img.shields.io/badge/VS%20Code-1.108%2B-blue.svg)](https://code.visualstudio.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A VS Code extension for browsing and managing [Backlog.md](https://github.com/backlog-md/backlog) tasks directly in your editor. Backlog.md is human-friendly and machine-accessible tool for managing a project task list and backlog in Markdown format.
+A VS Code extension for browsing and managing [Backlog.md](https://github.com/backlog-md/backlog) tasks directly in your editor.
+
+Backlog.md is human-friendly and machine-accessible tool for managing a project task list and backlog in Markdown format.
+
+You can think of it as Trello or a lightweight Jira - but that lives right in your repo, and that both humans and AI agents can collaborate on.
 
 ![Task list with detail preview](docs/images/dark/list-detail.png)
 
@@ -15,10 +19,14 @@ A VS Code extension for browsing and managing [Backlog.md](https://github.com/ba
 
 - **Kanban Board** — Drag-and-drop tasks between status columns (Draft, To Do, In Progress, Done)
 - **Task List** — Sortable, filterable table view with search and column customization
-- **Task Detail** — Rich view with inline editing for title, description, priority, status, assignees, and labels
+- **Rich Markdown rendering** — Including styling and [Mermaid.js](https://mermaid.js.org/) diagrams
+- **Format-aware editing** — Status dropdowns, quick linking of dependencies, Markdown shortcuts in descriptions, and checklist management for acceptance criteria / definition-of-done
 - **Real-time Sync** — File watcher automatically syncs changes from disk
-- **Theme Support** — Works with Light, Dark, and High Contrast themes
-- **Editor Intelligence** — Autocomplete, clickable links, and hover info for Markdown task files (see below)
+- **Editor Intelligence** — Autocomplete, clickable links, and hover info for Markdown task files
+- **Multi-backlog workspaces** — Switch between multiple backlog folders in the same workspace
+- **Advanced feature support** — Supports Backlog.md options like remote/cross-branch tasks
+- **Project-aware setup** — One-command setup for Backlog.md CLI
+- **Theme Support** — Plays nice with Light, Dark, and High Contrast themes
 
 <details>
 <summary>More screenshots</summary>
@@ -47,11 +55,9 @@ The extension is available on both the [VS Code Marketplace](https://marketplace
 
 ## Getting Started
 
-1. Install [backlog.md](https://backlog.md/)
-2. Run `backlog init` to set up the folder structure
-3. Click the **Backlog** icon in the Activity Bar to view your tasks
+The extension activates when it detects a project set up by Backlog.md (`backlog/config.yml` or `backlog/tasks/*.md`).
 
-The extension activates automatically when it detects a project set up by Backlog.md (`backlog/config.yml` or `backlog/tasks/*.md`).
+If you haven't already installed and initialized [backlog.md](https://backlog.md/), the extension will guide you through it when you open it.
 
 ## Editor Intelligence
 
@@ -66,32 +72,39 @@ When you open a backlog task file (e.g., via "Open Markdown" or by opening a `.m
 
 Press `?` in the tasks view to see all shortcuts, or use the `?` button in the bottom-right corner.
 
-| Key       | Action                          |
-| --------- | ------------------------------- |
-| `?`       | Show keyboard shortcuts         |
-| `z`       | Kanban view                     |
-| `x`       | List view                       |
-| `c`       | Drafts view                     |
-| `v`       | Archived view                   |
-| `j` / `k` | Next / previous task            |
-| `h` / `l` | Previous / next column (kanban) |
-| `Enter`   | Open focused task               |
-| `/`       | Focus search                    |
-| `n`       | Create new task                 |
-| `r`       | Refresh views                   |
-| `Esc`     | Close popup                     |
+| Key       | Action                               |
+| --------- | ------------------------------------ |
+| `?`       | Show keyboard shortcuts              |
+| `z`       | Kanban view                          |
+| `x`       | List view                            |
+| `c`       | Drafts view                          |
+| `v`       | Archived view                        |
+| `j` / `k` | Next / previous task                 |
+| `h` / `l` | Previous / next column (kanban)      |
+| `Enter`   | Move keyboard focus to details panel |
+| `/`       | Focus search                         |
+| `n`       | Create new task                      |
+| `e`       | Open edit view for focused task      |
+| `r`       | Refresh views                        |
+| `Esc`     | Close popup                          |
 
 ## Commands
 
 Open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P) and type "Backlog":
 
-| Command                        | Description                 |
-| ------------------------------ | --------------------------- |
-| **Backlog: Open Kanban Board** | Open the Kanban board view  |
-| **Backlog: Open Task List**    | Open the task list view     |
-| **Backlog: Open Dashboard**    | Open the dashboard overview |
-| **Backlog: Create Task**       | Create a new task file      |
-| **Backlog: Refresh**           | Refresh tasks from disk     |
+| Command                               | Description                                               |
+| ------------------------------------- | --------------------------------------------------------- |
+| **Backlog: Initialize Backlog**       | Set up a new backlog in the current workspace             |
+| **Backlog: Open Kanban Board**        | Open the Kanban board view                                |
+| **Backlog: Open Task List**           | Open the task list view                                   |
+| **Backlog: Open Dashboard**           | Open the dashboard overview                               |
+| **Backlog: Show Documents**           | Browse project documents                                  |
+| **Backlog: Show Decisions**           | Browse decision records                                   |
+| **Backlog: Create Task**              | Create a new task file                                    |
+| **Backlog: Open Task Markdown**       | Open the raw Markdown file for the current task           |
+| **Backlog: Select Active Backlog**    | Switch backlogs (in a multi-folder workspace)             |
+| **Backlog: Set Up Agent Integration** | Install Backlog.md CLI and configure AI agent integration |
+| **Backlog: Refresh**                  | Refresh tasks from disk                                   |
 
 ## Settings
 
