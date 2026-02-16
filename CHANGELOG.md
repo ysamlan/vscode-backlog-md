@@ -1,5 +1,21 @@
 # Changelog
 
+<a id="v0.3.1"></a>
+
+# [v0.3.1](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.1) - 2026-02-16
+
+### What's New
+
+- Search now also searches task IDs
+
+### Bug Fixes
+
+- Fix task preview panel not auto-refreshing on task file changes
+
+**Full Changelog**: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.0...v0.3.1
+
+[Changes][v0.3.1]
+
 <a id="v0.3.0"></a>
 
 # [v0.3.0](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.0) - 2026-02-16
@@ -80,6 +96,7 @@ Initial public release.
 
 [Changes][v0.1.0]
 
+[v0.3.1]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://github.com/ysamlan/vscode-backlog-md/compare/0.2.3...v0.3.0
 [0.2.3]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.2...0.2.3
 [v0.2.2]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.0...v0.2.2
