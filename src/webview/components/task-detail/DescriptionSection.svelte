@@ -14,14 +14,28 @@
 
   let isEditing = $state(false);
   let prevTaskId = '';
+  // Suppress onUpdate calls during task switch to prevent MarkdownEditor's
+  // onDestroy from flushing stale content to the newly-selected task.
+  let suppressUpdate = false;
 
   // Reset edit mode when switching to a different task.
   $effect(() => {
     if (taskId !== prevTaskId) {
       prevTaskId = taskId;
+      suppressUpdate = true;
       isEditing = false;
+      // Re-enable after the destroy cycle completes.
+      queueMicrotask(() => {
+        suppressUpdate = false;
+      });
     }
   });
+
+  function guardedUpdate(value: string) {
+    if (!suppressUpdate) {
+      onUpdate(value);
+    }
+  }
 
   function toggleEdit() {
     if (isReadOnly) return;
@@ -52,7 +66,7 @@
       <MarkdownEditor
         content={description}
         placeholder="Add a description..."
-        {onUpdate}
+        onUpdate={guardedUpdate}
         onExit={() => (isEditing = false)}
         {isReadOnly}
       />

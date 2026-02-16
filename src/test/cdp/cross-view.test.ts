@@ -28,9 +28,9 @@ import {
   queryWebviewElement,
   setSelectValueInWebview,
   dragAndDropInWebview,
-  typeInWebviewInput,
-  isElementFocusedInWebview,
-  getInputValueInWebview,
+  typeInWebviewContentEditable,
+  isFocusInsideWebviewElement,
+  getContentEditableTextInWebview,
   elementExistsInWebview,
   clearWebviewSessionCache,
 } from './lib/webview-helpers';
@@ -334,14 +334,18 @@ describe('Cross-view CDP tests', () => {
     );
     expect(descEditClicked).toBe(true);
 
-    // Wait for textarea to appear
-    await waitForElement(instance.cdp, 'detail', '[data-testid="description-textarea"]');
-
-    // 3. Type some extra text into the textarea
-    const typed = await typeInWebviewInput(
+    // Wait for TinyMDE contenteditable to appear (async import)
+    await waitForElement(
       instance.cdp,
       'detail',
-      '[data-testid="description-textarea"]',
+      '[data-testid="markdown-editor-content"] .TinyMDE[contenteditable]'
+    );
+
+    // 3. Type some extra text into the contenteditable editor
+    const typed = await typeInWebviewContentEditable(
+      instance.cdp,
+      'detail',
+      '[data-testid="markdown-editor-content"] .TinyMDE[contenteditable]',
       ' EXTRA TEXT SHOULD NOT PERSIST'
     );
     expect(typed).toBe(true);
@@ -358,14 +362,13 @@ describe('Cross-view CDP tests', () => {
     expect(detailAfter).toContain('Users are not redirected to the dashboard');
     expect(detailAfter).not.toContain('EXTRA TEXT SHOULD NOT PERSIST');
 
-    // 7. The description textarea should NOT be in editing mode
-    //    (isEditing is reset on task switch)
-    const textareaStillExists = await elementExistsInWebview(
+    // 7. The markdown editor should NOT be visible (isEditing is reset on task switch)
+    const editorStillExists = await elementExistsInWebview(
       instance.cdp,
       'detail',
-      '[data-testid="description-textarea"]'
+      '[data-testid="markdown-editor"]'
     );
-    expect(textareaStillExists).toBe(false);
+    expect(editorStillExists).toBe(false);
 
     // The view mode description should be visible instead
     const viewExists = await elementExistsInWebview(
@@ -400,13 +403,18 @@ describe('Cross-view CDP tests', () => {
       '[data-testid="edit-description-btn"]'
     );
     expect(descEditClicked).toBe(true);
-    await waitForElement(instance.cdp, 'detail', '[data-testid="description-textarea"]');
-
-    // 3. Type some text into the description textarea
-    const typed = await typeInWebviewInput(
+    // Wait for TinyMDE contenteditable to appear (async import)
+    await waitForElement(
       instance.cdp,
       'detail',
-      '[data-testid="description-textarea"]',
+      '[data-testid="markdown-editor-content"] .TinyMDE[contenteditable]'
+    );
+
+    // 3. Type some text into the contenteditable editor
+    const typed = await typeInWebviewContentEditable(
+      instance.cdp,
+      'detail',
+      '[data-testid="markdown-editor-content"] .TinyMDE[contenteditable]',
       'New description content for testing debounce'
     );
     expect(typed).toBe(true);
@@ -416,27 +424,27 @@ describe('Cross-view CDP tests', () => {
     //    does NOT disrupt focus, so we must wait for it to fire.
     await sleep(3000);
 
-    // 5. Verify textarea is STILL visible (edit mode was not exited)
-    const textareaStillExists = await elementExistsInWebview(
+    // 5. Verify editor is STILL visible (edit mode was not exited)
+    const editorStillExists = await elementExistsInWebview(
       instance.cdp,
       'detail',
-      '[data-testid="description-textarea"]'
+      '[data-testid="markdown-editor"]'
     );
-    expect(textareaStillExists).toBe(true);
+    expect(editorStillExists).toBe(true);
 
-    // 6. Verify the textarea still has focus
-    const stillFocused = await isElementFocusedInWebview(
+    // 6. Verify focus is still inside the editor
+    const stillFocused = await isFocusInsideWebviewElement(
       instance.cdp,
       'detail',
-      '[data-testid="description-textarea"]'
+      '[data-testid="markdown-editor"]'
     );
     expect(stillFocused).toBe(true);
 
     // 7. Verify the typed content is preserved (not reverted to original)
-    const value = await getInputValueInWebview(
+    const value = await getContentEditableTextInWebview(
       instance.cdp,
       'detail',
-      '[data-testid="description-textarea"]'
+      '[data-testid="markdown-editor-content"] .TinyMDE[contenteditable]'
     );
     expect(value).toContain('New description content for testing debounce');
   }, 60_000);

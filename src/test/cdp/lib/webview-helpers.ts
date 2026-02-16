@@ -466,6 +466,79 @@ export async function getInputValueInWebview(
 }
 
 /**
+ * Type text into a contenteditable element inside a webview.
+ * Uses document.execCommand('insertText') which triggers proper input events.
+ */
+export async function typeInWebviewContentEditable(
+  cdp: CdpClient,
+  role: WebviewRole,
+  selector: string,
+  text: string
+): Promise<boolean> {
+  const sessionId = await findWebviewByRole(cdp, role);
+  if (!sessionId) return false;
+
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const el = doc.querySelector(${JSON.stringify(selector)});
+    if (!el) return false;
+    el.focus();
+    doc.execCommand('insertText', false, ${JSON.stringify(text)});
+    return true;
+    `
+  );
+  return result === true;
+}
+
+/**
+ * Check if focus is inside a container element (or on it) within a webview.
+ * Useful for contenteditable editors where the focused element may be a child.
+ */
+export async function isFocusInsideWebviewElement(
+  cdp: CdpClient,
+  role: WebviewRole,
+  selector: string
+): Promise<boolean> {
+  const sessionId = await findWebviewByRole(cdp, role);
+  if (!sessionId) return false;
+
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const el = doc.querySelector(${JSON.stringify(selector)});
+    if (!el || !doc.activeElement) return false;
+    return el.contains(doc.activeElement);
+    `
+  );
+  return result === true;
+}
+
+/**
+ * Get the text content of a contenteditable element inside a webview.
+ */
+export async function getContentEditableTextInWebview(
+  cdp: CdpClient,
+  role: WebviewRole,
+  selector: string
+): Promise<string | null> {
+  const sessionId = await findWebviewByRole(cdp, role);
+  if (!sessionId) return null;
+
+  const result = await evaluateInWebview(
+    cdp,
+    sessionId,
+    `
+    const el = doc.querySelector(${JSON.stringify(selector)});
+    return el?.textContent ?? null;
+    `
+  );
+  return typeof result === 'string' ? result : null;
+}
+
+/**
  * Check whether an element matching the selector exists in a webview.
  */
 export async function elementExistsInWebview(
