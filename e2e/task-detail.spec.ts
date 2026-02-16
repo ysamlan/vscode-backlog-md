@@ -13,6 +13,20 @@ import {
 } from './fixtures/vscode-mock';
 import type { Task } from '../src/webview/lib/types';
 
+/**
+ * Select all content in the TinyMDE contenteditable editor via JS Selection API.
+ * More reliable than Control+A under CPU pressure from parallel workers.
+ */
+async function selectAllInTinyMDE(page: import('@playwright/test').Page): Promise<void> {
+  await page.evaluate(() => {
+    const editor = document.querySelector('.TinyMDE');
+    const sel = window.getSelection();
+    if (editor && sel) {
+      sel.selectAllChildren(editor);
+    }
+  });
+}
+
 // Sample task data for testing
 const sampleTask: Task = {
   id: 'TASK-1',
@@ -410,7 +424,7 @@ test.describe('Task Detail', () => {
       const tinyMDE = page.locator('.TinyMDE');
       await expect(tinyMDE).toBeVisible();
       await tinyMDE.click();
-      await page.keyboard.press('Control+A');
+      await selectAllInTinyMDE(page);
       await page.keyboard.type('New description');
       await clearPostedMessages(page);
       await page.locator('[data-testid="edit-description-btn"]').click();
@@ -451,7 +465,7 @@ test.describe('Task Detail', () => {
       // Type something new in TinyMDE
       const tinyMDE = page.locator('.TinyMDE');
       await tinyMDE.click();
-      await page.keyboard.press('Control+A');
+      await selectAllInTinyMDE(page);
       await page.keyboard.type('Updated description text');
 
       // Simulate the extension echoing back the saved description (same task ID)
@@ -616,7 +630,7 @@ test.describe('Task Detail', () => {
       await tinyMDE.click();
 
       // Clear existing content and type a checklist item
-      await page.keyboard.press('Control+A');
+      await selectAllInTinyMDE(page);
       await page.keyboard.type('- [ ] first item');
       await page.keyboard.press('Enter');
       // Wait for the setTimeout to fire
@@ -648,7 +662,7 @@ test.describe('Task Detail', () => {
       await tinyMDE.click();
 
       // Type a checklist item, press Enter to continue, then Enter again on empty
-      await page.keyboard.press('Control+A');
+      await selectAllInTinyMDE(page);
       await page.keyboard.type('- [ ] only item');
       await page.keyboard.press('Enter');
       // Wait for checklist continuation patch
@@ -675,7 +689,7 @@ test.describe('Task Detail', () => {
       await tinyMDE.click();
 
       // Type a regular bullet list item
-      await page.keyboard.press('Control+A');
+      await selectAllInTinyMDE(page);
       await page.keyboard.type('- regular item');
       await page.keyboard.press('Enter');
       await page.keyboard.type('another item');
@@ -697,7 +711,7 @@ test.describe('Task Detail', () => {
       await expect(tinyMDE).toBeVisible();
       await tinyMDE.click();
 
-      await page.keyboard.press('Control+A');
+      await selectAllInTinyMDE(page);
       await page.keyboard.type('plain text');
       await page.keyboard.press('Enter');
       await page.keyboard.type('more text');
