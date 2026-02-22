@@ -78,7 +78,9 @@ export class BacklogWriter {
    * Archive a task (cancelled/duplicate) to the archive/tasks/ folder
    */
   async archiveTask(taskId: string, parser: BacklogParser): Promise<string> {
-    return this.moveTaskToFolder(taskId, 'archive/tasks', parser);
+    const destinationPath = await this.moveTaskToFolder(taskId, 'archive/tasks', parser);
+    await this.sanitizeArchivedTaskLinks(taskId, parser);
+    return destinationPath;
   }
 
   /**
@@ -186,6 +188,59 @@ export class BacklogWriter {
     parser.invalidateTaskCache(destPath);
 
     return destPath;
+  }
+
+  /**
+   * After archiving a task, remove its ID from dependencies and exact-ID references
+   * in active tasks to mirror upstream cleanup semantics.
+   */
+  private async sanitizeArchivedTaskLinks(taskId: string, parser: BacklogParser): Promise<void> {
+    const activeTasks = await parser.getTasks();
+
+    for (const activeTask of activeTasks) {
+      const existingDependencies = activeTask.dependencies ?? [];
+      const existingReferences = activeTask.references ?? [];
+
+      const nextDependencies = existingDependencies.filter(
+        (dependencyId) => !this.areTaskIdsEqual(dependencyId, taskId)
+      );
+      const nextReferences = existingReferences.filter(
+        (reference) => !this.isExactTaskReference(reference, taskId)
+      );
+
+      const dependenciesChanged =
+        existingDependencies.length !== nextDependencies.length ||
+        existingDependencies.some((dependency, index) => dependency !== nextDependencies[index]);
+      const referencesChanged =
+        existingReferences.length !== nextReferences.length ||
+        existingReferences.some((reference, index) => reference !== nextReferences[index]);
+
+      if (!dependenciesChanged && !referencesChanged) {
+        continue;
+      }
+
+      await this.updateTask(
+        activeTask.id,
+        {
+          dependencies: nextDependencies,
+          references: nextReferences,
+        },
+        parser
+      );
+    }
+  }
+
+  private areTaskIdsEqual(left: string, right: string): boolean {
+    return left.trim().toUpperCase() === right.trim().toUpperCase();
+  }
+
+  private isExactTaskReference(reference: string, taskId: string): boolean {
+    const trimmedReference = reference.trim();
+    if (!trimmedReference) {
+      return false;
+    }
+
+    return this.areTaskIdsEqual(trimmedReference, taskId);
   }
 
   /**

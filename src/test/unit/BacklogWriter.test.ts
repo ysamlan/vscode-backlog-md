@@ -1291,6 +1291,10 @@ milestone: "v1.0-beta.1"
   });
 
   describe('Task Archiving', () => {
+    beforeEach(() => {
+      vi.spyOn(mockParser, 'getTasks').mockResolvedValue([]);
+    });
+
     it('should move task to completed/ folder', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       mockReaddirSync(['task-1 - Test-Task.md']);
@@ -1422,6 +1426,131 @@ milestone: "v1.0-beta.1"
         '/project/my-backlog/tasks/task-1.md',
         '/project/my-backlog/completed/task-1.md'
       );
+    });
+
+    it('should sanitize archived task ID from dependencies and exact references in active tasks', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-2',
+        title: 'Cancelled Task',
+        status: 'To Do',
+        filePath: '/fake/backlog/tasks/task-2 - Cancelled-Task.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      vi.spyOn(mockParser, 'getTasks').mockResolvedValue([
+        {
+          id: 'TASK-9',
+          title: 'Depends on archived task',
+          status: 'To Do',
+          filePath: '/fake/backlog/tasks/task-9 - Depends.md',
+          description: 'body content',
+          labels: [],
+          assignee: [],
+          dependencies: ['TASK-2', 'TASK-3'],
+          references: ['TASK-2', 'https://example.com/tasks/TASK-2', 'docs/task-2.md'],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+        },
+      ]);
+
+      const updateTaskSpy = vi.spyOn(writer, 'updateTask').mockResolvedValue(undefined);
+
+      await writer.archiveTask('TASK-2', mockParser);
+
+      expect(updateTaskSpy).toHaveBeenCalledTimes(1);
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        'TASK-9',
+        {
+          dependencies: ['TASK-3'],
+          references: ['https://example.com/tasks/TASK-2', 'docs/task-2.md'],
+        },
+        mockParser
+      );
+    });
+
+    it('should treat task ID reference matching as case-insensitive exact match only', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-2',
+        title: 'Cancelled Task',
+        status: 'To Do',
+        filePath: '/fake/backlog/tasks/task-2 - Cancelled-Task.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      vi.spyOn(mockParser, 'getTasks').mockResolvedValue([
+        {
+          id: 'TASK-10',
+          title: 'Reference variants',
+          status: 'To Do',
+          filePath: '/fake/backlog/tasks/task-10 - Refs.md',
+          description: '',
+          labels: [],
+          assignee: [],
+          dependencies: ['task-2', 'TASK-20'],
+          references: [' task-2 ', 'TASK-20', 'https://x.example/TASK-2'],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+        },
+      ]);
+
+      const updateTaskSpy = vi.spyOn(writer, 'updateTask').mockResolvedValue(undefined);
+
+      await writer.archiveTask('TASK-2', mockParser);
+
+      expect(updateTaskSpy).toHaveBeenCalledTimes(1);
+      expect(updateTaskSpy).toHaveBeenCalledWith(
+        'TASK-10',
+        {
+          dependencies: ['TASK-20'],
+          references: ['TASK-20', 'https://x.example/TASK-2'],
+        },
+        mockParser
+      );
+    });
+
+    it('should scope cleanup to active tasks by querying parser.getTasks only', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      vi.spyOn(mockParser, 'getTask').mockResolvedValue({
+        id: 'TASK-2',
+        title: 'Cancelled Task',
+        status: 'To Do',
+        filePath: '/fake/backlog/tasks/task-2 - Cancelled-Task.md',
+        description: '',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+      });
+
+      const getTasksSpy = vi.spyOn(mockParser, 'getTasks').mockResolvedValue([]);
+      const getDraftsSpy = vi.spyOn(mockParser, 'getDrafts');
+      const getCompletedTasksSpy = vi.spyOn(mockParser, 'getCompletedTasks');
+      const getArchivedTasksSpy = vi.spyOn(mockParser, 'getArchivedTasks');
+      const updateTaskSpy = vi.spyOn(writer, 'updateTask').mockResolvedValue(undefined);
+
+      await writer.archiveTask('TASK-2', mockParser);
+
+      expect(getTasksSpy).toHaveBeenCalledTimes(1);
+      expect(getDraftsSpy).not.toHaveBeenCalled();
+      expect(getCompletedTasksSpy).not.toHaveBeenCalled();
+      expect(getArchivedTasksSpy).not.toHaveBeenCalled();
+      expect(updateTaskSpy).not.toHaveBeenCalled();
     });
   });
 
