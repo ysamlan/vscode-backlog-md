@@ -212,6 +212,19 @@ Test task with inline list.`;
       expect(task).toBeDefined();
       expect(task!.assignee).toEqual(['@alice', '@bob']);
     });
+
+    it('should preserve dollar-sign numeric values in frontmatter strings', () => {
+      const content = `---
+id: TASK-8
+title: "Budget increase to $15,000 approved"
+---
+`;
+
+      const task = parseTask(content, '/fake/path/task-8 - Budget.md');
+
+      expect(task).toBeDefined();
+      expect(task!.title).toBe('Budget increase to $15,000 approved');
+    });
   });
 
   describe('parseTask — date handling', () => {

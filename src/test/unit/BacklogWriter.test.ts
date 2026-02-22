@@ -2216,6 +2216,17 @@ dependencies: [TASK-2, TASK-3]
       expect(roundTripped.dependencies).toEqual(original.dependencies);
     });
 
+    it('should preserve dollar-sign numeric strings through parse-write-parse round-trip', async () => {
+      const content = `---
+id: TASK-1
+title: "Budget increase to $15,000 approved"
+status: To Do
+---
+`;
+      const { roundTripped } = await roundTrip(content);
+      expect(roundTripped.title).toBe('Budget increase to $15,000 approved');
+    });
+
     it('should preserve all fields together on round-trip', async () => {
       const content = `---
 id: TASK-1
