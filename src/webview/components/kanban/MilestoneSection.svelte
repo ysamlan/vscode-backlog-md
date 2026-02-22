@@ -10,7 +10,8 @@
   }
 
   interface Props {
-    milestoneName: string | null;
+    milestoneId: string | null;
+    milestoneLabel: string;
     tasks: TaskWithBlocks[];
     columns: StatusColumn[];
     collapsed: boolean;
@@ -24,7 +25,8 @@
   }
 
   let {
-    milestoneName,
+    milestoneId,
+    milestoneLabel,
     tasks,
     columns,
     collapsed,
@@ -39,8 +41,8 @@
     $props();
 
   // Milestone key for tracking
-  let milestoneKey = $derived(milestoneName ?? '__uncategorized__');
-  let displayName = $derived(milestoneName ?? 'Uncategorized');
+  let milestoneKey = $derived(milestoneId ?? '__uncategorized__');
+  let displayName = $derived(milestoneLabel);
 
   // Progress calculation
   let doneTasks = $derived(tasks.filter((t) => t.status === 'Done').length);

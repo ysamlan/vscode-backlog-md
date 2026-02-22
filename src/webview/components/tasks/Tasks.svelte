@@ -407,6 +407,10 @@
     vscode.postMessage({ type: 'toggleMilestoneGrouping', enabled });
   }
 
+  function handleRequestCreateMilestone() {
+    vscode.postMessage({ type: 'requestCreateMilestone' });
+  }
+
   // List handlers
   function handleFilterChange(filter: string) {
     currentFilter = filter;
@@ -511,6 +515,7 @@
         onReadOnlyDragAttempt={handleReadOnlyDragAttempt}
         onReorderTasks={handleReorderTasks}
         onUpdateTaskStatus={handleUpdateTaskStatus}
+        onRequestCreateMilestone={handleRequestCreateMilestone}
       />
     </div>
   </div>

@@ -83,10 +83,11 @@
 
   // Get unique milestones from tasks (for dropdown)
   let taskMilestones = $derived([...new Set(tasks.map((t) => t.milestone).filter(Boolean))] as string[]);
-  let configMilestoneNames = $derived(milestones.map((m) => m.name));
+  let configMilestoneIds = $derived(milestones.map((m) => m.id));
+  let milestoneLabels = $derived(new Map(milestones.map((m) => [m.id, m.name])));
   let allMilestones = $derived([
-    ...configMilestoneNames,
-    ...taskMilestones.filter((m) => !configMilestoneNames.includes(m)),
+    ...configMilestoneIds,
+    ...taskMilestones.filter((m) => !configMilestoneIds.includes(m)),
   ]);
 
   // Filter tasks
@@ -421,7 +422,7 @@
       >
         <option value="">All Milestones</option>
         {#each allMilestones as milestone (milestone)}
-          <option value={milestone}>{milestone}</option>
+          <option value={milestone}>{milestoneLabels.get(milestone) || milestone}</option>
         {/each}
       </select>
       {#if allLabels.length > 0}

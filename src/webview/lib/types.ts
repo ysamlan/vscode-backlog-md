@@ -63,7 +63,7 @@ export interface TaskDetailData {
   priorities: string[];
   uniqueLabels: string[];
   uniqueAssignees: string[];
-  milestones: string[];
+  milestones: Array<{ id: string; label: string }>;
   blocksTaskIds: string[];
   linkableTasks: Array<{ id: string; title: string; status: string }>;
   isBlocked: boolean;

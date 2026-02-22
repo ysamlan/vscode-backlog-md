@@ -109,18 +109,32 @@ export class TaskCreatePanel {
     type: string;
     title?: string;
     description?: string;
+    milestone?: string;
+    milestoneTitle?: string;
   }): Promise<void> {
     switch (message.type) {
       case 'createTask':
-        await this.handleCreateTask(message.title || '', message.description || '');
+        await this.handleCreateTask(
+          message.title || '',
+          message.description || '',
+          message.milestone || ''
+        );
         break;
 
       case 'autosave':
-        await this.handleAutosave(message.title || '', message.description || '');
+        await this.handleAutosave(
+          message.title || '',
+          message.description || '',
+          message.milestone || ''
+        );
         break;
 
       case 'discardDraft':
         await this.handleDiscardDraft();
+        break;
+
+      case 'createMilestone':
+        await this.handleCreateMilestone(message.milestoneTitle || '');
         break;
     }
   }
@@ -128,19 +142,24 @@ export class TaskCreatePanel {
   /**
    * Handle autosave: update the draft file with current form contents
    */
-  private async handleAutosave(title: string, description: string): Promise<void> {
+  private async handleAutosave(
+    title: string,
+    description: string,
+    milestoneInput: string
+  ): Promise<void> {
     if (!this.draftId) return;
 
     try {
       const trimmedTitle = title.trim();
-      await this.writer.updateTask(
-        this.draftId,
-        {
-          title: trimmedTitle || undefined,
-          description: description.trim() || undefined,
-        },
-        this.parser
-      );
+      const milestone = await this.parser.resolveMilestone(milestoneInput);
+      const updates: { title?: string; description?: string; milestone?: string } = {
+        title: trimmedTitle || undefined,
+        description: description.trim() || undefined,
+      };
+      if (milestone !== undefined) {
+        updates.milestone = milestone;
+      }
+      await this.writer.updateTask(this.draftId, updates, this.parser);
       if (trimmedTitle) {
         this.hasContent = true;
       }
@@ -153,7 +172,11 @@ export class TaskCreatePanel {
   /**
    * Handle task creation: promote the draft to a real task
    */
-  private async handleCreateTask(title: string, description: string): Promise<void> {
+  private async handleCreateTask(
+    title: string,
+    description: string,
+    milestoneInput: string
+  ): Promise<void> {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       await this.panel.webview.postMessage({
@@ -165,23 +188,23 @@ export class TaskCreatePanel {
     }
 
     try {
+      const milestone = await this.parser.resolveMilestone(milestoneInput);
+      const updates: { title: string; description?: string; milestone?: string } = {
+        title: trimmedTitle,
+        description: description.trim() || undefined,
+      };
+      if (milestone !== undefined) {
+        updates.milestone = milestone;
+      }
       let newTaskId: string;
       if (this.draftId) {
         // Save final content to the draft, then promote it
-        await this.writer.updateTask(
-          this.draftId,
-          { title: trimmedTitle, description: description.trim() || undefined },
-          this.parser
-        );
+        await this.writer.updateTask(this.draftId, updates, this.parser);
         newTaskId = await this.writer.promoteDraft(this.draftId, this.parser);
       } else {
         // Fallback: no draft was created (init failed), create+promote inline
         const result = await this.writer.createDraft(this.backlogPath, this.parser);
-        await this.writer.updateTask(
-          result.id,
-          { title: trimmedTitle, description: description.trim() || undefined },
-          this.parser
-        );
+        await this.writer.updateTask(result.id, updates, this.parser);
         newTaskId = await this.writer.promoteDraft(result.id, this.parser);
       }
 
@@ -197,6 +220,50 @@ export class TaskCreatePanel {
       await this.panel.webview.postMessage({
         type: 'error',
         message: `Failed to create task: ${error}`,
+      });
+    }
+  }
+
+  private async handleCreateMilestone(rawTitle: string): Promise<void> {
+    const providedTitle = rawTitle.trim();
+    const milestoneTitle =
+      providedTitle ||
+      (
+        await vscode.window.showInputBox({
+          prompt: 'Enter milestone title',
+          placeHolder: 'e.g., v1.0 Launch',
+          ignoreFocusOut: true,
+        })
+      )?.trim();
+
+    if (!milestoneTitle) {
+      return;
+    }
+
+    try {
+      const created = await this.writer.createMilestone(
+        this.backlogPath,
+        milestoneTitle,
+        undefined,
+        this.parser
+      );
+      this.parser.invalidateMilestoneCache();
+
+      if (this.draftId) {
+        await this.writer.updateTask(this.draftId, { milestone: created.id }, this.parser);
+      }
+
+      this.providers.tasksProvider.refresh();
+      await this.panel.webview.postMessage({
+        type: 'milestoneCreated',
+        id: created.id,
+        label: created.name,
+      });
+      vscode.window.showInformationMessage(`Created milestone "${created.name}"`);
+    } catch (error) {
+      await this.panel.webview.postMessage({
+        type: 'error',
+        message: `Failed to create milestone: ${error}`,
       });
     }
   }
@@ -419,6 +486,15 @@ export class TaskCreatePanel {
         <div class="hint-text">Markdown formatting is supported</div>
     </div>
 
+    <div class="form-group">
+        <label for="milestoneInput">Milestone</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" id="milestoneInput" class="editable-title"
+                   placeholder="e.g., m-1 or Launch" />
+            <button id="createMilestoneBtn" class="secondary-button" type="button">New Milestone...</button>
+        </div>
+    </div>
+
     <div class="button-group">
         <button id="createBtn" class="primary-button">Create Task</button>
         <button id="discardBtn" class="secondary-button">Discard Draft</button>
@@ -430,6 +506,8 @@ export class TaskCreatePanel {
 
         const titleInput = document.getElementById('titleInput');
         const descriptionTextarea = document.getElementById('descriptionTextarea');
+        const milestoneInput = document.getElementById('milestoneInput');
+        const createMilestoneBtn = document.getElementById('createMilestoneBtn');
         const createBtn = document.getElementById('createBtn');
         const discardBtn = document.getElementById('discardBtn');
         const titleError = document.getElementById('titleError');
@@ -446,7 +524,8 @@ export class TaskCreatePanel {
                 vscode.postMessage({
                     type: 'autosave',
                     title: titleInput.value,
-                    description: descriptionTextarea.value
+                    description: descriptionTextarea.value,
+                    milestone: milestoneInput.value
                 });
             }, 1000);
         }
@@ -460,6 +539,9 @@ export class TaskCreatePanel {
 
         // Autosave on description input
         descriptionTextarea.addEventListener('input', () => {
+            scheduleAutosave();
+        });
+        milestoneInput.addEventListener('input', () => {
             scheduleAutosave();
         });
 
@@ -483,7 +565,15 @@ export class TaskCreatePanel {
             vscode.postMessage({
                 type: 'createTask',
                 title: title,
-                description: description
+                description: description,
+                milestone: milestoneInput.value
+            });
+        });
+
+        createMilestoneBtn.addEventListener('click', () => {
+            vscode.postMessage({
+                type: 'createMilestone',
+                milestoneTitle: ''
             });
         });
 
@@ -538,6 +628,11 @@ export class TaskCreatePanel {
                     setTimeout(() => {
                         saveIndicator.classList.remove('visible');
                     }, 2000);
+                    break;
+
+                case 'milestoneCreated':
+                    milestoneInput.value = message.id || message.label || '';
+                    scheduleAutosave();
                     break;
             }
         });

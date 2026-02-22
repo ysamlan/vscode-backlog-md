@@ -32,6 +32,7 @@
       ordinal: number | undefined,
       additionalUpdates: Array<{ taskId: string; ordinal: number }>
     ) => void;
+    onRequestCreateMilestone?: () => void;
   }
 
   let {
@@ -50,6 +51,7 @@
     onReadOnlyDragAttempt,
     onReorderTasks,
     onUpdateTaskStatus,
+    onRequestCreateMilestone,
   }: Props = $props();
 
   // Filter out subtasks (they are represented by progress on parent cards)
@@ -59,6 +61,7 @@
   let milestoneGroups = $derived.by(() => {
     const milestoneMap: Record<string, TaskWithBlocks[]> = {};
     const uncategorized: TaskWithBlocks[] = [];
+    const milestoneLabels = new Map(configMilestones.map((milestone) => [milestone.id, milestone.name]));
 
     for (const task of topLevelTasks) {
       if (task.milestone) {
@@ -68,24 +71,39 @@
       }
     }
 
-    // Sort milestones: config milestones first (in order), then others alphabetically
-    const configMilestoneNames = configMilestones.map((m) => m.name);
-    const milestoneNames = Object.keys(milestoneMap).sort((a, b) => {
-      const aIdx = configMilestoneNames.indexOf(a);
-      const bIdx = configMilestoneNames.indexOf(b);
+    // Include all configured milestones (even empty ones)
+    for (const m of configMilestones) {
+      if (!milestoneMap[m.id]) {
+        milestoneMap[m.id] = [];
+      }
+    }
+
+    // Sort milestones: non-empty first, then empty; within each group,
+    // configured IDs in order first, then others alphabetically by display label
+    const configMilestoneIds = configMilestones.map((m) => m.id);
+    const milestoneIds = Object.keys(milestoneMap).sort((a, b) => {
+      const aEmpty = milestoneMap[a].length === 0 ? 1 : 0;
+      const bEmpty = milestoneMap[b].length === 0 ? 1 : 0;
+      if (aEmpty !== bEmpty) return aEmpty - bEmpty;
+      const aIdx = configMilestoneIds.indexOf(a);
+      const bIdx = configMilestoneIds.indexOf(b);
       if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
       if (aIdx !== -1) return -1;
       if (bIdx !== -1) return 1;
-      return a.localeCompare(b);
+      return (milestoneLabels.get(a) || a).localeCompare(milestoneLabels.get(b) || b);
     });
 
-    const groups = milestoneNames.map((name) => ({
-      name,
-      tasks: milestoneMap[name],
+    const groups = milestoneIds.map((id) => ({
+      id,
+      label: milestoneLabels.get(id) || id,
+      tasks: milestoneMap[id],
     }));
 
     if (uncategorized.length > 0) {
-      groups.push({ name: null, tasks: uncategorized });
+      // Insert before empty milestones, after non-empty ones
+      const firstEmptyIdx = groups.findIndex((g) => g.tasks.length === 0);
+      const insertIdx = firstEmptyIdx === -1 ? groups.length : firstEmptyIdx;
+      groups.splice(insertIdx, 0, { id: null, label: 'Uncategorized', tasks: uncategorized });
     }
 
     return groups;
@@ -137,12 +155,13 @@
   <div class="empty-state">No tasks found. Create tasks in your backlog/ folder.</div>
 {:else if milestoneGrouping}
   <div class="kanban-board milestone-grouped">
-    {#each milestoneGroups as group (group.name ?? '__uncategorized__')}
+    {#each milestoneGroups as group (group.id ?? '__uncategorized__')}
         <MilestoneSection
-          milestoneName={group.name}
+          milestoneId={group.id}
+          milestoneLabel={group.label}
           tasks={group.tasks}
           {columns}
-          collapsed={collapsedMilestones.has(group.name ?? '__uncategorized__')}
+          collapsed={collapsedMilestones.has(group.id ?? '__uncategorized__')}
           {taskIdDisplay}
           {activeEditedTaskId}
           onToggleCollapse={onToggleMilestoneCollapse}
@@ -152,6 +171,16 @@
         onDrop={handleDrop}
       />
     {/each}
+    {#if onRequestCreateMilestone}
+      <button
+        type="button"
+        class="add-milestone-btn"
+        data-testid="create-milestone-btn"
+        onclick={onRequestCreateMilestone}
+      >
+        + Milestone
+      </button>
+    {/if}
   </div>
 {:else}
   <div class="kanban-board">

@@ -114,6 +114,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Create Task Detail provider for opening task details in editor
   const taskDetailProvider = new TaskDetailProvider(context.extensionUri, parser);
+  if (backlogFolder) {
+    taskDetailProvider.setBacklogPath(backlogFolder);
+  }
   console.log('[Backlog.md] Task detail provider created');
 
   // Track active edited task for sidebar highlighting and routing
@@ -159,6 +162,7 @@ export function activate(context: vscode.ExtensionContext) {
     tasksProvider.setParser(parser);
     taskPreviewProvider.setParser(parser);
     taskDetailProvider.setParser(parser);
+    taskDetailProvider.setBacklogPath(root.backlogPath);
     contentDetailProvider.setParser(parser);
 
     // Update language providers (or register them for the first time)
@@ -631,6 +635,41 @@ export function activate(context: vscode.ExtensionContext) {
         tasksProvider,
         taskDetailProvider,
       });
+    })
+  );
+
+  // Register create milestone command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.createMilestone', async () => {
+      const activeBacklogPath = manager.getActiveRoot()?.backlogPath;
+      if (!activeBacklogPath || !parser) {
+        vscode.window.showErrorMessage('No backlog folder found in workspace');
+        return;
+      }
+
+      const title = await vscode.window.showInputBox({
+        prompt: 'Enter milestone title',
+        placeHolder: 'e.g., v1.0 Launch',
+        ignoreFocusOut: true,
+      });
+      const normalizedTitle = title?.trim();
+      if (!normalizedTitle) {
+        return;
+      }
+
+      try {
+        const milestone = await writer.createMilestone(
+          activeBacklogPath,
+          normalizedTitle,
+          undefined,
+          parser
+        );
+        parser.invalidateMilestoneCache();
+        vscode.window.showInformationMessage(`Created milestone "${milestone.name}"`);
+        tasksProvider.refresh();
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to create milestone: ${error}`);
+      }
     })
   );
 

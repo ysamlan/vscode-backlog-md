@@ -310,6 +310,169 @@ labels: ["bug", "feature"]
     });
   });
 
+  describe('getMilestones', () => {
+    afterEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should load milestones from milestone files as source of truth', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        const pathStr = String(p);
+        return pathStr.includes('/milestones') || pathStr.endsWith('config.yml');
+      });
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockImplementation((p: fs.PathLike) => {
+        const pathStr = String(p);
+        if (pathStr.endsWith('/milestones')) {
+          return ['m-2 - Beta.md', 'README.md', 'm-1 - Launch.md'] as unknown as string[];
+        }
+        return [] as unknown as string[];
+      });
+      vi.mocked(fs.readFileSync).mockImplementation((p: fs.PathOrFileDescriptor) => {
+        const pathStr = String(p);
+        if (pathStr.includes('/milestones/m-1')) {
+          return `---
+id: m-1
+title: Launch
+---
+
+## Description
+
+Launch milestone`;
+        }
+        if (pathStr.includes('/milestones/m-2')) {
+          return `---
+id: m-2
+title: Beta
+---`;
+        }
+        if (pathStr.endsWith('config.yml')) {
+          return `milestones: ["legacy-v1"]`;
+        }
+        return '';
+      });
+
+      const parser = new BacklogParser('/fake/backlog');
+      const milestones = await parser.getMilestones();
+
+      expect(milestones).toEqual([
+        { id: 'm-1', name: 'Launch', description: 'Launch milestone' },
+        { id: 'm-2', name: 'Beta' },
+      ]);
+    });
+
+    it('should fallback to config string-array milestones when milestone files are absent', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        const pathStr = String(p);
+        return pathStr.endsWith('config.yml');
+      });
+      vi.mocked(fs.readFileSync).mockImplementation((p: fs.PathOrFileDescriptor) => {
+        const pathStr = String(p);
+        if (pathStr.endsWith('config.yml')) {
+          return `milestones: ["v1.0", "v2.0"]`;
+        }
+        return '';
+      });
+
+      const parser = new BacklogParser('/fake/backlog');
+      const milestones = await parser.getMilestones();
+
+      expect(milestones).toEqual([
+        { id: 'v1.0', name: 'v1.0' },
+        { id: 'v2.0', name: 'v2.0' },
+      ]);
+    });
+
+    it('should canonicalize task milestone titles to known milestone IDs when unambiguous', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        const pathStr = String(p);
+        return pathStr.includes('/tasks') || pathStr.includes('/milestones');
+      });
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockImplementation((p: fs.PathLike) => {
+        const pathStr = String(p);
+        if (pathStr.endsWith('/tasks')) {
+          return ['task-1 - Example.md'] as unknown as string[];
+        }
+        if (pathStr.endsWith('/milestones')) {
+          return ['m-1 - Launch.md'] as unknown as string[];
+        }
+        return [] as unknown as string[];
+      });
+      vi.mocked(fs.readFileSync).mockImplementation((p: fs.PathOrFileDescriptor) => {
+        const pathStr = String(p);
+        if (pathStr.includes('/milestones/m-1')) {
+          return `---
+id: m-1
+title: Launch
+---`;
+        }
+        if (pathStr.includes('/tasks/task-1')) {
+          return `---
+id: TASK-1
+title: Example
+status: To Do
+milestone: Launch
+---
+`;
+        }
+        return '';
+      });
+
+      const parser = new BacklogParser('/fake/backlog');
+      const tasks = await parser.getTasks();
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]?.milestone).toBe('m-1');
+    });
+
+    it('should keep raw milestone value when title matches multiple milestone IDs', async () => {
+      vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
+        const pathStr = String(p);
+        return pathStr.includes('/tasks') || pathStr.includes('/milestones');
+      });
+      (fs.readdirSync as ReturnType<typeof vi.fn>).mockImplementation((p: fs.PathLike) => {
+        const pathStr = String(p);
+        if (pathStr.endsWith('/tasks')) {
+          return ['task-1 - Example.md'] as unknown as string[];
+        }
+        if (pathStr.endsWith('/milestones')) {
+          return ['m-1 - Launch-A.md', 'm-2 - Launch-B.md'] as unknown as string[];
+        }
+        return [] as unknown as string[];
+      });
+      vi.mocked(fs.readFileSync).mockImplementation((p: fs.PathOrFileDescriptor) => {
+        const pathStr = String(p);
+        if (pathStr.includes('/milestones/m-1')) {
+          return `---
+id: m-1
+title: Launch
+---`;
+        }
+        if (pathStr.includes('/milestones/m-2')) {
+          return `---
+id: m-2
+title: Launch
+---`;
+        }
+        if (pathStr.includes('/tasks/task-1')) {
+          return `---
+id: TASK-1
+title: Example
+status: To Do
+milestone: Launch
+---
+`;
+        }
+        return '';
+      });
+
+      const parser = new BacklogParser('/fake/backlog');
+      const tasks = await parser.getTasks();
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]?.milestone).toBe('Launch');
+    });
+  });
+
   describe('getStatuses', () => {
     afterEach(() => {
       vi.clearAllMocks();

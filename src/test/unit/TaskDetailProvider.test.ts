@@ -29,6 +29,7 @@ const mockWriter = {
   archiveTask: vi.fn().mockResolvedValue(undefined),
   restoreArchivedTask: vi.fn().mockResolvedValue('/fake/backlog/tasks/task-5.md'),
   deleteTask: vi.fn().mockResolvedValue(undefined),
+  createMilestone: vi.fn().mockResolvedValue({ id: 'm-2', name: 'Launch' }),
   createSubtask: vi
     .fn()
     .mockResolvedValue({ id: 'TASK-99', filePath: '/fake/backlog/tasks/task-99.md' }),
@@ -87,6 +88,22 @@ describe('TaskDetailProvider', () => {
       getBlockedByThisTask: vi.fn().mockResolvedValue([]),
       getCompletedTasks: vi.fn().mockResolvedValue([]),
       getArchivedTasks: vi.fn().mockResolvedValue([]),
+      resolveMilestone: vi.fn().mockImplementation(async (raw: string) => {
+        const normalized = String(raw || '').trim();
+        if (!normalized) return undefined;
+        const milestones = await mockParser.getMilestones();
+        const inputKey = normalized.toLowerCase();
+        const idMatch = milestones.find(
+          (m: { id: string }) => m.id.trim().toLowerCase() === inputKey
+        );
+        if (idMatch) return idMatch.id;
+        const titleMatches = milestones.filter(
+          (m: { name: string }) => m.name.trim().toLowerCase() === inputKey
+        );
+        if (titleMatches.length === 1) return titleMatches[0].id;
+        return normalized;
+      }),
+      invalidateMilestoneCache: vi.fn(),
     } as unknown as BacklogParser;
 
     // Reset fs mocks
@@ -100,6 +117,7 @@ describe('TaskDetailProvider', () => {
     mockWriter.archiveTask.mockResolvedValue(undefined);
     mockWriter.restoreArchivedTask.mockResolvedValue('/fake/backlog/tasks/task-5.md');
     mockWriter.deleteTask.mockResolvedValue(undefined);
+    mockWriter.createMilestone.mockResolvedValue({ id: 'm-2', name: 'Launch' });
     mockWriter.createSubtask.mockResolvedValue({
       id: 'TASK-99',
       filePath: '/fake/backlog/tasks/task-99.md',
@@ -459,6 +477,40 @@ describe('TaskDetailProvider', () => {
   });
 
   describe('sendTaskData subtask info', () => {
+    it('sends milestone options as id/label pairs and keeps unknown task milestone as fallback option', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+      const task = {
+        id: 'TASK-1',
+        title: 'Task',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath,
+        milestone: 'custom-milestone',
+      };
+
+      (mockParser.getTask as Mock).mockResolvedValue(task);
+      (mockParser.getTasks as Mock).mockResolvedValue([task]);
+      (mockParser.getMilestones as Mock).mockResolvedValue([{ id: 'm-1', name: 'Launch' }]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.milestones).toEqual([
+        { id: 'm-1', label: 'Launch' },
+        { id: 'custom-milestone', label: 'custom-milestone' },
+      ]);
+    });
+
     it('should include parentTask when task has parentTaskId', async () => {
       const filePath = '/test/backlog/tasks/task-2.1.md';
 
@@ -1022,6 +1074,82 @@ describe('TaskDetailProvider', () => {
   });
 
   describe('handleMessage dependency linking', () => {
+    it('creates a milestone and assigns it to the current task', async () => {
+      const currentTask = {
+        id: 'TASK-1',
+        title: 'Current Task',
+        status: 'In Progress',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/backlog/tasks/task-1.md',
+        folder: 'tasks',
+      };
+
+      (mockParser.getTask as Mock).mockResolvedValue(currentTask);
+      (mockParser.getTasks as Mock).mockResolvedValue([currentTask]);
+      mockWriter.createMilestone.mockResolvedValue({ id: 'm-2', name: 'Launch' });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+
+      mockWriter.createMilestone.mockClear();
+      mockWriter.updateTask.mockClear();
+      const messageHandler = (mockWebview.onDidReceiveMessage as Mock).mock.calls[0][0];
+      await messageHandler({ type: 'createMilestone', milestoneTitle: 'Launch' });
+
+      expect(mockWriter.createMilestone).toHaveBeenCalledWith(
+        '/test/backlog',
+        'Launch',
+        undefined,
+        mockParser
+      );
+      expect(mockWriter.updateTask).toHaveBeenCalledWith(
+        'TASK-1',
+        { milestone: 'm-2' },
+        mockParser,
+        expect.any(String)
+      );
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        'Created milestone "Launch"'
+      );
+    });
+
+    it('canonicalizes milestone title updates to known milestone IDs', async () => {
+      const currentTask = {
+        id: 'TASK-1',
+        title: 'Current Task',
+        status: 'In Progress',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/backlog/tasks/task-1.md',
+        folder: 'tasks',
+      };
+
+      (mockParser.getTask as Mock).mockResolvedValue(currentTask);
+      (mockParser.getTasks as Mock).mockResolvedValue([currentTask]);
+      (mockParser.getMilestones as Mock).mockResolvedValue([{ id: 'm-1', name: 'Launch' }]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+
+      mockWriter.updateTask.mockClear();
+      const messageHandler = (mockWebview.onDidReceiveMessage as Mock).mock.calls[0][0];
+      await messageHandler({ type: 'updateField', field: 'milestone', value: 'Launch' });
+
+      expect(mockWriter.updateTask).toHaveBeenCalledWith(
+        'TASK-1',
+        { milestone: 'm-1' },
+        mockParser,
+        expect.any(String)
+      );
+    });
+
     it('adds blocked-by link by updating current task dependencies', async () => {
       const currentTask = {
         id: 'TASK-1',

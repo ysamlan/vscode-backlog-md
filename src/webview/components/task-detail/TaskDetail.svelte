@@ -19,7 +19,7 @@
   let statuses: string[] = $state([]);
   let uniqueLabels: string[] = $state([]);
   let uniqueAssignees: string[] = $state([]);
-  let milestones: string[] = $state([]);
+  let milestones: Array<{ id: string; label: string }> = $state([]);
   let blocksTaskIds: string[] = $state([]);
   let linkableTasks: Array<{ id: string; title: string; status: string }> = $state([]);
   let isBlocked = $state(false);
@@ -93,6 +93,10 @@
 
   function handleUpdateMilestone(milestone: string | undefined) {
     vscode.postMessage({ type: 'updateField', field: 'milestone', value: milestone });
+  }
+
+  function handleRequestCreateMilestone() {
+    vscode.postMessage({ type: 'createMilestone' });
   }
 
   function handleUpdateDescription(description: string) {
@@ -230,6 +234,7 @@
       onUpdateLabels={handleUpdateLabels}
       onUpdateAssignees={handleUpdateAssignees}
       onUpdateMilestone={handleUpdateMilestone}
+      onRequestCreateMilestone={handleRequestCreateMilestone}
       onOpenTask={handleOpenTask}
       onAddBlockedByLink={handleAddBlockedByLink}
       onAddBlocksLink={handleAddBlocksLink}

@@ -85,6 +85,11 @@
         "icon": "$(add)"
       },
       {
+        "command": "backlog.createMilestone",
+        "title": "Backlog: Create Milestone",
+        "icon": "$(milestone)"
+      },
+      {
         "command": "backlog.openMarkdown",
         "title": "Backlog: Open Task Markdown"
       },

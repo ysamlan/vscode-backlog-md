@@ -279,6 +279,22 @@ body {
   }
 }
 
+.add-milestone-btn {
+  background: none;
+  border: 1px dashed var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+  color: var(--vscode-descriptionForeground, rgba(255, 255, 255, 0.5));
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.add-milestone-btn:hover {
+  border-color: var(--vscode-focusBorder, #007fd4);
+  color: var(--vscode-foreground, #ccc);
+}
+
 .kanban-column {
   flex: 1 1 0%;
   min-width: 140px;
@@ -1332,6 +1348,7 @@ body {
 
 /* Milestone dropdown in task detail */
 .milestone-select {
+  max-width: 100%;
   background-color: var(--vscode-input-background, #3c3c3c);
   color: var(--vscode-input-foreground, #cccccc);
 }

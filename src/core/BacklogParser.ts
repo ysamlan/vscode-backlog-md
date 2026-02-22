@@ -44,6 +44,13 @@ interface RawFrontmatter {
   reporter?: string;
 }
 
+interface RawMilestoneFrontmatter {
+  id?: string;
+  title?: string;
+  name?: string;
+  description?: string;
+}
+
 /**
  * Pre-process YAML frontmatter to quote unquoted @-prefixed values
  * in assignee/reporter fields. YAML treats @ as a reserved character,
@@ -122,6 +129,8 @@ export class BacklogParser {
   private cachedConfig: BacklogConfig | undefined;
   private cachedConfigMtime: number | undefined;
   private taskCache = new Map<string, { mtimeMs: number; task: Task }>();
+  private cachedMilestones: Milestone[] | null = null;
+  private milestonesDirMtime: number | undefined;
 
   constructor(private backlogPath: string) {}
 
@@ -143,7 +152,16 @@ export class BacklogParser {
       this.taskCache.delete(filePath);
     } else {
       this.taskCache.clear();
+      this.invalidateMilestoneCache();
     }
+  }
+
+  /**
+   * Invalidate the milestone cache, forcing the next getMilestonesFromFiles() call to re-read from disk.
+   */
+  invalidateMilestoneCache(): void {
+    this.cachedMilestones = null;
+    this.milestonesDirMtime = undefined;
   }
 
   /**
@@ -169,6 +187,7 @@ export class BacklogParser {
     console.log(`[Backlog.md Parser] Found ${files.length} .md files:`, files.slice(0, 5));
     const tasks: Task[] = [];
     const currentPaths = new Set<string>();
+    const milestones = this.getMilestonesFromFiles();
 
     for (const file of files) {
       const filePath = path.join(folderPath, file);
@@ -188,6 +207,7 @@ export class BacklogParser {
         }
 
         if (task) {
+          task.milestone = this.resolveMilestoneValue(task.milestone, milestones);
           task.folder = (folderName === 'archive/tasks' ? 'archive' : folderName) as TaskFolder;
           tasks.push(task);
         }
@@ -334,11 +354,16 @@ export class BacklogParser {
   }
 
   /**
-   * Get all milestones from config
+   * Get all milestones, using milestone files as source-of-truth with config fallback.
    */
   async getMilestones(): Promise<Milestone[]> {
+    const fileMilestones = this.getMilestonesFromFiles();
+    if (fileMilestones.length > 0) {
+      return fileMilestones;
+    }
+
     const config = await this.getConfig();
-    return config.milestones || [];
+    return this.normalizeConfigMilestones(config.milestones);
   }
 
   /**
@@ -646,6 +671,158 @@ export class BacklogParser {
       return value.map((v) => String(v).trim()).filter(Boolean);
     }
     return [String(value).trim()].filter(Boolean);
+  }
+
+  private getMilestonesFromFiles(): Milestone[] {
+    const milestonesPath = path.join(this.backlogPath, 'milestones');
+    if (!fs.existsSync(milestonesPath)) return [];
+
+    try {
+      const dirMtime = fs.statSync(milestonesPath).mtimeMs;
+      if (this.cachedMilestones && this.milestonesDirMtime === dirMtime) {
+        return this.cachedMilestones;
+      }
+
+      const files = fs
+        .readdirSync(milestonesPath)
+        .filter((f) => f.endsWith('.md') && /^m-\d+/i.test(f) && f.toLowerCase() !== 'readme.md');
+
+      const milestones: Milestone[] = [];
+      for (const file of files) {
+        const parsed = this.parseMilestoneFile(path.join(milestonesPath, file));
+        if (parsed) milestones.push(parsed);
+      }
+
+      const sorted = milestones.sort((a, b) =>
+        a.id.localeCompare(b.id, undefined, { numeric: true })
+      );
+      this.cachedMilestones = sorted;
+      this.milestonesDirMtime = dirMtime;
+      return sorted;
+    } catch {
+      return [];
+    }
+  }
+
+  private parseMilestoneFile(filePath: string): Milestone | undefined {
+    if (!fs.existsSync(filePath)) return undefined;
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n');
+    const filename = path.basename(filePath, '.md');
+    const fileIdMatch = filename.match(/^(m-\d+)/i);
+    const fallbackId = fileIdMatch?.[1]?.toLowerCase();
+
+    let lineIndex = 0;
+    let rawFrontmatter: RawMilestoneFrontmatter | null = null;
+    if (lines[0]?.trim() === '---') {
+      lineIndex = 1;
+      const frontmatterLines: string[] = [];
+      while (lineIndex < lines.length && lines[lineIndex]?.trim() !== '---') {
+        frontmatterLines.push(lines[lineIndex]);
+        lineIndex++;
+      }
+      lineIndex++;
+      try {
+        rawFrontmatter =
+          (yaml.load(frontmatterLines.join('\n')) as RawMilestoneFrontmatter) || null;
+      } catch {
+        rawFrontmatter = null;
+      }
+    }
+
+    const id = String(rawFrontmatter?.id || fallbackId || '')
+      .trim()
+      .toLowerCase();
+    const frontmatterTitle = rawFrontmatter?.title || rawFrontmatter?.name;
+    let name = String(frontmatterTitle || '').trim();
+    let description = String(rawFrontmatter?.description || '').trim();
+
+    const bodyLines = lines.slice(lineIndex);
+    if (!name) {
+      const heading = bodyLines.find((line) => line.trim().startsWith('# '));
+      if (heading) {
+        name = heading
+          .trim()
+          .replace(/^#\s+/, '')
+          .replace(/^m-\d+\s*-\s*/i, '')
+          .trim();
+      }
+    }
+    if (!description) {
+      const descriptionLines: string[] = [];
+      let inDescription = false;
+      for (const line of bodyLines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('## ')) {
+          inDescription = trimmed.toLowerCase().includes('description');
+          continue;
+        }
+        if (inDescription && trimmed && !trimmed.startsWith('<!--')) {
+          descriptionLines.push(line);
+        }
+      }
+      description = descriptionLines.join('\n').trim();
+    }
+
+    if (!id || !name) return undefined;
+    return {
+      id,
+      name,
+      description: description || undefined,
+    };
+  }
+
+  private normalizeConfigMilestones(rawMilestones: unknown): Milestone[] {
+    if (!Array.isArray(rawMilestones)) return [];
+    return rawMilestones
+      .map((milestone): Milestone | undefined => {
+        if (typeof milestone === 'string') {
+          const value = milestone.trim();
+          if (!value) return undefined;
+          return { id: value, name: value };
+        }
+        if (typeof milestone === 'object' && milestone !== null) {
+          const record = milestone as Record<string, unknown>;
+          const id = String(record.id || record.name || '').trim();
+          const name = String(record.name || record.title || record.id || '').trim();
+          const description =
+            typeof record.description === 'string' ? record.description : undefined;
+          if (!id || !name) return undefined;
+          return { id, name, description };
+        }
+        return undefined;
+      })
+      .filter((milestone): milestone is Milestone => Boolean(milestone));
+  }
+
+  /**
+   * Resolve a raw milestone input (ID, title, or partial match) to a canonical milestone ID.
+   * Convenience async wrapper around resolveMilestoneValue that fetches milestones internally.
+   */
+  async resolveMilestone(raw: string | null | undefined): Promise<string | undefined> {
+    const normalized = String(raw || '').trim();
+    if (!normalized) return undefined;
+    const milestones = await this.getMilestones();
+    return this.resolveMilestoneValue(normalized, milestones);
+  }
+
+  resolveMilestoneValue(
+    rawMilestone: string | undefined,
+    milestones: Milestone[]
+  ): string | undefined {
+    const normalized = String(rawMilestone || '').trim();
+    if (!normalized) return undefined;
+    const inputKey = normalized.toLowerCase();
+    const idMatch = milestones.find((milestone) => milestone.id.trim().toLowerCase() === inputKey);
+    if (idMatch) return idMatch.id;
+
+    const titleMatches = milestones.filter(
+      (milestone) => milestone.name.trim().toLowerCase() === inputKey
+    );
+    if (titleMatches.length === 1) {
+      return titleMatches[0].id;
+    }
+    return normalized;
   }
 
   /**

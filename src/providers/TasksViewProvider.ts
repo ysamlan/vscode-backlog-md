@@ -35,6 +35,7 @@ export class TasksViewProvider extends BaseViewProvider {
   private collapsedColumns: Set<string> = new Set();
   private collapsedMilestones: Set<string> = new Set();
   private activeEditedTaskId: string | null = null;
+  private readonly writer = new BacklogWriter();
   private workspaceRoot: string | undefined;
   private onSelectTask?: (taskRef: {
     taskId: string;
@@ -373,18 +374,17 @@ export class TasksViewProvider extends BaseViewProvider {
         const originalStatus = task?.status || 'To Do';
 
         try {
-          const writer = new BacklogWriter();
           // Update status and optionally ordinal (for cross-column drops with position)
           const updates: Partial<Task> = { status: message.status };
           if (message.ordinal !== undefined) {
             updates.ordinal = message.ordinal;
           }
-          await writer.updateTask(taskId, updates, this.parser);
+          await this.writer.updateTask(taskId, updates, this.parser);
 
           // Also update any additional cards that needed ordinals assigned
           if (message.additionalOrdinalUpdates && message.additionalOrdinalUpdates.length > 0) {
             for (const update of message.additionalOrdinalUpdates) {
-              await writer.updateTask(update.taskId, { ordinal: update.ordinal }, this.parser);
+              await this.writer.updateTask(update.taskId, { ordinal: update.ordinal }, this.parser);
             }
           }
 
@@ -441,8 +441,7 @@ export class TasksViewProvider extends BaseViewProvider {
         if (Object.keys(updates).length === 0) break;
 
         try {
-          const writer = new BacklogWriter();
-          await writer.updateTask(taskId, updates, this.parser);
+          await this.writer.updateTask(taskId, updates, this.parser);
           this.postMessage({ type: 'taskUpdateSuccess', taskId });
         } catch (error) {
           console.error('Error updating task:', error);
@@ -470,8 +469,7 @@ export class TasksViewProvider extends BaseViewProvider {
           break;
         }
         try {
-          const writer = new BacklogWriter();
-          await writer.updateTask(taskId, { ordinal: message.ordinal }, this.parser);
+          await this.writer.updateTask(taskId, { ordinal: message.ordinal }, this.parser);
           this.postMessage({ type: 'taskUpdateSuccess', taskId });
         } catch (error) {
           console.error('Error reordering task:', error);
@@ -508,10 +506,9 @@ export class TasksViewProvider extends BaseViewProvider {
           break;
         }
         try {
-          const writer = new BacklogWriter();
           // Update all tasks with new ordinals
           for (const update of message.updates) {
-            await writer.updateTask(update.taskId, { ordinal: update.ordinal }, this.parser);
+            await this.writer.updateTask(update.taskId, { ordinal: update.ordinal }, this.parser);
           }
           // Send success for each task
           for (const update of message.updates) {
@@ -544,8 +541,7 @@ export class TasksViewProvider extends BaseViewProvider {
 
         if (confirmation === 'Archive') {
           try {
-            const writer = new BacklogWriter();
-            await writer.archiveTask(message.taskId, this.parser);
+            await this.writer.archiveTask(message.taskId, this.parser);
             await this.refresh();
           } catch (error) {
             vscode.window.showErrorMessage(`Failed to archive: ${error}`);
@@ -571,8 +567,7 @@ export class TasksViewProvider extends BaseViewProvider {
 
         if (completeConfirmation === 'Complete') {
           try {
-            const writer = new BacklogWriter();
-            await writer.completeTask(message.taskId, this.parser);
+            await this.writer.completeTask(message.taskId, this.parser);
             await this.refresh();
           } catch (error) {
             vscode.window.showErrorMessage(`Failed to complete: ${error}`);
@@ -591,8 +586,7 @@ export class TasksViewProvider extends BaseViewProvider {
           break;
         }
         try {
-          const writer = new BacklogWriter();
-          await writer.promoteDraft(message.taskId, this.parser);
+          await this.writer.promoteDraft(message.taskId, this.parser);
           await this.refresh();
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to promote draft: ${error}`);
@@ -610,8 +604,7 @@ export class TasksViewProvider extends BaseViewProvider {
           break;
         }
         try {
-          const writer = new BacklogWriter();
-          await writer.restoreArchivedTask(message.taskId, this.parser);
+          await this.writer.restoreArchivedTask(message.taskId, this.parser);
           await this.refresh();
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to restore task: ${error}`);
@@ -636,8 +629,7 @@ export class TasksViewProvider extends BaseViewProvider {
 
         if (deleteConfirmation === 'Delete') {
           try {
-            const writer = new BacklogWriter();
-            await writer.deleteTask(message.taskId, this.parser);
+            await this.writer.deleteTask(message.taskId, this.parser);
             await this.refresh();
           } catch (error) {
             vscode.window.showErrorMessage(`Failed to delete task: ${error}`);
@@ -680,6 +672,11 @@ export class TasksViewProvider extends BaseViewProvider {
 
       case 'requestCreateTask': {
         vscode.commands.executeCommand('backlog.createTask');
+        break;
+      }
+
+      case 'requestCreateMilestone': {
+        vscode.commands.executeCommand('backlog.createMilestone');
         break;
       }
 

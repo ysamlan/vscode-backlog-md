@@ -680,6 +680,19 @@ describe('TasksViewProvider', () => {
     });
   });
 
+  describe('requestCreateMilestone', () => {
+    it('routes requestCreateMilestone messages to the create milestone command', async () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({ type: 'requestCreateMilestone' });
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith('backlog.createMilestone');
+    });
+  });
+
   describe('setViewMode with dashboard', () => {
     it('should send activeTabChanged with dashboard tab', () => {
       const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);

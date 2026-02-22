@@ -1722,6 +1722,66 @@ status: Draft
     });
   });
 
+  describe('createMilestone', () => {
+    it('creates first milestone with m-0 id when none exist', async () => {
+      const result = await writer.createMilestone('/fake/backlog', 'Launch');
+
+      expect(result).toEqual({
+        id: 'm-0',
+        name: 'Launch',
+        description: 'Milestone: Launch',
+      });
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        '/fake/backlog/milestones/m-0 - launch.md',
+        expect.stringContaining('id: m-0'),
+        'utf-8'
+      );
+    });
+
+    it('scans active and archived milestones and uses max id + 1', async () => {
+      vi.mocked(fs.readdirSync).mockImplementation((dirPath) => {
+        const dir = String(dirPath);
+        if (dir.endsWith('/fake/backlog/milestones')) {
+          return ['m-2 - one.md'] as unknown as ReturnType<typeof fs.readdirSync>;
+        }
+        if (dir.endsWith('/fake/backlog/archive/milestones')) {
+          return ['m-7 - two.md'] as unknown as ReturnType<typeof fs.readdirSync>;
+        }
+        return [] as unknown as ReturnType<typeof fs.readdirSync>;
+      });
+
+      vi.mocked(fs.readFileSync).mockImplementation((filePath) => {
+        const file = String(filePath);
+        if (file.endsWith('/fake/backlog/milestones/m-2 - one.md')) {
+          return '---\nid: m-2\ntitle: "One"\n---\n';
+        }
+        if (file.endsWith('/fake/backlog/archive/milestones/m-7 - two.md')) {
+          return '---\nid: m-10\ntitle: "Two"\n---\n';
+        }
+        return '';
+      });
+
+      const result = await writer.createMilestone('/fake/backlog', 'Release');
+
+      expect(result.id).toBe('m-11');
+      expect(fs.writeFileSync).toHaveBeenCalledWith(
+        '/fake/backlog/milestones/m-11 - release.md',
+        expect.stringContaining('id: m-11'),
+        'utf-8'
+      );
+    });
+
+    it('rejects milestone aliases that would duplicate existing IDs', async () => {
+      const parserWithMilestones = {
+        getMilestones: vi.fn().mockResolvedValue([{ id: 'm-1', name: 'Launch' }]),
+      } as unknown as BacklogParser;
+
+      await expect(
+        writer.createMilestone('/fake/backlog', '1', undefined, parserWithMilestones)
+      ).rejects.toThrow('A milestone with this title or ID already exists');
+    });
+  });
+
   describe('createSubtask', () => {
     it('should create subtask with dot-notation ID', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);

@@ -243,6 +243,7 @@ export type WebviewMessage =
     }
   | { type: 'focusTaskPreview' }
   | { type: 'requestCreateTask' }
+  | { type: 'requestCreateMilestone' }
   | { type: 'openDocument'; documentId: string }
   | { type: 'openDecision'; decisionId: string }
   | { type: 'initBacklog'; mode: 'defaults' | 'customize' }

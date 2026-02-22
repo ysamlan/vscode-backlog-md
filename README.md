@@ -63,7 +63,7 @@ If you haven't already installed and initialized [backlog.md](https://backlog.md
 
 When you open a backlog task file (e.g., via "Open Markdown" or by opening a `.md` file inside `backlog/tasks/`), the extension provides smart editor features on top of the normal Markdown editing experience:
 
-- **Frontmatter autocomplete** — Context-aware suggestions when editing `status:`, `priority:`, `milestone:`, `labels:`, `assignee:`, and `dependencies:` fields. Values come from your `config.yml` and existing tasks.
+- **Frontmatter autocomplete** — Context-aware suggestions when editing `status:`, `priority:`, `milestone:`, `labels:`, `assignee:`, and `dependencies:` fields. Milestones are sourced from `backlog/milestones/*.md` first (with config fallback), and other values come from `config.yml` and existing tasks.
 - **Task ID autocomplete** — Type a task prefix (e.g., `TASK-`) anywhere in the body or in `dependencies:` to see suggestions of all known task IDs with their titles.
 - **Clickable task links** — Task IDs like `TASK-42` in the document body become clickable links that open the referenced task's detail view.
 - **Hover info** — Hover over any task ID to see a tooltip with the task's title, status, priority, milestone, labels, and a description preview.

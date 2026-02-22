@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as yaml from 'js-yaml';
-import { Task, TaskStatus } from './types';
+import { Milestone, Task, TaskStatus } from './types';
 import { BacklogParser } from './BacklogParser';
 
 /**
@@ -67,6 +67,59 @@ interface FrontmatterData {
  * Writes changes back to Backlog.md task files
  */
 export class BacklogWriter {
+  /**
+   * Create a new milestone file in backlog/milestones.
+   * Mirrors upstream ID allocation semantics by scanning both active and archived milestone files.
+   */
+  async createMilestone(
+    backlogPath: string,
+    title: string,
+    description?: string,
+    parser?: BacklogParser
+  ): Promise<Milestone> {
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) {
+      throw new Error('Milestone title is required');
+    }
+
+    const existingMilestones = parser ? await parser.getMilestones() : [];
+    const requestedKeys = this.buildMilestoneIdentifierKeys(normalizedTitle);
+    const duplicate = existingMilestones.find((milestone) => {
+      const milestoneKeys = new Set<string>([
+        ...this.buildMilestoneIdentifierKeys(milestone.id),
+        ...this.buildMilestoneIdentifierKeys(milestone.name),
+      ]);
+      for (const key of requestedKeys) {
+        if (milestoneKeys.has(key)) {
+          return true;
+        }
+      }
+      return false;
+    });
+    if (duplicate) {
+      throw new Error('A milestone with this title or ID already exists');
+    }
+
+    const milestonesDir = path.join(backlogPath, 'milestones');
+    const archivedMilestonesDir = path.join(backlogPath, 'archive', 'milestones');
+    if (!fs.existsSync(milestonesDir)) {
+      fs.mkdirSync(milestonesDir, { recursive: true });
+    }
+    const nextIdNumber = this.getNextMilestoneId(milestonesDir, archivedMilestonesDir);
+    const id = `m-${nextIdNumber}`;
+    const safeTitle = this.sanitizeMilestoneTitle(normalizedTitle);
+    const filename = `${id} - ${safeTitle}.md`;
+    const filePath = path.join(milestonesDir, filename);
+    const milestoneDescription = description?.trim() || `Milestone: ${normalizedTitle}`;
+
+    const frontmatter: FrontmatterData = { id, title: normalizedTitle };
+    const body = `\n## Description\n\n${milestoneDescription}\n`;
+    const content = this.reconstructFile(frontmatter, body);
+    fs.writeFileSync(filePath, content, 'utf-8');
+
+    return { id, name: normalizedTitle, description: milestoneDescription };
+  }
+
   /**
    * Move a completed task to the completed/ folder
    */
@@ -205,15 +258,11 @@ export class BacklogWriter {
         (dependencyId) => !this.areTaskIdsEqual(dependencyId, taskId)
       );
       const nextReferences = existingReferences.filter(
-        (reference) => !this.isExactTaskReference(reference, taskId)
+        (reference) => !this.areTaskIdsEqual(reference, taskId)
       );
 
-      const dependenciesChanged =
-        existingDependencies.length !== nextDependencies.length ||
-        existingDependencies.some((dependency, index) => dependency !== nextDependencies[index]);
-      const referencesChanged =
-        existingReferences.length !== nextReferences.length ||
-        existingReferences.some((reference, index) => reference !== nextReferences[index]);
+      const dependenciesChanged = existingDependencies.length !== nextDependencies.length;
+      const referencesChanged = existingReferences.length !== nextReferences.length;
 
       if (!dependenciesChanged && !referencesChanged) {
         continue;
@@ -232,15 +281,6 @@ export class BacklogWriter {
 
   private areTaskIdsEqual(left: string, right: string): boolean {
     return left.trim().toUpperCase() === right.trim().toUpperCase();
-  }
-
-  private isExactTaskReference(reference: string, taskId: string): boolean {
-    const trimmedReference = reference.trim();
-    if (!trimmedReference) {
-      return false;
-    }
-
-    return this.areTaskIdsEqual(trimmedReference, taskId);
   }
 
   /**
@@ -610,6 +650,98 @@ export class BacklogWriter {
     }
 
     return maxId + 1;
+  }
+
+  private getNextMilestoneId(milestonesDir: string, archivedMilestonesDir: string): number {
+    const ids = [
+      ...this.extractMilestoneIdsFromDirectory(milestonesDir),
+      ...this.extractMilestoneIdsFromDirectory(archivedMilestonesDir),
+    ];
+    if (ids.length === 0) {
+      return 0;
+    }
+    return Math.max(...ids) + 1;
+  }
+
+  private extractMilestoneIdsFromDirectory(dirPath: string): number[] {
+    if (!fs.existsSync(dirPath)) {
+      return [];
+    }
+
+    const files = fs
+      .readdirSync(dirPath)
+      .filter(
+        (file) => file.endsWith('.md') && /^m-\d+/i.test(file) && file.toLowerCase() !== 'readme.md'
+      );
+
+    const ids: number[] = [];
+    for (const file of files) {
+      const filePath = path.join(dirPath, file);
+      let candidateId = '';
+
+      try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const { frontmatter } = this.extractFrontmatter(content);
+        candidateId = String(frontmatter.id || '')
+          .trim()
+          .toLowerCase();
+      } catch {
+        candidateId = '';
+      }
+
+      if (!candidateId) {
+        const fallback = file.match(/^(m-\d+)/i)?.[1];
+        candidateId = String(fallback || '').toLowerCase();
+      }
+
+      const match = candidateId.match(/^m-(\d+)$/i);
+      if (!match?.[1]) {
+        continue;
+      }
+      const parsed = Number.parseInt(match[1], 10);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        ids.push(parsed);
+      }
+    }
+
+    return ids;
+  }
+
+  private buildMilestoneIdentifierKeys(value: string): Set<string> {
+    const normalized = value.trim().toLowerCase();
+    const keys = new Set<string>();
+    if (!normalized) {
+      return keys;
+    }
+
+    keys.add(normalized);
+
+    if (/^\d+$/.test(normalized)) {
+      const numeric = String(Number.parseInt(normalized, 10));
+      keys.add(numeric);
+      keys.add(`m-${numeric}`);
+      return keys;
+    }
+
+    const idMatch = normalized.match(/^m-(\d+)$/);
+    if (idMatch?.[1]) {
+      const numeric = String(Number.parseInt(idMatch[1], 10));
+      keys.add(numeric);
+      keys.add(`m-${numeric}`);
+    }
+
+    return keys;
+  }
+
+  private sanitizeMilestoneTitle(title: string): string {
+    const sanitized = title
+      .replace(/[<>:"/\\|?*]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase()
+      .slice(0, 50);
+    return sanitized || 'milestone';
   }
 
   /**

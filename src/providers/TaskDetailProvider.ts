@@ -28,7 +28,7 @@ interface TaskDetailData {
   priorities: string[];
   uniqueLabels: string[];
   uniqueAssignees: string[];
-  milestones: string[];
+  milestones: Array<{ id: string; label: string }>;
   blocksTaskIds: string[];
   linkableTasks: Array<{ id: string; title: string; status: string }>;
   isBlocked: boolean;
@@ -94,10 +94,16 @@ export class TaskDetailProvider {
     TaskDetailProvider.onActiveTaskChangedCallback?.(taskId);
   }
 
+  private backlogPath: string | undefined;
+
   constructor(
     private readonly extensionUri: vscode.Uri,
     private parser: BacklogParser | undefined
   ) {}
+
+  setBacklogPath(backlogPath: string): void {
+    this.backlogPath = backlogPath;
+  }
 
   setParser(parser: BacklogParser): void {
     this.parser = parser;
@@ -324,12 +330,20 @@ export class TaskDetailProvider {
       ]);
 
       // Combine config milestones with unique milestones from tasks
-      const configMilestoneNames = configMilestones.map((m) => m.name);
-      const taskMilestones = [...new Set(contextTasks.map((t) => t.milestone).filter(Boolean))];
-      const milestones = [
-        ...configMilestoneNames,
-        ...taskMilestones.filter((m) => !configMilestoneNames.includes(m!)),
+      const milestoneOptions = configMilestones.map((milestone) => ({
+        id: milestone.id,
+        label: milestone.name,
+      }));
+      const knownMilestoneIds = new Set(milestoneOptions.map((option) => option.id));
+      const taskMilestones = [
+        ...new Set(contextTasks.map((t) => t.milestone).filter(Boolean)),
       ] as string[];
+      for (const milestone of taskMilestones) {
+        if (!knownMilestoneIds.has(milestone)) {
+          milestoneOptions.push({ id: milestone, label: milestone });
+          knownMilestoneIds.add(milestone);
+        }
+      }
 
       const blocksTaskIds = contextTasks
         .filter((candidateTask) => candidateTask.dependencies.includes(contextTask.id))
@@ -406,7 +420,7 @@ export class TaskDetailProvider {
         priorities: ['high', 'medium', 'low'],
         uniqueLabels,
         uniqueAssignees,
-        milestones,
+        milestones: milestoneOptions,
         blocksTaskIds,
         linkableTasks,
         isBlocked,
@@ -482,6 +496,7 @@ export class TaskDetailProvider {
     type: string;
     taskId?: string;
     parentTaskId?: string;
+    milestoneTitle?: string;
     listType?: 'acceptanceCriteria' | 'definitionOfDone';
     itemId?: number;
     field?: string;
@@ -561,7 +576,11 @@ export class TaskDetailProvider {
 
           try {
             const updates: Record<string, unknown> = {};
-            updates[message.field] = message.value;
+            if (message.field === 'milestone') {
+              updates[message.field] = await this.parser.resolveMilestone(message.value as string);
+            } else {
+              updates[message.field] = message.value;
+            }
             await this.writer.updateTask(
               TaskDetailProvider.currentTaskId,
               updates,
@@ -699,7 +718,8 @@ export class TaskDetailProvider {
         if (this.blockReadOnlyMutation(parentTask, 'create a subtask')) break;
 
         try {
-          const backlogPath = path.dirname(path.dirname(parentTask?.filePath || ''));
+          const backlogPath =
+            this.backlogPath ?? path.dirname(path.dirname(parentTask?.filePath || ''));
           if (!backlogPath) break;
 
           const result = await this.writer.createSubtask(
@@ -712,6 +732,70 @@ export class TaskDetailProvider {
           await this.openTask(result.id);
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to create subtask: ${error}`);
+        }
+        break;
+      }
+
+      case 'createMilestone': {
+        if (!this.parser) break;
+        const currentTask = await this.getCurrentTaskFromContext();
+        if (this.blockReadOnlyMutation(currentTask, 'create a milestone')) break;
+
+        const backlogPath =
+          this.backlogPath ??
+          (currentTask?.filePath
+            ? this.resolveBacklogPathFromTaskPath(currentTask.filePath)
+            : undefined);
+        if (!backlogPath) {
+          vscode.window.showErrorMessage('Unable to resolve backlog path for milestone creation.');
+          break;
+        }
+
+        const providedTitle = message.milestoneTitle?.trim();
+        const milestoneTitle =
+          providedTitle ||
+          (
+            await vscode.window.showInputBox({
+              prompt: 'Enter milestone title',
+              placeHolder: 'e.g., v1.0 Launch',
+              ignoreFocusOut: true,
+            })
+          )?.trim();
+
+        if (!milestoneTitle) {
+          break;
+        }
+
+        try {
+          const created = await this.writer.createMilestone(
+            backlogPath,
+            milestoneTitle,
+            undefined,
+            this.parser
+          );
+
+          this.parser.invalidateMilestoneCache();
+
+          if (TaskDetailProvider.currentTaskId && currentTask?.filePath) {
+            await this.writer.updateTask(
+              TaskDetailProvider.currentTaskId,
+              { milestone: created.id },
+              this.parser,
+              TaskDetailProvider.currentFileHash
+            );
+            const newContent = fs.readFileSync(currentTask.filePath, 'utf-8');
+            TaskDetailProvider.currentFileHash = computeContentHash(newContent);
+          }
+
+          await this.openTask(
+            TaskDetailProvider.currentTaskRef ?? {
+              taskId: TaskDetailProvider.currentTaskId ?? (currentTask?.id || ''),
+            },
+            { preserveFocus: true }
+          );
+          vscode.window.showInformationMessage(`Created milestone "${created.name}"`);
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to create milestone: ${error}`);
         }
         break;
       }
@@ -855,6 +939,20 @@ export class TaskDetailProvider {
       `Cannot ${action}: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
     );
     return true;
+  }
+
+  private resolveBacklogPathFromTaskPath(taskFilePath: string): string | undefined {
+    let currentDir = path.dirname(taskFilePath);
+    while (true) {
+      if (path.basename(currentDir) === 'backlog') {
+        return currentDir;
+      }
+      const parent = path.dirname(currentDir);
+      if (parent === currentDir) {
+        return undefined;
+      }
+      currentDir = parent;
+    }
   }
 
   private async getCurrentTaskFromContext(): Promise<Task | undefined> {

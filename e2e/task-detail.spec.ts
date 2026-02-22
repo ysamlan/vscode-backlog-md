@@ -52,7 +52,10 @@ const sampleTaskData = {
   priorities: ['high', 'medium', 'low'],
   uniqueLabels: ['bug', 'feature', 'urgent'],
   uniqueAssignees: ['@alice', '@bob'],
-  milestones: ['v1.0', 'v2.0'],
+  milestones: [
+    { id: 'v1.0', label: 'v1.0' },
+    { id: 'v2.0', label: 'v2.0' },
+  ],
   blocksTaskIds: ['TASK-3'],
   isBlocked: true,
   linkableTasks: [

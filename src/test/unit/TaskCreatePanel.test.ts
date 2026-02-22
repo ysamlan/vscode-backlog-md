@@ -54,6 +54,12 @@ describe('TaskCreatePanel', () => {
       getStatuses: vi.fn().mockResolvedValue(['To Do', 'In Progress', 'Done']),
       getUniqueLabels: vi.fn().mockResolvedValue([]),
       getUniqueAssignees: vi.fn().mockResolvedValue([]),
+      getMilestones: vi.fn().mockResolvedValue([]),
+      resolveMilestone: vi.fn().mockImplementation(async (raw: string) => {
+        const normalized = String(raw || '').trim();
+        return normalized || undefined;
+      }),
+      invalidateMilestoneCache: vi.fn(),
     } as unknown as BacklogParser;
 
     mockWriter = {
@@ -62,6 +68,7 @@ describe('TaskCreatePanel', () => {
         .mockResolvedValue({ id: 'DRAFT-1', filePath: '/test/backlog/drafts/draft-1.md' }),
       updateTask: vi.fn().mockResolvedValue(undefined),
       promoteDraft: vi.fn().mockResolvedValue('TASK-1'),
+      createMilestone: vi.fn().mockResolvedValue({ id: 'm-1', name: 'Launch' }),
     } as unknown as BacklogWriter;
 
     mockTaskDetailProvider = {
@@ -114,6 +121,7 @@ describe('TaskCreatePanel', () => {
       const html = mockWebview.html as string;
       expect(html).toContain('id="titleInput"');
       expect(html).toContain('id="descriptionTextarea"');
+      expect(html).toContain('id="milestoneInput"');
       expect(html).toContain('id="createBtn"');
       expect(html).toContain('id="discardBtn"');
       expect(html).toContain('Create New Task');
@@ -325,6 +333,21 @@ describe('TaskCreatePanel', () => {
       );
     });
 
+    it('should persist milestone when provided on submit', async () => {
+      await messageHandler({
+        type: 'createTask',
+        title: 'Milestoned Task',
+        description: '',
+        milestone: 'm-1',
+      });
+
+      expect(mockWriter.updateTask).toHaveBeenCalledWith(
+        'DRAFT-1',
+        { title: 'Milestoned Task', description: undefined, milestone: 'm-1' },
+        mockParser
+      );
+    });
+
     it('should send error message on promote failure', async () => {
       (mockWriter.promoteDraft as Mock).mockRejectedValue(new Error('Promote failed'));
 
@@ -445,6 +468,33 @@ describe('TaskCreatePanel', () => {
 
       expect(mockParser.getTask).toHaveBeenCalledWith('DRAFT-1');
       expect(mockPanel.dispose).toHaveBeenCalled();
+    });
+  });
+
+  describe('create milestone', () => {
+    beforeEach(async () => {
+      showPanel();
+      await vi.waitFor(() => {
+        expect(mockWriter.createDraft).toHaveBeenCalled();
+      });
+    });
+
+    it('creates milestone and applies it to the draft', async () => {
+      await messageHandler({ type: 'createMilestone', milestoneTitle: 'Launch' });
+
+      expect(
+        (mockWriter as unknown as { createMilestone: Mock }).createMilestone
+      ).toHaveBeenCalledWith('/test/backlog', 'Launch', undefined, mockParser);
+      expect(mockWriter.updateTask).toHaveBeenCalledWith(
+        'DRAFT-1',
+        { milestone: 'm-1' },
+        mockParser
+      );
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'milestoneCreated',
+        id: 'm-1',
+        label: 'Launch',
+      });
     });
   });
 

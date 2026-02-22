@@ -9,12 +9,13 @@
     linkableTasks: Array<{ id: string; title: string; status: string }>;
     uniqueLabels: string[];
     uniqueAssignees: string[];
-    milestones: string[];
+    milestones: Array<{ id: string; label: string }>;
     parentTask?: { id: string; title: string };
     isReadOnly?: boolean;
     onUpdateLabels: (labels: string[]) => void;
     onUpdateAssignees: (assignees: string[]) => void;
     onUpdateMilestone: (milestone: string | undefined) => void;
+    onRequestCreateMilestone: () => void;
     onOpenTask: (taskId: string) => void;
     onAddBlockedByLink: (taskId: string) => void;
     onAddBlocksLink: (taskId: string) => void;
@@ -37,6 +38,7 @@
     onUpdateLabels,
     onUpdateAssignees,
     onUpdateMilestone,
+    onRequestCreateMilestone,
     onOpenTask,
     onAddBlockedByLink,
     onAddBlocksLink,
@@ -98,8 +100,14 @@
 
   function handleMilestoneChange(e: Event) {
     if (isReadOnly) return;
-    const value = (e.target as HTMLSelectElement).value || undefined;
-    onUpdateMilestone(value);
+    const select = e.target as HTMLSelectElement;
+    const value = select.value;
+    if (value === '__create_milestone__') {
+      select.value = milestone || '';
+      onRequestCreateMilestone();
+      return;
+    }
+    onUpdateMilestone(value || undefined);
   }
 
   function resolveLinkTaskId(
@@ -307,9 +315,12 @@
           onchange={handleMilestoneChange}
         >
           <option value="">None</option>
-          {#each milestones as m (m)}
-            <option value={m}>{m}</option>
+          {#each milestones as m (m.id)}
+            <option value={m.id}>{m.label}</option>
           {/each}
+          {#if !isReadOnly}
+            <option value="__create_milestone__">+ Create new milestone...</option>
+          {/if}
         </select>
       </div>
     </div>
