@@ -1611,4 +1611,58 @@ test.describe('Tasks View', () => {
       await expect(page.locator('[data-testid="task-TASK-1"]')).not.toHaveClass(/active-edited/);
     });
   });
+
+  test.describe('Double-Click to Open Edit View', () => {
+    test('double-clicking a kanban card sends openTask message', async ({ page }) => {
+      await setupTasksView(page);
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="task-TASK-1"]').dblclick();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'openTask',
+        taskId: 'TASK-1',
+        filePath: '/test/tasks/task-1.md',
+      });
+    });
+
+    test('single-click on kanban card still sends selectTask (not openTask)', async ({ page }) => {
+      await setupTasksView(page);
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="task-TASK-1"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'selectTask',
+        taskId: 'TASK-1',
+        filePath: '/test/tasks/task-1.md',
+      });
+    });
+
+    test('double-clicking a list row sends openTask message', async ({ page }) => {
+      await setupListViewWithTasks(page, sampleTasks);
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="task-row-TASK-1"]').dblclick();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'openTask',
+        taskId: 'TASK-1',
+        filePath: '/test/tasks/task-1.md',
+      });
+    });
+
+    test('single-click on list row still sends selectTask (not openTask)', async ({ page }) => {
+      await setupListViewWithTasks(page, sampleTasks);
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="task-row-TASK-1"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'selectTask',
+        taskId: 'TASK-1',
+        filePath: '/test/tasks/task-1.md',
+      });
+    });
+  });
 });
