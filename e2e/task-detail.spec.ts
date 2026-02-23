@@ -1143,6 +1143,121 @@ test.describe('Task Detail', () => {
 
       await expect(page.locator('[data-testid="missing-dependency-warning-TASK-2"]')).toBeVisible();
     });
+
+    test('click × on blocked-by chip sends removeBlockedByLink message', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      await page.locator('[data-testid="remove-blocked-by-TASK-2"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'removeBlockedByLink',
+        taskId: 'TASK-2',
+      });
+    });
+
+    test('click × on blocks chip sends removeBlocksLink message', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      await page.locator('[data-testid="remove-blocks-TASK-3"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'removeBlocksLink',
+        taskId: 'TASK-3',
+      });
+    });
+
+    test('dependency remove buttons hidden in read-only mode', async ({ page }) => {
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          isReadOnly: true,
+          readOnlyReason: 'Task is from feature/other and is read-only.',
+        },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="remove-blocked-by-TASK-2"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="remove-blocks-TASK-3"]')).toHaveCount(0);
+    });
+  });
+
+  test.describe('Label autocomplete dropdown', () => {
+    test('shows filtered suggestions on focus', async ({ page }) => {
+      const input = page.locator('[data-testid="add-label-input"]');
+      await input.focus();
+
+      // Should show suggestions excluding already-added labels
+      await expect(page.locator('[data-testid="label-suggestions"]')).toBeVisible();
+      // 'bug' and 'urgent' are already on the task, only 'feature' should show
+      await expect(page.locator('[data-testid="label-suggestion-feature"]')).toBeVisible();
+      await expect(page.locator('[data-testid="label-suggestion-bug"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="label-suggestion-urgent"]')).toHaveCount(0);
+    });
+
+    test('clicking suggestion adds label', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      const input = page.locator('[data-testid="add-label-input"]');
+      await input.focus();
+      await page.locator('[data-testid="label-suggestion-feature"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateField',
+        field: 'labels',
+        value: ['bug', 'urgent', 'feature'],
+      });
+    });
+
+    test('dropdown closes on blur', async ({ page }) => {
+      const input = page.locator('[data-testid="add-label-input"]');
+      await input.focus();
+      await expect(page.locator('[data-testid="label-suggestions"]')).toBeVisible();
+
+      await input.blur();
+      await page.waitForTimeout(200);
+      await expect(page.locator('[data-testid="label-suggestions"]')).toHaveCount(0);
+    });
+  });
+
+  test.describe('Assignee autocomplete dropdown', () => {
+    test('shows filtered suggestions on focus', async ({ page }) => {
+      const input = page.locator('[data-testid="add-assignee-input"]');
+      await input.focus();
+
+      await expect(page.locator('[data-testid="assignee-suggestions"]')).toBeVisible();
+      // '@alice' is already assigned, only '@bob' should show
+      await expect(page.locator('[data-testid="assignee-suggestion-@bob"]')).toBeVisible();
+      await expect(page.locator('[data-testid="assignee-suggestion-@alice"]')).toHaveCount(0);
+    });
+
+    test('clicking suggestion adds assignee', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      const input = page.locator('[data-testid="add-assignee-input"]');
+      await input.focus();
+      await page.locator('[data-testid="assignee-suggestion-@bob"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateField',
+        field: 'assignee',
+        value: ['@alice', '@bob'],
+      });
+    });
+
+    test('dropdown closes on blur', async ({ page }) => {
+      const input = page.locator('[data-testid="add-assignee-input"]');
+      await input.focus();
+      await expect(page.locator('[data-testid="assignee-suggestions"]')).toBeVisible();
+
+      await input.blur();
+      await page.waitForTimeout(200);
+      await expect(page.locator('[data-testid="assignee-suggestions"]')).toHaveCount(0);
+    });
   });
 
   test('sends refresh message on mount', async ({ page }) => {

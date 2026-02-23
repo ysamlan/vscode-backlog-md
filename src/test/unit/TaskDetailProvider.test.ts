@@ -1420,6 +1420,143 @@ describe('TaskDetailProvider', () => {
       );
       expect(mockWriter.updateTask).not.toHaveBeenCalled();
     });
+
+    it('removes blocked-by link by filtering dependency from current task', async () => {
+      const currentTask = {
+        id: 'TASK-1',
+        title: 'Current Task',
+        status: 'In Progress',
+        labels: [],
+        assignee: [],
+        dependencies: ['TASK-2', 'TASK-4'],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/backlog/tasks/task-1.md',
+        folder: 'tasks',
+      };
+
+      (mockParser.getTask as Mock).mockResolvedValue(currentTask);
+      (mockParser.getTasks as Mock).mockResolvedValue([currentTask]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+
+      mockWriter.updateTask.mockClear();
+      const messageHandler = (mockWebview.onDidReceiveMessage as Mock).mock.calls[0][0];
+      await messageHandler({ type: 'removeBlockedByLink', taskId: 'TASK-2' });
+
+      expect(mockWriter.updateTask).toHaveBeenCalledWith(
+        'TASK-1',
+        { dependencies: ['TASK-4'] },
+        mockParser,
+        expect.any(String)
+      );
+    });
+
+    it('removes blocks link by filtering current task from target task dependencies', async () => {
+      const currentTask = {
+        id: 'TASK-1',
+        title: 'Current Task',
+        status: 'In Progress',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/backlog/tasks/task-1.md',
+        folder: 'tasks',
+      };
+      const targetTask = {
+        id: 'TASK-4',
+        title: 'Target Task',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: ['TASK-8', 'TASK-1'],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/backlog/tasks/task-4.md',
+        folder: 'tasks',
+      };
+
+      (mockParser.getTask as Mock).mockImplementation(async (id: string) => {
+        if (id === 'TASK-1') return currentTask;
+        if (id === 'TASK-4') return targetTask;
+        return undefined;
+      });
+      (mockParser.getTasks as Mock).mockResolvedValue([currentTask, targetTask]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+
+      mockWriter.updateTask.mockClear();
+      const messageHandler = (mockWebview.onDidReceiveMessage as Mock).mock.calls[0][0];
+      await messageHandler({ type: 'removeBlocksLink', taskId: 'TASK-4' });
+
+      expect(mockWriter.updateTask).toHaveBeenCalledWith(
+        'TASK-4',
+        { dependencies: ['TASK-8'] },
+        mockParser
+      );
+    });
+
+    it('ignores removeBlockedByLink when taskId not in dependencies', async () => {
+      const currentTask = {
+        id: 'TASK-1',
+        title: 'Current Task',
+        status: 'In Progress',
+        labels: [],
+        assignee: [],
+        dependencies: ['TASK-2'],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/backlog/tasks/task-1.md',
+        folder: 'tasks',
+      };
+      (mockParser.getTask as Mock).mockResolvedValue(currentTask);
+      (mockParser.getTasks as Mock).mockResolvedValue([currentTask]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+
+      mockWriter.updateTask.mockClear();
+      const messageHandler = (mockWebview.onDidReceiveMessage as Mock).mock.calls[0][0];
+      await messageHandler({ type: 'removeBlockedByLink', taskId: 'TASK-99' });
+
+      expect(mockWriter.updateTask).not.toHaveBeenCalled();
+    });
+
+    it('blocks removeBlockedByLink for read-only current task', async () => {
+      const filePath = '/test/.backlog/branches/feature/task-1.md';
+      const readOnlyTask = {
+        id: 'TASK-1',
+        title: 'Cross Branch Task',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: ['TASK-2'],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath,
+        source: 'local-branch',
+        branch: 'feature/other',
+      };
+      (mockParser.getTask as Mock).mockResolvedValue(readOnlyTask);
+      (mockParser.getTasksWithCrossBranch as Mock).mockResolvedValue([readOnlyTask]);
+      (mockParser.getTasks as Mock).mockResolvedValue([]);
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+
+      mockWriter.updateTask.mockClear();
+      const messageHandler = (mockWebview.onDidReceiveMessage as Mock).mock.calls[0][0];
+      await messageHandler({ type: 'removeBlockedByLink', taskId: 'TASK-2' });
+
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        expect.stringContaining('read-only')
+      );
+      expect(mockWriter.updateTask).not.toHaveBeenCalled();
+    });
   });
 
   describe('getCurrentTaskId', () => {

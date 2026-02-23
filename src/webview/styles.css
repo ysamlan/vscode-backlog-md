@@ -1450,6 +1450,85 @@ body {
   color: var(--vscode-descriptionForeground, #858585);
 }
 
+/* Dependency chip styles */
+.dependencies-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.dependency-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--vscode-badge-background, #4d4d4d);
+  color: var(--vscode-badge-foreground, #ffffff);
+}
+
+.dependency-chip .dependency-link {
+  color: var(--vscode-textLink-foreground, #3794ff);
+}
+
+.remove-dependency {
+  cursor: pointer;
+  margin-left: 4px;
+  opacity: 0.6;
+}
+
+.remove-dependency:hover {
+  opacity: 1;
+}
+
+/* Autocomplete picker (labels, assignees) */
+.autocomplete-picker {
+  position: relative;
+  display: inline-flex;
+}
+
+.autocomplete-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 160px;
+  border: 1px solid var(--vscode-widget-border, #454545);
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, #252526);
+  color: var(--vscode-editorWidget-foreground, #cccccc);
+  max-height: 260px;
+  overflow-y: auto;
+  z-index: 20;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.autocomplete-suggestion-item {
+  width: 100%;
+  display: block;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--vscode-widget-border, #303031);
+  background: transparent;
+  color: inherit;
+  padding: 7px 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.autocomplete-suggestion-item:last-child {
+  border-bottom: 0;
+}
+
+.autocomplete-suggestion-item:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+.autocomplete-suggestion-item:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+}
+
 /* Checklist styles */
 .checklist {
   list-style: none;
