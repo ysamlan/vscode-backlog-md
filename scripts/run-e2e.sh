@@ -10,7 +10,15 @@ STORAGE_PATH=".vscode-test"
 EXTENSIONS_DIR="$STORAGE_PATH/test-extensions"
 mkdir -p "$EXTENSIONS_DIR"
 
-CMD="bunx extest setup-and-run 'out/test/e2e/*.test.js' --mocha_config .mocharc.json --storage $STORAGE_PATH --extensions_dir $EXTENSIONS_DIR"
+# Package the extension ourselves with --no-dependencies to avoid npm/bun node_modules incompatibility.
+# vsce's default packaging runs `npm list --production` which fails with bun-managed node_modules.
+VSIX_FILE=".vscode-test/test-extension.vsix"
+bunx vsce package --no-dependencies -o "$VSIX_FILE"
+
+# Split setup-and-run into separate steps so we can provide our pre-built vsix
+SETUP_CMD="bunx extest get-vscode --storage $STORAGE_PATH && bunx extest get-chromedriver --storage $STORAGE_PATH && bunx extest install-vsix --vsix_file $VSIX_FILE --storage $STORAGE_PATH --extensions_dir $EXTENSIONS_DIR"
+RUN_CMD="bunx extest run-tests 'out/test/e2e/*.test.js' --mocha_config .mocharc.json --storage $STORAGE_PATH --extensions_dir $EXTENSIONS_DIR"
+CMD="$SETUP_CMD && $RUN_CMD"
 
 # Check if we need xvfb:
 # - Not on macOS (darwin) - macOS doesn't use X11

@@ -31,12 +31,12 @@ SOFTWARE.
 
 The following npm packages may be included in this product:
 
- - @chevrotain/cst-dts-gen@11.0.3
- - @chevrotain/gast@11.0.3
- - @chevrotain/regexp-to-ast@11.0.3
- - @chevrotain/types@11.0.3
- - @chevrotain/utils@11.0.3
- - chevrotain@11.0.3
+ - @chevrotain/cst-dts-gen@11.1.1
+ - @chevrotain/gast@11.1.1
+ - @chevrotain/regexp-to-ast@11.1.1
+ - @chevrotain/types@11.1.1
+ - @chevrotain/utils@11.1.1
+ - chevrotain@11.1.1
 
 These packages each contain the following license:
 
@@ -372,7 +372,7 @@ THE SOFTWARE.
 The following npm packages may be included in this product:
 
  - marked@16.4.2
- - marked@17.0.2
+ - marked@17.0.3
 
 These packages each contain the following license:
 
@@ -688,7 +688,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 The following npm packages may be included in this product:
 
- - aria-query@5.3.2
+ - aria-query@5.3.1
  - axobject-query@4.1.0
 
 These packages each contain the following license:
@@ -992,7 +992,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The following npm package may be included in this product:
 
- - svelte@5.51.2
+ - svelte@5.53.3
 
 This package contains the following license:
 
@@ -1064,7 +1064,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - devalue@5.6.2
+ - devalue@5.6.3
 
 This package contains the following license:
 
@@ -1666,7 +1666,7 @@ THIS SOFTWARE.
 
 The following npm package may be included in this product:
 
- - langium@3.3.1
+ - langium@4.2.1
 
 This package contains the following license:
 
@@ -1761,12 +1761,11 @@ SOFTWARE.
 
 -----------
 
-The following npm packages may be included in this product:
+The following npm package may be included in this product:
 
- - lodash-es@4.17.21
  - lodash-es@4.17.23
 
-These packages each contain the following license:
+This package contains the following license:
 
 Copyright OpenJS Foundation and other contributors <https://openjsf.org/>
 
@@ -2703,7 +2702,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - tiny-markdown-editor@0.2.19
+ - tiny-markdown-editor@0.2.21
 
 This package contains the following license:
 
@@ -3423,7 +3422,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - mermaid@11.12.2
+ - mermaid@11.12.3
 
 This package contains the following license:
 
@@ -3483,7 +3482,7 @@ DEALINGS IN THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - @mermaid-js/parser@0.6.3
+ - @mermaid-js/parser@1.0.0
 
 This package contains the following license:
 
@@ -3513,7 +3512,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - vscode-uri@3.0.8
+ - vscode-uri@3.1.0
 
 This package contains the following license:
 
