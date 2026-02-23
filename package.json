@@ -182,7 +182,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "package": "vsce package",
+    "package": "vsce package --no-dependencies",
     "licenses:generate": "bash scripts/generate-licenses.sh",
     "screenshots": "bash scripts/screenshots/run.sh",
     "screenshots:validate": "bun scripts/screenshots/validate.ts",
@@ -197,17 +197,17 @@
     ]
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.58.2",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
-    "@tailwindcss/cli": "^4.1.18",
+    "@tailwindcss/cli": "^4.2.1",
     "@testing-library/svelte": "^5.3.1",
     "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^22.19.11",
+    "@types/node": "^25.3.0",
     "@types/vscode": "^1.108.0",
     "esbuild": "^0.27.3",
-    "eslint": "^9.39.2",
+    "eslint": "^10.0.1",
     "eslint-config-prettier": "^10.1.8",
     "generate-license-file": "^4.1.1",
     "husky": "^9.1.7",
@@ -216,18 +216,18 @@
     "oxipng-bin": "^1.0.0",
     "prettier": "^3.8.1",
     "sharp": "^0.34.5",
-    "tailwindcss": "^4.1.18",
+    "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.55.0",
+    "typescript-eslint": "^8.56.1",
     "vite": "^7.3.1",
     "vitest": "^4.0.18",
-    "vscode-extension-tester": "^8.21.0"
+    "vscode-extension-tester": "^8.22.0"
   },
   "dependencies": {
     "js-yaml": "^4.1.1",
-    "marked": "^17.0.2",
-    "mermaid": "^11.12.2",
-    "svelte": "^5.51.2",
-    "tiny-markdown-editor": "^0.2.19"
+    "marked": "^17.0.3",
+    "mermaid": "^11.12.3",
+    "svelte": "^5.53.3",
+    "tiny-markdown-editor": "^0.2.21"
   }
 }

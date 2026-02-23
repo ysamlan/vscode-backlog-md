@@ -707,7 +707,7 @@ export class BacklogWriter {
           .trim()
           .toLowerCase();
       } catch {
-        candidateId = '';
+        // candidateId remains '' from initialization
       }
 
       if (!candidateId) {
