@@ -24,6 +24,7 @@
     taskIdDisplay,
     isActiveEdited = false,
     onSelectTask,
+    onOpenTask,
     onReadOnlyDragAttempt,
     ondragstart,
     ondragend,
@@ -38,6 +39,10 @@
 
   function handleClick() {
     onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
+  }
+
+  function handleDoubleClick() {
+    onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
   }
 
   function handleFocus() {
@@ -99,6 +104,7 @@
   data-ordinal={task.ordinal !== undefined ? task.ordinal : ''}
   data-testid="task-{task.id}"
   onclick={handleClick}
+  ondblclick={handleDoubleClick}
   onfocus={handleFocus}
   onkeydown={handleKeydown}
   ondragstart={handleDragStart}

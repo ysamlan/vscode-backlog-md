@@ -367,6 +367,10 @@
     onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
   }
 
+  function handleRowDoubleClick(task: TaskWithBlocks) {
+    onOpenTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch });
+  }
+
 
 </script>
 
@@ -509,6 +513,7 @@
               class:subtask-row={isSubtask}
               class:readonly-row={isReadOnly}
               onclick={() => handleRowClickGuarded(task)}
+              ondblclick={() => handleRowDoubleClick(task)}
               onfocus={() =>
                 onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch })}
               onkeydown={(e) => handleRowKeydown(e, task)}
