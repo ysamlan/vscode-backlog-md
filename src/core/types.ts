@@ -301,6 +301,9 @@ export type ExtensionMessage =
       task: Task;
       statuses: string[];
       descriptionHtml: string;
+      planHtml: string;
+      notesHtml: string;
+      finalSummaryHtml: string;
       isReadOnly: boolean;
       readOnlyReason?: string;
       subtaskSummaries?: Array<{

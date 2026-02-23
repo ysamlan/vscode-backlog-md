@@ -65,6 +65,9 @@ const sampleTaskData = {
   ],
   descriptionHtml:
     '<p>This is a sample task description with <strong>markdown</strong> formatting.</p>',
+  planHtml: '',
+  notesHtml: '',
+  finalSummaryHtml: '',
 };
 
 const sampleTaskDataWithSubtasks = {
@@ -861,6 +864,147 @@ test.describe('Task Detail', () => {
         type: 'updateField',
         field: 'definitionOfDone',
         value: '- [ ] #1 Tests pass\n- [ ] #2 Code reviewed',
+      });
+    });
+  });
+
+  test.describe('Implementation Plan', () => {
+    test('shows empty placeholder when plan is absent', async ({ page }) => {
+      await expect(page.locator('[data-testid="plan-view"]')).toContainText('No plan');
+    });
+
+    test('displays plan content when provided', async ({ page }) => {
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          task: { ...sampleTask, plan: '1. First step\n2. Second step' },
+          planHtml: '<ol><li>First step</li><li>Second step</li></ol>',
+        },
+      });
+      await page.waitForTimeout(50);
+
+      const planView = page.locator('[data-testid="plan-view"]');
+      await expect(planView).toContainText('First step');
+      await expect(planView).toContainText('Second step');
+    });
+
+    test('toggles to edit mode and sends updateField for plan', async ({ page }) => {
+      await page.locator('[data-testid="edit-plan-btn"]').click();
+      await expect(
+        page.locator('[data-testid="plan-section"] [data-testid="markdown-editor"]')
+      ).toBeVisible();
+      await expect(page.locator('[data-testid="edit-plan-btn"]')).toHaveText('Done');
+
+      const tinyMDE = page.locator('[data-testid="plan-section"] .TinyMDE');
+      await tinyMDE.click();
+      await selectAllInTinyMDE(page);
+      await page.keyboard.type('New plan content');
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="edit-plan-btn"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateField',
+        field: 'plan',
+        value: 'New plan content',
+      });
+    });
+  });
+
+  test.describe('Implementation Notes', () => {
+    test('shows empty placeholder when notes are absent', async ({ page }) => {
+      await expect(page.locator('[data-testid="implementationNotes-view"]')).toContainText(
+        'No notes'
+      );
+    });
+
+    test('displays notes content when provided', async ({ page }) => {
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...sampleTaskData,
+          task: { ...sampleTask, implementationNotes: 'Used approach X.' },
+          notesHtml: '<p>Used approach X.</p>',
+        },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="implementationNotes-view"]')).toContainText(
+        'Used approach X.'
+      );
+    });
+
+    test('toggles to edit mode and sends updateField for implementationNotes', async ({ page }) => {
+      await page.locator('[data-testid="edit-implementationNotes-btn"]').click();
+      await expect(
+        page.locator('[data-testid="implementationNotes-section"] [data-testid="markdown-editor"]')
+      ).toBeVisible();
+
+      const tinyMDE = page.locator('[data-testid="implementationNotes-section"] .TinyMDE');
+      await tinyMDE.click();
+      await selectAllInTinyMDE(page);
+      await page.keyboard.type('Updated notes');
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="edit-implementationNotes-btn"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateField',
+        field: 'implementationNotes',
+        value: 'Updated notes',
+      });
+    });
+  });
+
+  test.describe('Final Summary', () => {
+    test('shows final summary section for editable tasks (even when empty)', async ({ page }) => {
+      await expect(page.locator('[data-testid="finalSummary-section"]')).toBeVisible();
+      await expect(page.locator('[data-testid="finalSummary-view"]')).toContainText('No summary');
+    });
+
+    test('hides final summary section in read-only mode when empty', async ({ page }) => {
+      await postMessageToWebview(page, { type: 'taskData', data: readOnlyTaskData });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="finalSummary-section"]')).toHaveCount(0);
+    });
+
+    test('shows final summary section in read-only mode when populated', async ({ page }) => {
+      await postMessageToWebview(page, {
+        type: 'taskData',
+        data: {
+          ...readOnlyTaskData,
+          task: { ...readOnlyTaskData.task, finalSummary: 'Completed with Z.' },
+          finalSummaryHtml: '<p>Completed with Z.</p>',
+        },
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="finalSummary-section"]')).toBeVisible();
+      await expect(page.locator('[data-testid="finalSummary-view"]')).toContainText(
+        'Completed with Z.'
+      );
+    });
+
+    test('toggles to edit mode and sends updateField for finalSummary', async ({ page }) => {
+      await page.locator('[data-testid="edit-finalSummary-btn"]').click();
+      await expect(
+        page.locator('[data-testid="finalSummary-section"] [data-testid="markdown-editor"]')
+      ).toBeVisible();
+
+      const tinyMDE = page.locator('[data-testid="finalSummary-section"] .TinyMDE');
+      await tinyMDE.click();
+      await selectAllInTinyMDE(page);
+      await page.keyboard.type('Summary text');
+      await clearPostedMessages(page);
+      await page.locator('[data-testid="edit-finalSummary-btn"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toEqual({
+        type: 'updateField',
+        field: 'finalSummary',
+        value: 'Summary text',
       });
     });
   });

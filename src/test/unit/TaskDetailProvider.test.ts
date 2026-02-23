@@ -846,6 +846,124 @@ describe('TaskDetailProvider', () => {
     });
   });
 
+  describe('sendTaskData body section HTML', () => {
+    it('should include planHtml when task has a plan', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Task with plan',
+        description: '',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        plan: '1. Step one\n2. Step two',
+        filePath,
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.planHtml).toContain('Step one');
+    });
+
+    it('should include notesHtml when task has implementationNotes', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Task with notes',
+        description: '',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        implementationNotes: 'Found that X required Y approach.',
+        filePath,
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.notesHtml).toContain('Found that X required Y approach');
+    });
+
+    it('should include finalSummaryHtml when task has finalSummary', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Task with summary',
+        description: '',
+        status: 'Done',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        finalSummary: 'Completed with approach Z.',
+        filePath,
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.finalSummaryHtml).toContain('Completed with approach Z');
+    });
+
+    it('should send empty strings for missing body sections', async () => {
+      const filePath = '/test/backlog/tasks/task-1.md';
+
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Task with no body sections',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath,
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const postMessageCalls = (mockWebview.postMessage as Mock).mock.calls;
+      const taskDataCall = postMessageCalls.find(
+        (call: unknown[]) => (call[0] as { type: string }).type === 'taskData'
+      );
+      expect(taskDataCall).toBeTruthy();
+      expect(taskDataCall![0].data.planHtml).toBe('');
+      expect(taskDataCall![0].data.notesHtml).toBe('');
+      expect(taskDataCall![0].data.finalSummaryHtml).toBe('');
+    });
+  });
+
   describe('sendTaskData isArchived', () => {
     it('should set isArchived: true when task folder is archive', async () => {
       const filePath = '/test/backlog/archive/tasks/task-5.md';

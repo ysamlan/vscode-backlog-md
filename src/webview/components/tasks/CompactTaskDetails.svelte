@@ -17,6 +17,9 @@
     task: TaskWithBlocks | null;
     statuses: string[];
     descriptionHtml: string;
+    planHtml: string;
+    notesHtml: string;
+    finalSummaryHtml: string;
     subtaskSummaries: SubtaskSummary[];
     onOpenFull: (task: TaskWithBlocks) => void;
     onOpenSubtask: (subtask: SubtaskSummary) => void;
@@ -29,6 +32,9 @@
     task,
     statuses,
     descriptionHtml,
+    planHtml,
+    notesHtml,
+    finalSummaryHtml,
     subtaskSummaries,
     onOpenFull,
     onOpenSubtask,
@@ -211,6 +217,39 @@
         <span class="compact-muted">No description.</span>
       {/if}
     </div>
+
+    {#if planHtml}
+      <div class="compact-description-heading">Implementation Plan</div>
+      <div
+        class="compact-description markdown-content"
+        data-testid="compact-plan"
+        use:renderMermaidAction={planHtml}
+      >
+        {@html planHtml}
+      </div>
+    {/if}
+
+    {#if notesHtml}
+      <div class="compact-description-heading">Implementation Notes</div>
+      <div
+        class="compact-description markdown-content"
+        data-testid="compact-notes"
+        use:renderMermaidAction={notesHtml}
+      >
+        {@html notesHtml}
+      </div>
+    {/if}
+
+    {#if finalSummaryHtml}
+      <div class="compact-description-heading">Final Summary</div>
+      <div
+        class="compact-description markdown-content"
+        data-testid="compact-final-summary"
+        use:renderMermaidAction={finalSummaryHtml}
+      >
+        {@html finalSummaryHtml}
+      </div>
+    {/if}
 
     {#if subtaskSummaries.length > 0}
       <div class="compact-subtasks-heading">Subtasks ({subtaskSummaries.length})</div>
