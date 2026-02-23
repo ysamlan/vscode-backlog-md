@@ -54,7 +54,7 @@ export interface Task {
   definitionOfDone: ChecklistItem[];
   implementationNotes?: string;
   finalSummary?: string;
-  plan?: string;
+  implementationPlan?: string;
   references?: string[];
   documentation?: string[];
   type?: string;

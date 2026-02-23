@@ -5,7 +5,6 @@
   import TaskHeader from './TaskHeader.svelte';
   import MetaSection from './MetaSection.svelte';
   import SubtasksSection from './SubtasksSection.svelte';
-  import DescriptionSection from './DescriptionSection.svelte';
   import Checklist from './Checklist.svelte';
   import MarkdownSection from './MarkdownSection.svelte';
   import ActionButtons from './ActionButtons.svelte';
@@ -123,7 +122,7 @@
   }
 
   function handleUpdatePlan(value: string) {
-    vscode.postMessage({ type: 'updateField', field: 'plan', value });
+    vscode.postMessage({ type: 'updateField', field: 'implementationPlan', value });
   }
 
   function handleUpdateImplementationNotes(value: string) {
@@ -272,10 +271,13 @@
     />
   {/if}
 
-  <DescriptionSection
+  <MarkdownSection
     taskId={task.id}
-    description={task.description || ''}
-    {descriptionHtml}
+    title="Description"
+    fieldName="description"
+    content={task.description || ''}
+    contentHtml={descriptionHtml}
+    emptyLabel="No description"
     onUpdate={handleUpdateDescription}
     {isReadOnly}
   />
@@ -303,8 +305,8 @@
   <MarkdownSection
     taskId={task.id}
     title="Implementation Plan"
-    fieldName="plan"
-    content={task.plan || ''}
+    fieldName="implementationPlan"
+    content={task.implementationPlan || ''}
     contentHtml={planHtml}
     emptyLabel="No plan"
     onUpdate={handleUpdatePlan}

@@ -34,6 +34,9 @@ interface TaskDetailData {
   isBlocked: boolean;
   missingDependencyIds?: string[];
   descriptionHtml: string;
+  planHtml: string;
+  notesHtml: string;
+  finalSummaryHtml: string;
   isDraft?: boolean;
   isArchived?: boolean;
   isReadOnly?: boolean;
@@ -381,7 +384,7 @@ export class TaskDetailProvider {
 
       // Parse body section markdown
       const descriptionHtml = task.description ? await parseMarkdown(task.description) : '';
-      const planHtml = task.plan ? await parseMarkdown(task.plan) : '';
+      const planHtml = task.implementationPlan ? await parseMarkdown(task.implementationPlan) : '';
       const notesHtml = task.implementationNotes
         ? await parseMarkdown(task.implementationNotes)
         : '';

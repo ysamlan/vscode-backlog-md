@@ -280,7 +280,7 @@ describe('TaskPreviewViewProvider', () => {
       assignee: [],
       labels: [],
       dependencies: [],
-      plan: '1. First step\n2. Second step',
+      implementationPlan: '1. First step\n2. Second step',
       implementationNotes: 'Used **approach X**.',
       finalSummary: 'All done with `code`.',
     });

@@ -870,7 +870,9 @@ test.describe('Task Detail', () => {
 
   test.describe('Implementation Plan', () => {
     test('shows empty placeholder when plan is absent', async ({ page }) => {
-      await expect(page.locator('[data-testid="plan-view"]')).toContainText('No plan');
+      await expect(page.locator('[data-testid="implementationPlan-view"]')).toContainText(
+        'No plan'
+      );
     });
 
     test('displays plan content when provided', async ({ page }) => {
@@ -878,35 +880,35 @@ test.describe('Task Detail', () => {
         type: 'taskData',
         data: {
           ...sampleTaskData,
-          task: { ...sampleTask, plan: '1. First step\n2. Second step' },
+          task: { ...sampleTask, implementationPlan: '1. First step\n2. Second step' },
           planHtml: '<ol><li>First step</li><li>Second step</li></ol>',
         },
       });
       await page.waitForTimeout(50);
 
-      const planView = page.locator('[data-testid="plan-view"]');
+      const planView = page.locator('[data-testid="implementationPlan-view"]');
       await expect(planView).toContainText('First step');
       await expect(planView).toContainText('Second step');
     });
 
-    test('toggles to edit mode and sends updateField for plan', async ({ page }) => {
-      await page.locator('[data-testid="edit-plan-btn"]').click();
+    test('toggles to edit mode and sends updateField for implementationPlan', async ({ page }) => {
+      await page.locator('[data-testid="edit-implementationPlan-btn"]').click();
       await expect(
-        page.locator('[data-testid="plan-section"] [data-testid="markdown-editor"]')
+        page.locator('[data-testid="implementationPlan-section"] [data-testid="markdown-editor"]')
       ).toBeVisible();
-      await expect(page.locator('[data-testid="edit-plan-btn"]')).toHaveText('Done');
+      await expect(page.locator('[data-testid="edit-implementationPlan-btn"]')).toHaveText('Done');
 
-      const tinyMDE = page.locator('[data-testid="plan-section"] .TinyMDE');
+      const tinyMDE = page.locator('[data-testid="implementationPlan-section"] .TinyMDE');
       await tinyMDE.click();
       await selectAllInTinyMDE(page);
       await page.keyboard.type('New plan content');
       await clearPostedMessages(page);
-      await page.locator('[data-testid="edit-plan-btn"]').click();
+      await page.locator('[data-testid="edit-implementationPlan-btn"]').click();
 
       const message = await getLastPostedMessage(page);
       expect(message).toEqual({
         type: 'updateField',
-        field: 'plan',
+        field: 'implementationPlan',
         value: 'New plan content',
       });
     });

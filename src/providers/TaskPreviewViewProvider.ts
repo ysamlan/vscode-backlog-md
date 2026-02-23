@@ -115,7 +115,9 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
     const descriptionHtml = taskWithBlocks.description
       ? await parseMarkdown(taskWithBlocks.description)
       : '';
-    const planHtml = taskWithBlocks.plan ? await parseMarkdown(taskWithBlocks.plan) : '';
+    const planHtml = taskWithBlocks.implementationPlan
+      ? await parseMarkdown(taskWithBlocks.implementationPlan)
+      : '';
     const notesHtml = taskWithBlocks.implementationNotes
       ? await parseMarkdown(taskWithBlocks.implementationNotes)
       : '';

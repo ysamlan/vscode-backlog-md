@@ -860,7 +860,7 @@ describe('TaskDetailProvider', () => {
         dependencies: [],
         acceptanceCriteria: [],
         definitionOfDone: [],
-        plan: '1. Step one\n2. Step two',
+        implementationPlan: '1. Step one\n2. Step two',
         filePath,
       });
 

@@ -2394,7 +2394,7 @@ Summary text.
       const { original, roundTripped } = await roundTrip(content);
 
       expect(roundTripped.description).toBe(original.description);
-      expect(roundTripped.plan).toBe(original.plan);
+      expect(roundTripped.implementationPlan).toBe(original.implementationPlan);
       expect(roundTripped.implementationNotes).toBe(original.implementationNotes);
       expect(roundTripped.finalSummary).toBe(original.finalSummary);
       expect(roundTripped.acceptanceCriteria).toEqual(original.acceptanceCriteria);
@@ -2681,6 +2681,211 @@ reporter: "@original-reporter"
       const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
       const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
       expect(frontmatter.reporter).toBe('@original-reporter');
+    });
+  });
+
+  describe('updateTask structured sections', () => {
+    it('should update implementationPlan between existing SECTION:PLAN markers', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Old plan content
+<!-- SECTION:PLAN:END -->
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { implementationPlan: 'New plan content' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('<!-- SECTION:PLAN:BEGIN -->');
+      expect(writtenContent).toContain('New plan content');
+      expect(writtenContent).toContain('<!-- SECTION:PLAN:END -->');
+      expect(writtenContent).not.toContain('Old plan content');
+    });
+
+    it('should add SECTION:PLAN markers when ## Implementation Plan header exists but markers do not', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Implementation Plan
+
+Existing plan text without markers
+
+## Acceptance Criteria
+- [ ] #1 First criterion
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { implementationPlan: 'New plan content' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('<!-- SECTION:PLAN:BEGIN -->');
+      expect(writtenContent).toContain('New plan content');
+      expect(writtenContent).toContain('<!-- SECTION:PLAN:END -->');
+      expect(writtenContent).toContain('## Acceptance Criteria');
+    });
+
+    it('should create new ## Implementation Plan section when nothing exists', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+Some description
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { implementationPlan: 'Brand new plan' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('## Implementation Plan');
+      expect(writtenContent).toContain('<!-- SECTION:PLAN:BEGIN -->');
+      expect(writtenContent).toContain('Brand new plan');
+      expect(writtenContent).toContain('<!-- SECTION:PLAN:END -->');
+    });
+
+    it('should update implementationNotes between existing SECTION:NOTES markers', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Old notes
+<!-- SECTION:NOTES:END -->
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { implementationNotes: 'Updated notes' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('<!-- SECTION:NOTES:BEGIN -->');
+      expect(writtenContent).toContain('Updated notes');
+      expect(writtenContent).toContain('<!-- SECTION:NOTES:END -->');
+      expect(writtenContent).not.toContain('Old notes');
+    });
+
+    it('should create new ## Implementation Notes section when nothing exists', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+Some description
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { implementationNotes: 'Brand new notes' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('## Implementation Notes');
+      expect(writtenContent).toContain('<!-- SECTION:NOTES:BEGIN -->');
+      expect(writtenContent).toContain('Brand new notes');
+      expect(writtenContent).toContain('<!-- SECTION:NOTES:END -->');
+    });
+
+    it('should update finalSummary between existing SECTION:FINAL_SUMMARY markers', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Old summary
+<!-- SECTION:FINAL_SUMMARY:END -->
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { finalSummary: 'Updated summary' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('<!-- SECTION:FINAL_SUMMARY:BEGIN -->');
+      expect(writtenContent).toContain('Updated summary');
+      expect(writtenContent).toContain('<!-- SECTION:FINAL_SUMMARY:END -->');
+      expect(writtenContent).not.toContain('Old summary');
+    });
+
+    it('should create new ## Final Summary section when nothing exists', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Description
+
+Some description
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { finalSummary: 'Brand new summary' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('## Final Summary');
+      expect(writtenContent).toContain('<!-- SECTION:FINAL_SUMMARY:BEGIN -->');
+      expect(writtenContent).toContain('Brand new summary');
+      expect(writtenContent).toContain('<!-- SECTION:FINAL_SUMMARY:END -->');
+    });
+
+    it('should handle ## Notes header variant (legacy)', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Notes
+
+Some legacy notes without markers
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Summary
+<!-- SECTION:FINAL_SUMMARY:END -->
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask(
+        'TASK-1',
+        { implementationNotes: 'Updated legacy notes' },
+        mockParser
+      );
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('<!-- SECTION:NOTES:BEGIN -->');
+      expect(writtenContent).toContain('Updated legacy notes');
+      expect(writtenContent).toContain('<!-- SECTION:NOTES:END -->');
+      expect(writtenContent).toContain('## Final Summary');
     });
   });
 });
