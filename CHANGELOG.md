@@ -1,5 +1,41 @@
 # Changelog
 
+<a id="v0.3.4"></a>
+
+# [v0.3.4](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.4) - 2026-02-23
+
+## Features
+
+- add 'x' buttons to remove dependencies in edit view
+
+## Bugfixes
+
+- release workflow fixes for openvsx publishing by [@ysamlan](https://github.com/ysamlan) in [#5](https://github.com/ysamlan/vscode-backlog-md/pull/5)
+- fix positioning of autocomplete dropdowns for labels etc. with new styled input
+
+**Full Changelog**: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.3...v0.3.4
+
+[Changes][v0.3.4]
+
+<a id="v0.3.3"></a>
+
+# [v0.3.3](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.3) - 2026-02-23
+
+## New Features
+
+- Add Implementation Plan, Notes, and Final Summary sections by [@ysamlan](https://github.com/ysamlan) in [#2](https://github.com/ysamlan/vscode-backlog-md/pull/2)
+- Add double-click on task cards to open full edit view by [@ysamlan](https://github.com/ysamlan) in [#3](https://github.com/ysamlan/vscode-backlog-md/pull/3)
+
+## Bug Fixes
+
+- Fix issues with headers at end of markdown fields being swallowed by the editor on save
+- Fix bullet list / numbered list display in Markdown previews
+- Fix e2e test and release issue with dependency on npm dependency checks (unnecessary for us as a `bun` shop)
+
+**Full Changelog**: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.2...v0.3.3
+
+[Changes][v0.3.3]
+
 <a id="v0.3.2"></a>
 
 # [v0.3.2](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.2) - 2026-02-23
@@ -115,6 +151,8 @@ Initial public release.
 
 [Changes][v0.1.0]
 
+[v0.3.4]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.3...v0.3.4
+[v0.3.3]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.2...v0.3.3
 [v0.3.2]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://github.com/ysamlan/vscode-backlog-md/compare/0.2.3...v0.3.0

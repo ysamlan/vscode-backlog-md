@@ -2,7 +2,7 @@
   "name": "vscode-backlog-md",
   "displayName": "Backlog.md",
   "description": "Built-in views for browsing and managing Backlog.md tasks",
-  "version": "0.3.2",
+  "version": "0.3.4",
   "publisher": "ysamlan",
   "license": "MIT",
   "icon": "images/icon.png",
