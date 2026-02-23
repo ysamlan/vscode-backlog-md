@@ -1,5 +1,24 @@
 # Changelog
 
+<a id="v0.3.2"></a>
+
+# [v0.3.2](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.2) - 2026-02-23
+
+### Features
+
+- First-class Milestones
+  - Milestones are now sourced from backlog/milestones/ files, matching new upstream Backlog.md behavior
+  - Empty milestones are visible in the kanban "By Milestone" view so you can see your full roadmap
+  - New command: Backlog: Create Milestone in the command palette (accessible from the Kanban by-epic and task edit views too)
+
+### Bugfixes
+
+- Archiving a task now automatically removes its ID from other tasks' dependencies and references (matching upstream)
+
+**Full Changelog**: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.1...v0.3.2
+
+[Changes][v0.3.2]
+
 <a id="v0.3.1"></a>
 
 # [v0.3.1](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.1) - 2026-02-16
@@ -96,6 +115,7 @@ Initial public release.
 
 [Changes][v0.1.0]
 
+[v0.3.2]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.1...v0.3.2
 [v0.3.1]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.0...v0.3.1
 [v0.3.0]: https://github.com/ysamlan/vscode-backlog-md/compare/0.2.3...v0.3.0
 [0.2.3]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.2.2...0.2.3
