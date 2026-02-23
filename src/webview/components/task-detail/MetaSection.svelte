@@ -19,6 +19,8 @@
     onOpenTask: (taskId: string) => void;
     onAddBlockedByLink: (taskId: string) => void;
     onAddBlocksLink: (taskId: string) => void;
+    onRemoveBlockedByLink: (taskId: string) => void;
+    onRemoveBlocksLink: (taskId: string) => void;
     onFilterByLabel: (label: string) => void;
   }
 
@@ -42,6 +44,8 @@
     onOpenTask,
     onAddBlockedByLink,
     onAddBlocksLink,
+    onRemoveBlockedByLink,
+    onRemoveBlocksLink,
     onFilterByLabel,
   }: Props = $props();
 
@@ -51,6 +55,8 @@
   let blocksInput = $state('');
   let blockedByPickerOpen = $state(false);
   let blocksPickerOpen = $state(false);
+  let labelPickerOpen = $state(false);
+  let assigneePickerOpen = $state(false);
   const MAX_VISIBLE_SUGGESTIONS = 10;
 
   const blockedBySuggestions = $derived(
@@ -59,6 +65,22 @@
   const blocksSuggestions = $derived(
     getSuggestions(blocksInput, new Set(blocksTaskIds), MAX_VISIBLE_SUGGESTIONS)
   );
+  const labelSuggestions = $derived(getFilteredSuggestions(labelInput, uniqueLabels, labels));
+  const assigneeSuggestions = $derived(
+    getFilteredSuggestions(assigneeInput, uniqueAssignees, assignees)
+  );
+
+  function getFilteredSuggestions(
+    query: string,
+    allItems: string[],
+    excludeItems: string[]
+  ): string[] {
+    const normalized = query.trim().toLowerCase();
+    return allItems
+      .filter((item) => !excludeItems.includes(item))
+      .filter((item) => !normalized || item.toLowerCase().includes(normalized))
+      .slice(0, MAX_VISIBLE_SUGGESTIONS);
+  }
 
   function handleAddLabel(e: KeyboardEvent) {
     if (isReadOnly) return;
@@ -68,8 +90,10 @@
         onUpdateLabels([...labels, newLabel]);
       }
       labelInput = '';
+      labelPickerOpen = false;
     } else if (e.key === 'Escape') {
       labelInput = '';
+      labelPickerOpen = false;
       (e.target as HTMLInputElement).blur();
     }
   }
@@ -77,6 +101,21 @@
   function handleRemoveLabel(label: string) {
     if (isReadOnly) return;
     onUpdateLabels(labels.filter((l) => l !== label));
+  }
+
+  function selectLabelSuggestion(label: string) {
+    if (isReadOnly) return;
+    if (!labels.includes(label)) {
+      onUpdateLabels([...labels, label]);
+    }
+    labelInput = '';
+    labelPickerOpen = false;
+  }
+
+  function scheduleCloseLabelPicker() {
+    setTimeout(() => {
+      labelPickerOpen = false;
+    }, 100);
   }
 
   function handleAddAssignee(e: KeyboardEvent) {
@@ -87,8 +126,10 @@
         onUpdateAssignees([...assignees, newAssignee]);
       }
       assigneeInput = '';
+      assigneePickerOpen = false;
     } else if (e.key === 'Escape') {
       assigneeInput = '';
+      assigneePickerOpen = false;
       (e.target as HTMLInputElement).blur();
     }
   }
@@ -96,6 +137,21 @@
   function handleRemoveAssignee(assignee: string) {
     if (isReadOnly) return;
     onUpdateAssignees(assignees.filter((a) => a !== assignee));
+  }
+
+  function selectAssigneeSuggestion(assignee: string) {
+    if (isReadOnly) return;
+    if (!assignees.includes(assignee)) {
+      onUpdateAssignees([...assignees, assignee]);
+    }
+    assigneeInput = '';
+    assigneePickerOpen = false;
+  }
+
+  function scheduleCloseAssigneePicker() {
+    setTimeout(() => {
+      assigneePickerOpen = false;
+    }, 100);
   }
 
   function handleMilestoneChange(e: Event) {
@@ -257,16 +313,38 @@
             </span>
           </span>
         {/each}
-        <input
-          type="text"
-          class="add-label-input"
-          data-testid="add-label-input"
-          placeholder="+ Add"
-          list="labelSuggestions"
-          bind:value={labelInput}
-          disabled={isReadOnly}
-          onkeydown={handleAddLabel}
-        />
+        <div class="autocomplete-picker">
+          <input
+            type="text"
+            class="add-label-input"
+            data-testid="add-label-input"
+            placeholder="+ Add"
+            bind:value={labelInput}
+            disabled={isReadOnly}
+            onkeydown={handleAddLabel}
+            onfocus={() => {
+              if (!isReadOnly) labelPickerOpen = true;
+            }}
+            onblur={scheduleCloseLabelPicker}
+          />
+          {#if labelPickerOpen && labelSuggestions.length > 0}
+            <div class="autocomplete-suggestions" data-testid="label-suggestions" role="listbox">
+              {#each labelSuggestions as suggestion (suggestion)}
+                <button
+                  type="button"
+                  class="autocomplete-suggestion-item"
+                  data-testid="label-suggestion-{suggestion}"
+                  onmousedown={(e) => {
+                    e.preventDefault();
+                    selectLabelSuggestion(suggestion);
+                  }}
+                >
+                  {suggestion}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
 
@@ -290,16 +368,42 @@
             </span>
           </span>
         {/each}
-        <input
-          type="text"
-          class="add-assignee-input"
-          data-testid="add-assignee-input"
-          placeholder="+ Add"
-          list="assigneeSuggestions"
-          bind:value={assigneeInput}
-          disabled={isReadOnly}
-          onkeydown={handleAddAssignee}
-        />
+        <div class="autocomplete-picker">
+          <input
+            type="text"
+            class="add-assignee-input"
+            data-testid="add-assignee-input"
+            placeholder="+ Add"
+            bind:value={assigneeInput}
+            disabled={isReadOnly}
+            onkeydown={handleAddAssignee}
+            onfocus={() => {
+              if (!isReadOnly) assigneePickerOpen = true;
+            }}
+            onblur={scheduleCloseAssigneePicker}
+          />
+          {#if assigneePickerOpen && assigneeSuggestions.length > 0}
+            <div
+              class="autocomplete-suggestions"
+              data-testid="assignee-suggestions"
+              role="listbox"
+            >
+              {#each assigneeSuggestions as suggestion (suggestion)}
+                <button
+                  type="button"
+                  class="autocomplete-suggestion-item"
+                  data-testid="assignee-suggestion-{suggestion}"
+                  onmousedown={(e) => {
+                    e.preventDefault();
+                    selectAssigneeSuggestion(suggestion);
+                  }}
+                >
+                  {suggestion}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
 
@@ -330,30 +434,45 @@
       <div class="meta-label">Blocked by</div>
       <div data-testid="blocked-by">
         {#if dependencies.length > 0}
-          {#each dependencies as dep, i (dep)}
-            {#if i > 0}, {/if}
-            <button
-              type="button"
-              class="dependency-link"
-              data-task-id={dep}
-              data-testid="dependency-link-{dep}"
-              onclick={() => onOpenTask(dep)}
-            >
-              {dep}
-            </button>
-            {#if missingDependencyIds.includes(dep)}
-              <span
-                class="missing-dependency-warning"
-                data-testid="missing-dependency-warning-{dep}"
-                title="Linked task not found"
-                aria-label="Linked task not found"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                </svg>
+          <div class="dependencies-list">
+            {#each dependencies as dep (dep)}
+              <span class="dependency-chip" data-testid="dependency-chip-{dep}">
+                <button
+                  type="button"
+                  class="dependency-link"
+                  data-task-id={dep}
+                  data-testid="dependency-link-{dep}"
+                  onclick={() => onOpenTask(dep)}
+                >
+                  {dep}
+                </button>
+                {#if missingDependencyIds.includes(dep)}
+                  <span
+                    class="missing-dependency-warning"
+                    data-testid="missing-dependency-warning-{dep}"
+                    title="Linked task not found"
+                    aria-label="Linked task not found"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    </svg>
+                  </span>
+                {/if}
+                {#if !isReadOnly}
+                  <span
+                    class="remove-dependency"
+                    data-testid="remove-blocked-by-{dep}"
+                    onclick={() => onRemoveBlockedByLink(dep)}
+                    onkeydown={(e) => e.key === 'Enter' && onRemoveBlockedByLink(dep)}
+                    role="button"
+                    tabindex={0}
+                  >
+                    ×
+                  </span>
+                {/if}
               </span>
-            {/if}
-          {/each}
+            {/each}
+          </div>
         {:else if isReadOnly}
           <span class="empty-value">None</span>
         {/if}
@@ -409,18 +528,33 @@
       <div class="meta-label">Blocks</div>
       <div data-testid="blocks">
         {#if blocksTaskIds.length > 0}
-          {#each blocksTaskIds as taskId, i (taskId)}
-            {#if i > 0}, {/if}
-            <button
-              type="button"
-              class="dependency-link"
-              data-task-id={taskId}
-              data-testid="blocks-link-{taskId}"
-              onclick={() => onOpenTask(taskId)}
-            >
-              {taskId}
-            </button>
-          {/each}
+          <div class="dependencies-list">
+            {#each blocksTaskIds as taskId (taskId)}
+              <span class="dependency-chip" data-testid="blocks-chip-{taskId}">
+                <button
+                  type="button"
+                  class="dependency-link"
+                  data-task-id={taskId}
+                  data-testid="blocks-link-{taskId}"
+                  onclick={() => onOpenTask(taskId)}
+                >
+                  {taskId}
+                </button>
+                {#if !isReadOnly}
+                  <span
+                    class="remove-dependency"
+                    data-testid="remove-blocks-{taskId}"
+                    onclick={() => onRemoveBlocksLink(taskId)}
+                    onkeydown={(e) => e.key === 'Enter' && onRemoveBlocksLink(taskId)}
+                    role="button"
+                    tabindex={0}
+                  >
+                    ×
+                  </span>
+                {/if}
+              </span>
+            {/each}
+          </div>
         {:else if isReadOnly}
           <span class="empty-value">None</span>
         {/if}
@@ -472,16 +606,3 @@
     </div>
   </div>
 </div>
-
-<!-- Datalists for autocomplete -->
-<datalist id="labelSuggestions">
-  {#each uniqueLabels as l (l)}
-    <option value={l}></option>
-  {/each}
-</datalist>
-
-<datalist id="assigneeSuggestions">
-  {#each uniqueAssignees as a (a)}
-    <option value={a}></option>
-  {/each}
-</datalist>

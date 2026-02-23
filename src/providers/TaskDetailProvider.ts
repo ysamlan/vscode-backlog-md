@@ -886,6 +886,64 @@ export class TaskDetailProvider {
         }
         break;
       }
+
+      case 'removeBlockedByLink': {
+        if (!message.taskId || !this.parser || !TaskDetailProvider.currentTaskId) break;
+        const currentTask = await this.getCurrentTaskFromContext();
+        if (this.blockReadOnlyMutation(currentTask, 'remove blocked-by links')) break;
+        if (!currentTask) break;
+
+        if (!currentTask.dependencies.includes(message.taskId)) break;
+
+        try {
+          await this.writer.updateTask(
+            currentTask.id,
+            { dependencies: currentTask.dependencies.filter((dep) => dep !== message.taskId) },
+            this.parser,
+            TaskDetailProvider.currentFileHash
+          );
+          if (currentTask.filePath && fs.existsSync(currentTask.filePath)) {
+            const newContent = fs.readFileSync(currentTask.filePath, 'utf-8');
+            TaskDetailProvider.currentFileHash = computeContentHash(newContent);
+          }
+          await this.openTask(
+            TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId },
+            { preserveFocus: true }
+          );
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to remove dependency: ${error}`);
+        }
+        break;
+      }
+
+      case 'removeBlocksLink': {
+        if (!message.taskId || !this.parser || !TaskDetailProvider.currentTaskId) break;
+        const currentTask = await this.getCurrentTaskFromContext();
+        if (this.blockReadOnlyMutation(currentTask, 'remove blocks links')) break;
+        if (!currentTask) break;
+
+        const localTasks = await this.parser.getTasks();
+        const targetTask = localTasks.find((task) => task.id === message.taskId);
+        if (!targetTask) break;
+        if (this.blockReadOnlyMutation(targetTask, 'remove blocks links')) break;
+
+        if (!targetTask.dependencies.includes(currentTask.id)) break;
+
+        try {
+          await this.writer.updateTask(
+            targetTask.id,
+            { dependencies: targetTask.dependencies.filter((dep) => dep !== currentTask.id) },
+            this.parser
+          );
+          await this.openTask(
+            TaskDetailProvider.currentTaskRef ?? { taskId: TaskDetailProvider.currentTaskId },
+            { preserveFocus: true }
+          );
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to update blocked task: ${error}`);
+        }
+        break;
+      }
     }
   }
 

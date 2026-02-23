@@ -145,6 +145,14 @@
     vscode.postMessage({ type: 'addBlocksLink', taskId });
   }
 
+  function handleRemoveBlockedByLink(taskId: string) {
+    vscode.postMessage({ type: 'removeBlockedByLink', taskId });
+  }
+
+  function handleRemoveBlocksLink(taskId: string) {
+    vscode.postMessage({ type: 'removeBlocksLink', taskId });
+  }
+
   function handleFilterByLabel(label: string) {
     vscode.postMessage({ type: 'filterByLabel', label });
   }
@@ -256,6 +264,8 @@
       onOpenTask={handleOpenTask}
       onAddBlockedByLink={handleAddBlockedByLink}
       onAddBlocksLink={handleAddBlocksLink}
+      onRemoveBlockedByLink={handleRemoveBlockedByLink}
+      onRemoveBlocksLink={handleRemoveBlocksLink}
       onFilterByLabel={handleFilterByLabel}
       {isReadOnly}
     />
