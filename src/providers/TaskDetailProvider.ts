@@ -34,6 +34,9 @@ interface TaskDetailData {
   isBlocked: boolean;
   missingDependencyIds?: string[];
   descriptionHtml: string;
+  planHtml: string;
+  notesHtml: string;
+  finalSummaryHtml: string;
   isDraft?: boolean;
   isArchived?: boolean;
   isReadOnly?: boolean;
@@ -379,8 +382,13 @@ export class TaskDetailProvider {
       });
       const isBlocked = blockingDependencyIds.length > 0;
 
-      // Parse description markdown
+      // Parse body section markdown
       const descriptionHtml = task.description ? await parseMarkdown(task.description) : '';
+      const planHtml = task.implementationPlan ? await parseMarkdown(task.implementationPlan) : '';
+      const notesHtml = task.implementationNotes
+        ? await parseMarkdown(task.implementationNotes)
+        : '';
+      const finalSummaryHtml = task.finalSummary ? await parseMarkdown(task.finalSummary) : '';
 
       // Compute parent task info
       let parentTask: { id: string; title: string } | undefined;
@@ -426,6 +434,9 @@ export class TaskDetailProvider {
         isBlocked,
         missingDependencyIds: missingDependencyIds.length > 0 ? missingDependencyIds : undefined,
         descriptionHtml,
+        planHtml,
+        notesHtml,
+        finalSummaryHtml,
         isDraft: task.folder === 'drafts',
         isArchived: task.folder === 'archive',
         isReadOnly: isReadOnlyTask(task),

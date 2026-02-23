@@ -5,8 +5,8 @@
   import TaskHeader from './TaskHeader.svelte';
   import MetaSection from './MetaSection.svelte';
   import SubtasksSection from './SubtasksSection.svelte';
-  import DescriptionSection from './DescriptionSection.svelte';
   import Checklist from './Checklist.svelte';
+  import MarkdownSection from './MarkdownSection.svelte';
   import ActionButtons from './ActionButtons.svelte';
 
   // View state
@@ -25,6 +25,9 @@
   let isBlocked = $state(false);
   let missingDependencyIds: string[] = $state([]);
   let descriptionHtml = $state('');
+  let planHtml = $state('');
+  let notesHtml = $state('');
+  let finalSummaryHtml = $state('');
   let isDraft = $state(false);
   let isArchived = $state(false);
   let isReadOnly = $state(false);
@@ -48,6 +51,9 @@
           isBlocked = data.isBlocked;
           missingDependencyIds = data.missingDependencyIds ?? [];
           descriptionHtml = data.descriptionHtml;
+          planHtml = data.planHtml ?? '';
+          notesHtml = data.notesHtml ?? '';
+          finalSummaryHtml = data.finalSummaryHtml ?? '';
           isDraft = data.isDraft ?? false;
           isArchived = data.isArchived ?? false;
           isReadOnly = data.isReadOnly ?? false;
@@ -113,6 +119,18 @@
 
   function handleUpdateDefinitionOfDone(text: string) {
     vscode.postMessage({ type: 'updateField', field: 'definitionOfDone', value: text });
+  }
+
+  function handleUpdatePlan(value: string) {
+    vscode.postMessage({ type: 'updateField', field: 'implementationPlan', value });
+  }
+
+  function handleUpdateImplementationNotes(value: string) {
+    vscode.postMessage({ type: 'updateField', field: 'implementationNotes', value });
+  }
+
+  function handleUpdateFinalSummary(value: string) {
+    vscode.postMessage({ type: 'updateField', field: 'finalSummary', value });
   }
 
   function handleOpenTask(taskId: string) {
@@ -253,10 +271,13 @@
     />
   {/if}
 
-  <DescriptionSection
+  <MarkdownSection
     taskId={task.id}
-    description={task.description || ''}
-    {descriptionHtml}
+    title="Description"
+    fieldName="description"
+    content={task.description || ''}
+    contentHtml={descriptionHtml}
+    emptyLabel="No description"
     onUpdate={handleUpdateDescription}
     {isReadOnly}
   />
@@ -280,6 +301,41 @@
     onUpdateText={handleUpdateDefinitionOfDone}
     {isReadOnly}
   />
+
+  <MarkdownSection
+    taskId={task.id}
+    title="Implementation Plan"
+    fieldName="implementationPlan"
+    content={task.implementationPlan || ''}
+    contentHtml={planHtml}
+    emptyLabel="No plan"
+    onUpdate={handleUpdatePlan}
+    {isReadOnly}
+  />
+
+  <MarkdownSection
+    taskId={task.id}
+    title="Implementation Notes"
+    fieldName="implementationNotes"
+    content={task.implementationNotes || ''}
+    contentHtml={notesHtml}
+    emptyLabel="No notes"
+    onUpdate={handleUpdateImplementationNotes}
+    {isReadOnly}
+  />
+
+  {#if task.finalSummary || !isReadOnly}
+    <MarkdownSection
+      taskId={task.id}
+      title="Final Summary"
+      fieldName="finalSummary"
+      content={task.finalSummary || ''}
+      contentHtml={finalSummaryHtml}
+      emptyLabel="No summary"
+      onUpdate={handleUpdateFinalSummary}
+      {isReadOnly}
+    />
+  {/if}
 
   <ActionButtons
     onOpenFile={handleOpenFile}

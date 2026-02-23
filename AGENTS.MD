@@ -204,7 +204,7 @@ All providers use `BacklogParser` as their data source (already mtime-cached). R
 
 Upstream source: **https://github.com/MrLesk/Backlog.md**.
 
-> **Research workflow**: A local checkout lives at `/workspace/tmp/mrlesk-Backlog.md-src/`. Always use this for researching upstream functionality instead of fetching from GitHub. If the directory is missing, clone it: `git clone https://github.com/MrLesk/Backlog.md.git /workspace/tmp/mrlesk-Backlog.md-src`
+> **Research workflow**: A local checkout lives at `/workspace/tmp/mrlesk-Backlog.md-src/`. Always use this for researching upstream functionality instead of fetching from GitHub. **Before accessing, check if the directory exists** — it may already be present locally but will be missing in cloud/CI environments with a clean checkout. If the directory is missing, clone it: `mkdir -p /workspace/tmp && git clone https://github.com/MrLesk/Backlog.md.git /workspace/tmp/mrlesk-Backlog.md-src`. Do not re-clone if already present.
 
 > **Behavior alignment policy**: When there is a functionality/behavior question ("how should this work?"), first research how upstream Backlog.md implements it in TUI/web UI and come prepared with that context before proposing changes or asking the user to choose. You may still ask the user for preference or approval, but default behavior should match upstream unless there is a clear, documented reason to diverge.
 

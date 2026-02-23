@@ -17,6 +17,9 @@
   let task = $state<TaskWithBlocks | null>(null);
   let statuses = $state<string[]>([]);
   let descriptionHtml = $state('');
+  let planHtml = $state('');
+  let notesHtml = $state('');
+  let finalSummaryHtml = $state('');
   let subtaskSummaries = $state<SubtaskSummary[]>([]);
 
   onMessage((message) => {
@@ -25,12 +28,18 @@
         task = message.task as TaskWithBlocks;
         statuses = (message.statuses as string[]) || [];
         descriptionHtml = (message.descriptionHtml as string) || '';
+        planHtml = (message.planHtml as string) || '';
+        notesHtml = (message.notesHtml as string) || '';
+        finalSummaryHtml = (message.finalSummaryHtml as string) || '';
         subtaskSummaries = (message.subtaskSummaries as SubtaskSummary[]) || [];
         break;
       case 'taskPreviewCleared':
         task = null;
         statuses = [];
         descriptionHtml = '';
+        planHtml = '';
+        notesHtml = '';
+        finalSummaryHtml = '';
         subtaskSummaries = [];
         break;
     }
@@ -85,6 +94,9 @@
   {task}
   {statuses}
   {descriptionHtml}
+  {planHtml}
+  {notesHtml}
+  {finalSummaryHtml}
   {subtaskSummaries}
   onOpenFull={handleOpenFull}
   onOpenSubtask={handleOpenSubtask}

@@ -1682,7 +1682,7 @@ status: To Do
 - [ ] #1 Test
 `;
       const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
-      expect(task?.plan).toBe('1. First step\n2. Second step\n3. Third step');
+      expect(task?.implementationPlan).toBe('1. First step\n2. Second step\n3. Third step');
     });
 
     it('should parse ## Implementation Plan section as plan', () => {
@@ -1703,7 +1703,43 @@ status: To Do
 Some description
 `;
       const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
-      expect(task?.plan).toBe('- Step A\n- Step B');
+      expect(task?.implementationPlan).toBe('- Step A\n- Step B');
+    });
+
+    it('should preserve markdown headings inside structured section markers', () => {
+      const parser = new BacklogParser('/fake/path');
+      const content = `---
+id: TASK-1
+title: Test headings in plan
+status: To Do
+---
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. First step
+2. Second step
+
+## Some heading inside plan
+
+More content here
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Note text
+
+## Subheading in notes
+
+More notes
+<!-- SECTION:NOTES:END -->
+`;
+      const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
+      expect(task?.implementationPlan).toBe(
+        '1. First step\n2. Second step\n\n## Some heading inside plan\n\nMore content here'
+      );
+      expect(task?.implementationNotes).toBe('Note text\n\n## Subheading in notes\n\nMore notes');
     });
 
     it('should handle missing new fields gracefully', () => {
@@ -1718,7 +1754,7 @@ status: To Do
       expect(task?.references).toBeUndefined();
       expect(task?.documentation).toBeUndefined();
       expect(task?.type).toBeUndefined();
-      expect(task?.plan).toBeUndefined();
+      expect(task?.implementationPlan).toBeUndefined();
     });
 
     it('should handle references as single string', () => {
@@ -1764,7 +1800,7 @@ This is the plan content.
 These are implementation notes.
 `;
       const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
-      expect(task?.plan).toBe('This is the plan content.');
+      expect(task?.implementationPlan).toBe('This is the plan content.');
       expect(task?.implementationNotes).toBe('These are implementation notes.');
     });
   });
@@ -3345,7 +3381,7 @@ Step 1.
 Step 2.
 `;
       const task = parser.parseTaskContent(content, '/fake/path/task-1.md');
-      expect(task?.plan).toBe('Step 1.\n\nStep 2.');
+      expect(task?.implementationPlan).toBe('Step 1.\n\nStep 2.');
     });
 
     it('should preserve blank lines in final summary', () => {

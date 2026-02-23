@@ -4,27 +4,35 @@
 
   interface Props {
     taskId: string;
-    description: string;
-    descriptionHtml: string;
+    title: string;
+    fieldName: string;
+    content: string;
+    contentHtml: string;
+    emptyLabel?: string;
     onUpdate: (value: string) => void;
     isReadOnly?: boolean;
   }
 
-  let { taskId, description, descriptionHtml, onUpdate, isReadOnly = false }: Props = $props();
+  let {
+    taskId,
+    title,
+    fieldName,
+    content,
+    contentHtml,
+    emptyLabel = `No ${title.toLowerCase()}`,
+    onUpdate,
+    isReadOnly = false,
+  }: Props = $props();
 
   let isEditing = $state(false);
   let prevTaskId = '';
-  // Suppress onUpdate calls during task switch to prevent MarkdownEditor's
-  // onDestroy from flushing stale content to the newly-selected task.
   let suppressUpdate = false;
 
-  // Reset edit mode when switching to a different task.
   $effect(() => {
     if (taskId !== prevTaskId) {
       prevTaskId = taskId;
       suppressUpdate = true;
       isEditing = false;
-      // Re-enable after the destroy cycle completes.
       queueMicrotask(() => {
         suppressUpdate = false;
       });
@@ -48,12 +56,12 @@
   }
 </script>
 
-<div class="section">
+<div class="section" data-testid="{fieldName}-section">
   <div class="section-header">
-    <div class="section-title">Description</div>
+    <div class="section-title">{title}</div>
     <button
       class="edit-btn"
-      data-testid="edit-description-btn"
+      data-testid="edit-{fieldName}-btn"
       onclick={toggleEdit}
       onpointerdown={(e) => isEditing && e.stopPropagation()}
       disabled={isReadOnly}
@@ -64,8 +72,8 @@
   <div class="description-container">
     {#if isEditing}
       <MarkdownEditor
-        content={description}
-        placeholder="Add a description..."
+        content={content}
+        placeholder="Add {title.toLowerCase()}..."
         onUpdate={guardedUpdate}
         onExit={() => (isEditing = false)}
         {isReadOnly}
@@ -73,17 +81,17 @@
     {:else}
       <div
         class="markdown-content description-view"
-        data-testid="description-view"
+        data-testid="{fieldName}-view"
         onclick={handleViewClick}
         onkeydown={(e) => e.key === 'Enter' && handleViewClick()}
         role="button"
         tabindex={isReadOnly ? -1 : 0}
-        use:renderMermaidAction={descriptionHtml}
+        use:renderMermaidAction={contentHtml}
       >
-        {#if descriptionHtml}
-          {@html descriptionHtml}
+        {#if contentHtml}
+          {@html contentHtml}
         {:else}
-          <em class="empty-value">No description</em>
+          <em class="empty-value">{emptyLabel}</em>
         {/if}
       </div>
     {/if}

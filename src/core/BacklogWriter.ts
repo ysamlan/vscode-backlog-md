@@ -386,6 +386,27 @@ export class BacklogWriter {
         String((updates as Record<string, unknown>).definitionOfDone)
       );
     }
+    if (updates.implementationPlan !== undefined) {
+      updatedBody = this.updateStructuredSectionInBody(
+        updatedBody,
+        'implementationPlan',
+        updates.implementationPlan
+      );
+    }
+    if (updates.implementationNotes !== undefined) {
+      updatedBody = this.updateStructuredSectionInBody(
+        updatedBody,
+        'implementationNotes',
+        updates.implementationNotes
+      );
+    }
+    if (updates.finalSummary !== undefined) {
+      updatedBody = this.updateStructuredSectionInBody(
+        updatedBody,
+        'finalSummary',
+        updates.finalSummary
+      );
+    }
 
     // Reconstruct the file
     const updatedContent = this.reconstructFile(frontmatter, updatedBody);
@@ -824,6 +845,72 @@ export class BacklogWriter {
 
     // No section header — append new section
     return `${body}\n${sectionHeader}\n${beginMarker}\n${newContent}\n${endMarker}\n`;
+  }
+
+  private static readonly STRUCTURED_SECTIONS: Record<
+    string,
+    { title: string; markerId: string; headerVariants: RegExp }
+  > = {
+    implementationPlan: {
+      title: 'Implementation Plan',
+      markerId: 'PLAN',
+      headerVariants: /^## (?:Implementation )?Plan\s*$/m,
+    },
+    implementationNotes: {
+      title: 'Implementation Notes',
+      markerId: 'NOTES',
+      headerVariants: /^## (?:Implementation )?Notes\s*$/m,
+    },
+    finalSummary: {
+      title: 'Final Summary',
+      markerId: 'FINAL_SUMMARY',
+      headerVariants: /^## (?:Final )?Summary\s*$/m,
+    },
+  };
+
+  /**
+   * Update a structured section (Implementation Plan, Notes, Final Summary) in the markdown body.
+   * Uses the same 3-tier fallback as updateDescriptionInBody:
+   *  1. Markers exist → replace between them
+   *  2. Header exists but no markers → add markers around existing content
+   *  3. Nothing exists → append new section
+   */
+  private updateStructuredSectionInBody(
+    body: string,
+    sectionKey: string,
+    newContent: string
+  ): string {
+    const config = BacklogWriter.STRUCTURED_SECTIONS[sectionKey];
+    if (!config) return body;
+
+    const beginMarker = `<!-- SECTION:${config.markerId}:BEGIN -->`;
+    const endMarker = `<!-- SECTION:${config.markerId}:END -->`;
+
+    const beginIndex = body.indexOf(beginMarker);
+    const endIndex = body.indexOf(endMarker);
+
+    if (beginIndex !== -1 && endIndex !== -1 && endIndex > beginIndex) {
+      // Tier 1: Replace content between markers
+      const before = body.substring(0, beginIndex + beginMarker.length);
+      const after = body.substring(endIndex);
+      return `${before}\n${newContent}\n${after}`;
+    }
+
+    // Tier 2: Header exists but no markers
+    const match = body.match(config.headerVariants);
+    if (match && match.index !== undefined) {
+      const afterHeader = body.substring(match.index + match[0].length);
+      const nextSectionMatch = afterHeader.match(/^## /m);
+      const nextSectionIndex = nextSectionMatch?.index ?? afterHeader.length;
+
+      const before = body.substring(0, match.index + match[0].length);
+      const after = body.substring(match.index + match[0].length + nextSectionIndex);
+
+      return `${before}\n\n${beginMarker}\n${newContent}\n${endMarker}\n${after}`;
+    }
+
+    // Tier 3: Nothing exists — append new section
+    return `${body}\n## ${config.title}\n\n${beginMarker}\n${newContent}\n${endMarker}\n`;
   }
 
   /**

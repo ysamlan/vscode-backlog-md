@@ -1724,6 +1724,7 @@ body {
 .markdown-content ol {
   margin: 0.5em 0;
   padding-left: 2em;
+  list-style: revert;
 }
 
 .markdown-content li {

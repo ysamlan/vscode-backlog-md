@@ -508,10 +508,21 @@ export class BacklogParser {
     const summaryLines: string[] = [];
     const planLines: string[] = [];
     let inDescriptionBlock = false;
+    let inStructuredBlock = false;
 
     for (let i = lineIndex; i < lines.length; i++) {
       const line = lines[i];
       const trimmedLine = line.trim();
+
+      // Track structured section markers (PLAN, NOTES, FINAL_SUMMARY)
+      if (/^<!-- SECTION:(?:PLAN|NOTES|FINAL_SUMMARY):BEGIN -->$/.test(trimmedLine)) {
+        inStructuredBlock = true;
+        continue;
+      }
+      if (/^<!-- SECTION:(?:PLAN|NOTES|FINAL_SUMMARY):END -->$/.test(trimmedLine)) {
+        inStructuredBlock = false;
+        continue;
+      }
 
       // Track description section markers
       if (trimmedLine === '<!-- SECTION:DESCRIPTION:BEGIN -->') {
@@ -532,8 +543,8 @@ export class BacklogParser {
         continue;
       }
 
-      // Parse sections
-      if (trimmedLine.startsWith('## ')) {
+      // Parse sections — skip header detection when inside structured block markers
+      if (trimmedLine.startsWith('## ') && !inStructuredBlock) {
         const sectionName = trimmedLine.substring(3).toLowerCase();
 
         if (sectionName.includes('description')) {
@@ -600,7 +611,7 @@ export class BacklogParser {
     task.description = descriptionLines.join('\n').trim() || undefined;
     task.implementationNotes = notesLines.join('\n').trim() || undefined;
     task.finalSummary = summaryLines.join('\n').trim() || undefined;
-    task.plan = planLines.join('\n').trim() || undefined;
+    task.implementationPlan = planLines.join('\n').trim() || undefined;
 
     return task.title ? task : undefined;
   }

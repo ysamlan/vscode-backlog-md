@@ -22,3 +22,12 @@ Users are not redirected to the dashboard after successful login.
 - [ ] #1 Login redirects to dashboard
 - [ ] #2 Remember last visited page
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Trace the login form submit handler to find where redirect is (not) happening
+2. Check if `returnTo` query param is being captured before the auth redirect
+3. After successful login, redirect to `returnTo` or default to `/dashboard`
+4. Add integration test covering the redirect-after-login flow
+<!-- SECTION:PLAN:END -->

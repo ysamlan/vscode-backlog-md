@@ -450,8 +450,7 @@ Description here.
 <!-- SECTION:PLAN:END -->`;
 
       const task = parseTask(content, '/fake/path/task-42 - Plan-test.md');
-      // Local uses `plan` field, upstream uses `implementationPlan`
-      expect(task!.plan).toBe('1. Step one\n2. Step two');
+      expect(task!.implementationPlan).toBe('1. Step one\n2. Step two');
     });
 
     it('should extract final summary', () => {
@@ -906,7 +905,7 @@ Completed successfully.
     expect(task!.acceptanceCriteria).toHaveLength(2);
     expect(task!.acceptanceCriteria[0].checked).toBe(true);
     expect(task!.definitionOfDone).toHaveLength(1);
-    expect(task!.plan).toBe('1. Do thing A');
+    expect(task!.implementationPlan).toBe('1. Do thing A');
     expect(task!.implementationNotes).toBe('Note about approach.');
     expect(task!.finalSummary).toBe('Completed successfully.');
   });

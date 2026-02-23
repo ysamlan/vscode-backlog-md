@@ -35,6 +35,9 @@ const samplePreviewData = {
   type: 'taskPreviewData' as const,
   task: sampleTask,
   descriptionHtml: '<p>A detailed description of the task.</p>',
+  planHtml: '',
+  notesHtml: '',
+  finalSummaryHtml: '',
   statuses: ['To Do', 'In Progress', 'Done'],
   isReadOnly: false,
   subtaskSummaries: [
@@ -136,8 +139,36 @@ test.describe('Task Preview Panel', () => {
     });
 
     test('displays description text', async ({ page }) => {
-      await expect(page.locator('.compact-description')).toContainText(
+      await expect(page.locator('.compact-description').first()).toContainText(
         'A detailed description of the task.'
+      );
+    });
+
+    test('hides plan, notes, and summary sections when empty', async ({ page }) => {
+      await expect(page.locator('[data-testid="compact-plan"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="compact-notes"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="compact-final-summary"]')).toHaveCount(0);
+    });
+
+    test('displays plan, notes, and summary sections when populated', async ({ page }) => {
+      await postMessageToWebview(page, {
+        ...samplePreviewData,
+        task: {
+          ...sampleTask,
+          plan: '1. Step one',
+          implementationNotes: 'Used approach X.',
+          finalSummary: 'Completed.',
+        },
+        planHtml: '<ol><li>Step one</li></ol>',
+        notesHtml: '<p>Used approach X.</p>',
+        finalSummaryHtml: '<p>Completed.</p>',
+      });
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="compact-plan"]')).toContainText('Step one');
+      await expect(page.locator('[data-testid="compact-notes"]')).toContainText('Used approach X.');
+      await expect(page.locator('[data-testid="compact-final-summary"]')).toContainText(
+        'Completed.'
       );
     });
 

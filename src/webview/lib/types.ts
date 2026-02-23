@@ -69,6 +69,9 @@ export interface TaskDetailData {
   isBlocked: boolean;
   missingDependencyIds?: string[];
   descriptionHtml: string;
+  planHtml: string;
+  notesHtml: string;
+  finalSummaryHtml: string;
   isDraft?: boolean;
   isArchived?: boolean;
   isReadOnly?: boolean;

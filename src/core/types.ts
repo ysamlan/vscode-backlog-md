@@ -54,7 +54,7 @@ export interface Task {
   definitionOfDone: ChecklistItem[];
   implementationNotes?: string;
   finalSummary?: string;
-  plan?: string;
+  implementationPlan?: string;
   references?: string[];
   documentation?: string[];
   type?: string;
@@ -301,6 +301,9 @@ export type ExtensionMessage =
       task: Task;
       statuses: string[];
       descriptionHtml: string;
+      planHtml: string;
+      notesHtml: string;
+      finalSummaryHtml: string;
       isReadOnly: boolean;
       readOnlyReason?: string;
       subtaskSummaries?: Array<{
