@@ -2219,6 +2219,13 @@ body {
   opacity: 0.6;
 }
 
+/* Ghost parent row: dimmed, non-interactive context row for filtered-out parents */
+.task-table tr.ghost-parent-row {
+  opacity: 0.45;
+  pointer-events: none;
+  font-style: italic;
+}
+
 .subtask-row {
   opacity: 0.85;
 }

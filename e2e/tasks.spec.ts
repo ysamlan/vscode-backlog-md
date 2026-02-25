@@ -1302,6 +1302,139 @@ test.describe('Tasks View', () => {
     });
   });
 
+  test.describe('List View - Ghost Parent for Filtered-Out Parents', () => {
+    const parentChildTasks: (Task & { blocksTaskIds?: string[] })[] = [
+      {
+        id: 'TASK-21',
+        title: 'Parent task (done)',
+        status: 'Done',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-21.md',
+      },
+      {
+        id: 'TASK-21.1',
+        title: 'Subtask still in progress',
+        status: 'In Progress',
+        parentTaskId: 'TASK-21',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-21.1.md',
+      },
+      {
+        id: 'TASK-22',
+        title: 'Unrelated task',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/tasks/task-22.md',
+      },
+    ];
+
+    test('injects ghost parent row when parent is filtered out by not-done filter', async ({
+      page,
+    }) => {
+      await setupListViewWithTasks(page, parentChildTasks);
+
+      // Default filter is "not-done" which hides Done tasks (TASK-21)
+      // But TASK-21.1 is In Progress, so it should appear with a ghost parent
+      const ghostRow = page.locator('tr.ghost-parent-row');
+      await expect(ghostRow).toHaveCount(1);
+      await expect(ghostRow).toHaveAttribute('data-task-id', 'TASK-21');
+    });
+
+    test('ghost parent row is followed by its subtask with connector', async ({ page }) => {
+      await setupListViewWithTasks(page, parentChildTasks);
+
+      const rows = page.locator('tbody tr');
+      const count = await rows.count();
+      const taskIds: string[] = [];
+      for (let i = 0; i < count; i++) {
+        taskIds.push((await rows.nth(i).getAttribute('data-task-id'))!);
+      }
+
+      // Ghost parent TASK-21 should appear immediately before TASK-21.1
+      const parentIdx = taskIds.indexOf('TASK-21');
+      const childIdx = taskIds.indexOf('TASK-21.1');
+      expect(parentIdx).toBeGreaterThanOrEqual(0);
+      expect(childIdx).toBe(parentIdx + 1);
+
+      // Subtask row should have connector
+      const subtaskRow = page.locator('[data-testid="task-row-TASK-21.1"]');
+      await expect(subtaskRow).toHaveClass(/subtask-row/);
+      await expect(subtaskRow.locator('.subtask-connector')).toBeVisible();
+    });
+
+    test('ghost parent row is not interactive', async ({ page }) => {
+      await setupListViewWithTasks(page, parentChildTasks);
+      await clearPostedMessages(page);
+
+      const ghostRow = page.locator('tr.ghost-parent-row');
+
+      // pointer-events: none means clicks won't register, but let's also verify
+      // tabindex is -1 (not focusable)
+      await expect(ghostRow).toHaveAttribute('tabindex', '-1');
+
+      // Verify no messages were sent (ghost row should not trigger selectTask)
+      const messages = await getPostedMessages(page);
+      const selectMessages = messages.filter(
+        (m) => m.type === 'selectTask' && m.taskId === 'TASK-21'
+      );
+      expect(selectMessages).toHaveLength(0);
+    });
+
+    test('no ghost parent when parent is visible (all filter)', async ({ page }) => {
+      await setupListViewWithTasks(page, parentChildTasks);
+
+      // Switch to "All" to show all tasks including Done
+      await page.locator('[data-testid="status-filter"]').selectOption('all');
+      await page.waitForTimeout(50);
+
+      // No ghost rows should exist — parent is visible normally
+      await expect(page.locator('tr.ghost-parent-row')).toHaveCount(0);
+
+      // All 3 tasks visible
+      await expect(page.locator('tbody tr')).toHaveCount(3);
+    });
+
+    test('subtask renders as top-level when parent is truly missing', async ({ page }) => {
+      // Only the subtask, no parent in the task list at all
+      const orphanOnly: (Task & { blocksTaskIds?: string[] })[] = [
+        {
+          id: 'TASK-99.1',
+          title: 'Orphan subtask',
+          status: 'To Do',
+          parentTaskId: 'TASK-99',
+          labels: [],
+          assignee: [],
+          dependencies: [],
+          acceptanceCriteria: [],
+          definitionOfDone: [],
+          filePath: '/test/tasks/task-99.1.md',
+        },
+      ];
+
+      await setupListViewWithTasks(page, orphanOnly);
+
+      // No ghost parent (TASK-99 doesn't exist in the data at all)
+      await expect(page.locator('tr.ghost-parent-row')).toHaveCount(0);
+
+      // Subtask renders as top-level (no subtask-row class)
+      const row = page.locator('[data-testid="task-row-TASK-99.1"]');
+      await expect(row).toBeVisible();
+      await expect(row).not.toHaveClass(/subtask-row/);
+    });
+  });
+
   test.describe('List View Sorting', () => {
     const sortTestTasks: (Task & { blocksTaskIds?: string[] })[] = [
       {

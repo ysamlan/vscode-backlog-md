@@ -1,7 +1,7 @@
 ---
 id: TASK-2
 title: Implement user authentication
-status: In Progress
+status: Done
 priority: high
 milestone: v1.0
 labels: [feature]

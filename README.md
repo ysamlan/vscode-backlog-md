@@ -101,6 +101,7 @@ Open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P) and type "Backlog":
 | **Backlog: Show Documents**           | Browse project documents                                  |
 | **Backlog: Show Decisions**           | Browse decision records                                   |
 | **Backlog: Create Task**              | Create a new task file                                    |
+| **Backlog: Create Milestone**         | Create a new milestone                                    |
 | **Backlog: Open Task Markdown**       | Open the raw Markdown file for the current task           |
 | **Backlog: Select Active Backlog**    | Switch backlogs (in a multi-folder workspace)             |
 | **Backlog: Set Up Agent Integration** | Install Backlog.md CLI and configure AI agent integration |

@@ -171,7 +171,7 @@
   });
 
   // Build hierarchical display list: insert subtasks directly after their parent
-  type DisplayEntry = { task: TaskWithBlocks; isSubtask: boolean };
+  type DisplayEntry = { task: TaskWithBlocks; isSubtask: boolean; isGhostParent: boolean };
   let displayTasks = $derived.by((): DisplayEntry[] => {
     // Build a lookup of parentTaskId -> children present in sortedTasks
     const childrenByParent: Record<string, TaskWithBlocks[]> = {};
@@ -186,30 +186,43 @@
 
     // If there are no subtasks at all, skip the extra work
     if (Object.keys(subtaskIds).length === 0) {
-      return sortedTasks.map((task) => ({ task, isSubtask: false }));
+      return sortedTasks.map((task) => ({ task, isSubtask: false, isGhostParent: false }));
     }
 
     const result: DisplayEntry[] = [];
+    const sortedTaskIds = new Set(sortedTasks.map((t) => t.id));
+
     for (const task of sortedTasks) {
       // Skip subtasks in their original sorted position; they will be
       // inserted after their parent instead.
       if (subtaskIds[task.id]) continue;
 
-      result.push({ task, isSubtask: false });
+      result.push({ task, isSubtask: false, isGhostParent: false });
 
       // Append any children of this task immediately after it
       const children = childrenByParent[task.id];
       if (children) {
         for (const child of children) {
-          result.push({ task: child, isSubtask: true });
+          result.push({ task: child, isSubtask: true, isGhostParent: false });
         }
       }
     }
 
-    // Append orphaned subtasks whose parent is not in the current list
-    for (const task of sortedTasks) {
-      if (subtaskIds[task.id] && !result.some((e) => e.task.id === task.id)) {
-        result.push({ task, isSubtask: true });
+    // Inject ghost parents for orphaned subtasks whose parent is not in the filtered list
+    const taskLookup = new Map(tasks.map((t) => [t.id, t]));
+    for (const [parentId, children] of Object.entries(childrenByParent)) {
+      if (sortedTaskIds.has(parentId)) continue; // parent already in list
+      const parentTask = taskLookup.get(parentId);
+      if (parentTask) {
+        result.push({ task: parentTask as TaskWithBlocks, isSubtask: false, isGhostParent: true });
+        for (const child of children) {
+          result.push({ task: child, isSubtask: true, isGhostParent: false });
+        }
+      } else {
+        // Parent truly missing (deleted/archived) — render subtasks as top-level
+        for (const child of children) {
+          result.push({ task: child, isSubtask: false, isGhostParent: false });
+        }
       }
     }
 
@@ -495,14 +508,14 @@
           ondragleave={handleDragLeave}
           ondrop={handleDrop}
         >
-          {#each displayTasks as { task, isSubtask } (taskRowKey(task))}
+          {#each displayTasks as { task, isSubtask, isGhostParent } (taskRowKey(task))}
             {@const blockerCount = task.blockingDependencyIds?.length ?? 0}
             {@const isReadOnly = isReadOnlyTask(task)}
             <tr
               data-task-id={task.id}
               data-testid="task-row-{task.id}"
-              tabindex="0"
-              draggable={isDragEnabled && !isDraftsView && !isArchivedView && !isSubtask ? 'true' : undefined}
+              tabindex={isGhostParent ? -1 : 0}
+              draggable={isDragEnabled && !isDraftsView && !isArchivedView && !isSubtask && !isGhostParent ? 'true' : undefined}
               class:dragging={draggedTaskId === task.id}
               class:drop-before={dropTargetTaskId === task.id && dropPosition === 'before'}
               class:drop-after={dropTargetTaskId === task.id && dropPosition === 'after'}
@@ -512,14 +525,15 @@
               class:archived-row={isArchivedView}
               class:subtask-row={isSubtask}
               class:readonly-row={isReadOnly}
-              onclick={() => handleRowClickGuarded(task)}
-              ondblclick={() => handleRowDoubleClick(task)}
-              onfocus={() =>
+              class:ghost-parent-row={isGhostParent}
+              onclick={isGhostParent ? undefined : () => handleRowClickGuarded(task)}
+              ondblclick={isGhostParent ? undefined : () => handleRowDoubleClick(task)}
+              onfocus={isGhostParent ? undefined : () =>
                 onSelectTask(task.id, { filePath: task.filePath, source: task.source, branch: task.branch })}
-              onkeydown={(e) => handleRowKeydown(e, task)}
-              ondragstart={(e) => handleDragStart(e, task.id)}
-              ondragend={handleDragEnd}
-              ondragover={(e) => handleDragOver(e, task.id)}
+              onkeydown={isGhostParent ? undefined : (e) => handleRowKeydown(e, task)}
+              ondragstart={isGhostParent ? undefined : (e) => handleDragStart(e, task.id)}
+              ondragend={isGhostParent ? undefined : handleDragEnd}
+              ondragover={isGhostParent ? undefined : (e) => handleDragOver(e, task.id)}
             >
               {#if isDragEnabled && !isDraftsView && !isArchivedView}
                 {#if isSubtask}
