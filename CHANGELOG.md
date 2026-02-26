@@ -1,5 +1,39 @@
 # Changelog
 
+<a id="v0.3.5"></a>
+
+# [v0.3.5](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.5) - 2026-02-26
+
+A few bugfixes and several changes to align better with upstream backlog.md behavior.
+
+### Added
+
+- Priority filter in list view.
+- Better cross-branch task-state filtering across tasks, drafts, completed, and archive/
+  tasks.
+
+### Changed
+
+- Aligned parser/writer and task views with upstream Backlog.md behavior (status
+  handling, sorting, ordering, and compatibility details).
+- Preserved source line endings (CRLF/LF) during task rewrites.
+
+### Fixed
+
+- Cross-branch views no longer show completed/archived tasks as live.
+- Filtered list no longer mis-renders subtasks under unrelated parents (new ghost parent row
+  behavior).
+- Kanban/list sorting and grouping edge cases (priority tiebreaking, done-column recency
+  sort, case-insensitive status matching, uncategorized milestone ordering).
+
+### Model-only (no UI)
+
+- Upstream parity for Task → draft demotion, status-change callbacks, Document/Decision CRUD and extended milestone lifecycle operations.
+
+**Full Changelog**: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.4...v0.3.5
+
+[Changes][v0.3.5]
+
 <a id="v0.3.4"></a>
 
 # [v0.3.4](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.4) - 2026-02-23
@@ -151,6 +185,7 @@ Initial public release.
 
 [Changes][v0.1.0]
 
+[v0.3.5]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.4...v0.3.5
 [v0.3.4]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.3...v0.3.4
 [v0.3.3]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.2...v0.3.3
 [v0.3.2]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.1...v0.3.2
