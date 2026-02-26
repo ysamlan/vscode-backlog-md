@@ -459,6 +459,290 @@ status: To Do
 });
 
 /**
+ * Tests for completed/archived task state filtering.
+ * Verifies that tasks completed or archived on one branch are not shown
+ * as live when found in tasks/ on an ancestor branch.
+ */
+describe('CrossBranchTaskLoader - Completed/Archived State Filtering', () => {
+  // Helper to create a task file in a specific directory
+  const writeTaskFile = (dir: string, id: string, title: string, status: string) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const content = `---
+id: ${id}
+title: ${title}
+status: ${status}
+---
+
+# ${id} - ${title}
+`;
+    const filename = `${id.toLowerCase()} - ${title.replace(/\s+/g, '-')}.md`;
+    fs.writeFileSync(path.join(dir, filename), content);
+  };
+
+  const gitInDir = (dir: string, command: string, env?: Record<string, string>) => {
+    execSync(`git ${command}`, {
+      cwd: dir,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@test.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@test.com',
+        ...env,
+      },
+    });
+  };
+
+  const commitWithDate = (dir: string, message: string, date: string) => {
+    execSync(`git commit -m "${message}" --date="${date}"`, {
+      cwd: dir,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Test',
+        GIT_AUTHOR_EMAIL: 'test@test.com',
+        GIT_COMMITTER_NAME: 'Test',
+        GIT_COMMITTER_EMAIL: 'test@test.com',
+        GIT_AUTHOR_DATE: date,
+        GIT_COMMITTER_DATE: date,
+      },
+    });
+  };
+
+  describe('Completed on current branch, active on ancestor', () => {
+    let tempDir: string;
+
+    afterAll(() => {
+      if (tempDir && fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should NOT show task completed on current branch but active on ancestor', async () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'state-completed-test-'));
+      const backlogDir = path.join(tempDir, 'backlog');
+      fs.mkdirSync(backlogDir);
+
+      gitInDir(tempDir, 'init -b main');
+      gitInDir(tempDir, 'config user.email "test@test.com"');
+      gitInDir(tempDir, 'config user.name "Test"');
+
+      // Create config
+      fs.writeFileSync(
+        path.join(backlogDir, 'config.yml'),
+        'check_active_branches: true\nactive_branch_days: 30\n'
+      );
+
+      // Create TASK-1 and TASK-2 on main with older timestamp
+      const taskDir = path.join(backlogDir, 'tasks');
+      writeTaskFile(taskDir, 'TASK-1', 'Task One', 'To Do');
+      writeTaskFile(taskDir, 'TASK-2', 'Task Two', 'To Do');
+
+      const olderDate = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      gitInDir(tempDir, 'add .');
+      commitWithDate(tempDir, 'Initial tasks on main', olderDate);
+
+      // Create feature branch and complete TASK-1
+      gitInDir(tempDir, 'checkout -b feature');
+      const completedDir = path.join(backlogDir, 'completed');
+      writeTaskFile(completedDir, 'TASK-1', 'Task One', 'Done');
+      fs.unlinkSync(path.join(taskDir, 'task-1 - Task-One.md'));
+      gitInDir(tempDir, 'add .');
+      gitInDir(tempDir, 'commit -m "Complete TASK-1"');
+
+      // Stay on feature (current branch)
+      const gitService = new GitBranchService(tempDir);
+      const parser = new BacklogParser(backlogDir);
+      const config = await parser.getConfig();
+      const loader = new CrossBranchTaskLoader(gitService, parser, config, backlogDir);
+
+      const tasks = await loader.loadTasksAcrossBranches();
+      const taskIds = tasks.map((t) => t.id);
+
+      // TASK-1 is completed on feature (current) → should NOT appear
+      expect(taskIds).not.toContain('TASK-1');
+      // TASK-2 is still active on both branches → should appear
+      expect(taskIds).toContain('TASK-2');
+    });
+  });
+
+  describe('Archived on another branch, active on ancestor', () => {
+    let tempDir: string;
+
+    afterAll(() => {
+      if (tempDir && fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should NOT show task archived on a more recent branch', async () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'state-archived-test-'));
+      const backlogDir = path.join(tempDir, 'backlog');
+      fs.mkdirSync(backlogDir);
+
+      gitInDir(tempDir, 'init -b main');
+      gitInDir(tempDir, 'config user.email "test@test.com"');
+      gitInDir(tempDir, 'config user.name "Test"');
+
+      fs.writeFileSync(
+        path.join(backlogDir, 'config.yml'),
+        'check_active_branches: true\nactive_branch_days: 30\n'
+      );
+
+      // Create TASK-1 on main with older timestamp
+      const taskDir = path.join(backlogDir, 'tasks');
+      writeTaskFile(taskDir, 'TASK-1', 'Task One', 'To Do');
+
+      const olderDate = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      gitInDir(tempDir, 'add .');
+      commitWithDate(tempDir, 'Initial task on main', olderDate);
+
+      // Create archive branch and archive TASK-1
+      gitInDir(tempDir, 'checkout -b archive-branch');
+      const archiveDir = path.join(backlogDir, 'archive', 'tasks');
+      writeTaskFile(archiveDir, 'TASK-1', 'Task One', 'To Do');
+      fs.unlinkSync(path.join(taskDir, 'task-1 - Task-One.md'));
+
+      const midDate = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      gitInDir(tempDir, 'add .');
+      commitWithDate(tempDir, 'Archive TASK-1', midDate);
+
+      // Create current branch from archive-branch (linear history: main → archive → current)
+      gitInDir(tempDir, 'checkout -b current');
+      // Add a new task so current branch has something
+      writeTaskFile(taskDir, 'TASK-2', 'Task Two', 'In Progress');
+      gitInDir(tempDir, 'add .');
+      gitInDir(tempDir, 'commit -m "Add TASK-2"');
+
+      const gitService = new GitBranchService(tempDir);
+      const parser = new BacklogParser(backlogDir);
+      const config = await parser.getConfig();
+      const loader = new CrossBranchTaskLoader(gitService, parser, config, backlogDir);
+
+      const tasks = await loader.loadTasksAcrossBranches();
+      const taskIds = tasks.map((t) => t.id);
+
+      // TASK-1 archived on archive-branch (more recent than main) → should NOT appear
+      expect(taskIds).not.toContain('TASK-1');
+      // TASK-2 is active on current → should appear
+      expect(taskIds).toContain('TASK-2');
+    });
+  });
+
+  describe('Completed on ancestor, active on current', () => {
+    let tempDir: string;
+
+    afterAll(() => {
+      if (tempDir && fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should show task that is active on current branch even if completed on ancestor', async () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'state-reactivated-test-'));
+      const backlogDir = path.join(tempDir, 'backlog');
+      fs.mkdirSync(backlogDir);
+
+      gitInDir(tempDir, 'init -b main');
+      gitInDir(tempDir, 'config user.email "test@test.com"');
+      gitInDir(tempDir, 'config user.name "Test"');
+
+      fs.writeFileSync(
+        path.join(backlogDir, 'config.yml'),
+        'check_active_branches: true\nactive_branch_days: 30\n'
+      );
+
+      // On main: TASK-1 in completed/ (older timestamp)
+      const taskDir = path.join(backlogDir, 'tasks');
+      fs.mkdirSync(taskDir, { recursive: true });
+      const completedDir = path.join(backlogDir, 'completed');
+      writeTaskFile(completedDir, 'TASK-1', 'Task One', 'Done');
+
+      const olderDate = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      gitInDir(tempDir, 'add .');
+      commitWithDate(tempDir, 'TASK-1 completed on main', olderDate);
+
+      // Create feature branch where TASK-1 is reactivated (back in tasks/)
+      gitInDir(tempDir, 'checkout -b feature');
+      writeTaskFile(taskDir, 'TASK-1', 'Task One', 'In Progress');
+      fs.unlinkSync(path.join(completedDir, 'task-1 - Task-One.md'));
+      gitInDir(tempDir, 'add .');
+      gitInDir(tempDir, 'commit -m "Reactivate TASK-1"');
+
+      const gitService = new GitBranchService(tempDir);
+      const parser = new BacklogParser(backlogDir);
+      const config = await parser.getConfig();
+      const loader = new CrossBranchTaskLoader(gitService, parser, config, backlogDir);
+
+      const tasks = await loader.loadTasksAcrossBranches();
+      const taskIds = tasks.map((t) => t.id);
+
+      // TASK-1 is active on current (more recent) → should appear
+      expect(taskIds).toContain('TASK-1');
+      const task1 = tasks.find((t) => t.id === 'TASK-1');
+      expect(task1!.status).toBe('In Progress');
+    });
+  });
+
+  describe('Active on all branches', () => {
+    let tempDir: string;
+
+    afterAll(() => {
+      if (tempDir && fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should show task that is active on all branches (resolved normally)', async () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'state-active-all-test-'));
+      const backlogDir = path.join(tempDir, 'backlog');
+      fs.mkdirSync(backlogDir);
+
+      gitInDir(tempDir, 'init -b main');
+      gitInDir(tempDir, 'config user.email "test@test.com"');
+      gitInDir(tempDir, 'config user.name "Test"');
+
+      fs.writeFileSync(
+        path.join(backlogDir, 'config.yml'),
+        'check_active_branches: true\nactive_branch_days: 30\n'
+      );
+
+      // Create TASK-1 on main
+      const taskDir = path.join(backlogDir, 'tasks');
+      writeTaskFile(taskDir, 'TASK-1', 'Task One', 'To Do');
+
+      const olderDate = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      gitInDir(tempDir, 'add .');
+      commitWithDate(tempDir, 'Add TASK-1 on main', olderDate);
+
+      // Create feature branch with TASK-1 updated
+      gitInDir(tempDir, 'checkout -b feature');
+      writeTaskFile(taskDir, 'TASK-1', 'Task One', 'In Progress');
+      gitInDir(tempDir, 'add .');
+      gitInDir(tempDir, 'commit -m "Update TASK-1 on feature"');
+
+      const gitService = new GitBranchService(tempDir);
+      const parser = new BacklogParser(backlogDir);
+      const config: BacklogConfig = {
+        check_active_branches: true,
+        active_branch_days: 30,
+        task_resolution_strategy: 'most_recent',
+      };
+      const loader = new CrossBranchTaskLoader(gitService, parser, config, backlogDir);
+
+      const tasks = await loader.loadTasksAcrossBranches();
+      const taskIds = tasks.map((t) => t.id);
+
+      // TASK-1 is active on all branches → should appear
+      expect(taskIds).toContain('TASK-1');
+    });
+  });
+});
+
+/**
  * Unit tests for resolution logic in isolation
  */
 describe('CrossBranchTaskLoader - Resolution Logic', () => {

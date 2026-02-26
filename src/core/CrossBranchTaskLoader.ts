@@ -44,6 +44,44 @@ interface TaskFileIndexEntry {
 }
 
 /**
+ * Which directory a task file lives in — used for state tracking across branches.
+ * Matches upstream's state snapshot pattern.
+ */
+type TaskDirectoryType = 'task' | 'draft' | 'completed' | 'archived';
+
+/**
+ * State entry tracking a task's directory location on a specific branch.
+ * Used to determine the latest state of a task across all branches —
+ * e.g., a task completed on branch B should shadow the active version on ancestor branch A.
+ */
+interface BranchTaskStateEntry {
+  taskId: string;
+  type: TaskDirectoryType;
+  branch: string;
+  lastModified: Date;
+}
+
+/**
+ * Result of indexing a branch — contains both hydration entries (tasks/ only)
+ * and state entries (all directories) for filtering.
+ */
+interface BranchIndexResult {
+  indexEntries: TaskFileIndexEntry[];
+  stateEntries: BranchTaskStateEntry[];
+}
+
+/**
+ * Directories to scan for state tracking on each branch.
+ * Only 'task' entries are hydrated; others are used for filtering only.
+ */
+const STATE_DIRECTORIES: Array<{ path: string; type: TaskDirectoryType }> = [
+  { path: 'backlog/tasks', type: 'task' },
+  { path: 'backlog/drafts', type: 'draft' },
+  { path: 'backlog/completed', type: 'completed' },
+  { path: 'backlog/archive/tasks', type: 'archived' },
+];
+
+/**
  * Loads and merges tasks from multiple git branches.
  * Uses an index-first strategy: builds a cheap file index per branch,
  * then only reads full content for tasks that need hydrating.
@@ -96,6 +134,23 @@ export class CrossBranchTaskLoader {
         localTaskMap.set(task.id, task);
       }
 
+      // Collect state entries — track task locations across all branches for filtering
+      const allStateEntries: BranchTaskStateEntry[] = [];
+
+      // Add state entries for local active tasks
+      for (const task of localTasks) {
+        allStateEntries.push({
+          taskId: task.id,
+          type: 'task',
+          branch: currentBranch,
+          lastModified: task.lastModified || new Date(0),
+        });
+      }
+
+      // Scan current branch's completed/archived/drafts directories for state tracking
+      const localNonActiveEntries = await this.collectLocalStateEntries(currentBranch);
+      allStateEntries.push(...localNonActiveEntries);
+
       // Filter out current branch from git scanning
       const otherBranches = branches.filter((b) => b.name !== currentBranch);
 
@@ -110,8 +165,9 @@ export class CrossBranchTaskLoader {
         const results = await Promise.all(
           batch.map((branch) => this.buildBranchIndex(branch.name))
         );
-        for (const entries of results) {
-          allIndexEntries.push(...entries);
+        for (const result of results) {
+          allIndexEntries.push(...result.indexEntries);
+          allStateEntries.push(...result.stateEntries);
         }
       }
 
@@ -150,10 +206,13 @@ export class CrossBranchTaskLoader {
 
       const mergedTasks = this.mergeTasksByResolutionStrategy(taskGroups);
 
+      // Phase 5: Filter by state — exclude tasks whose latest state is completed/archived/draft
+      const filteredTasks = this.filterByLatestState(mergedTasks, allStateEntries);
+
       console.log(
-        `[CrossBranchTaskLoader] Loaded ${mergedTasks.length} tasks from ${branches.length} branches`
+        `[CrossBranchTaskLoader] Loaded ${filteredTasks.length} tasks (${mergedTasks.length - filteredTasks.length} filtered by state) from ${branches.length} branches`
       );
-      return mergedTasks;
+      return filteredTasks;
     } catch (error) {
       console.error('[CrossBranchTaskLoader] Error loading cross-branch tasks:', error);
       throw error;
@@ -194,37 +253,51 @@ export class CrossBranchTaskLoader {
 
   /**
    * Build a cheap index of task files on a branch (no content reads).
-   * Uses batch timestamp collection for efficiency.
+   * Scans all state directories for state tracking, but only creates
+   * hydration entries for tasks/ (active tasks).
    */
-  private async buildBranchIndex(branch: string): Promise<TaskFileIndexEntry[]> {
-    const tasksRelativePath = 'backlog/tasks';
-
+  private async buildBranchIndex(branch: string): Promise<BranchIndexResult> {
     const backlogExists = await this.gitService.pathExistsOnBranch(branch, 'backlog');
     if (!backlogExists) {
-      return [];
+      return { indexEntries: [], stateEntries: [] };
     }
 
-    // Get file list and modification timestamps in parallel
-    const [taskFiles, modifiedMap] = await Promise.all([
-      this.gitService.listFilesInPath(branch, tasksRelativePath),
-      this.gitService.getFileModifiedMap(branch, tasksRelativePath),
-    ]);
+    // Scan all state directories in parallel
+    const dirResults = await Promise.all(
+      STATE_DIRECTORIES.map(async (dir) => {
+        const [files, modifiedMap] = await Promise.all([
+          this.gitService.listFilesInPath(branch, dir.path),
+          this.gitService.getFileModifiedMap(branch, dir.path),
+        ]);
+        return { files, modifiedMap, type: dir.type };
+      })
+    );
 
-    const entries: TaskFileIndexEntry[] = [];
-    for (const filename of taskFiles) {
-      if (!filename.endsWith('.md')) continue;
+    const indexEntries: TaskFileIndexEntry[] = [];
+    const stateEntries: BranchTaskStateEntry[] = [];
 
-      // Extract task ID from filename (e.g., "task-1 - Test-task.md" → "TASK-1")
-      const idMatch = filename.match(/^([a-zA-Z]+-\d+(?:\.\d+)*)/i);
-      if (!idMatch) continue;
+    for (const { files, modifiedMap, type } of dirResults) {
+      for (const filename of files) {
+        if (!filename.endsWith('.md')) continue;
 
-      const taskId = idMatch[1].toUpperCase();
-      const lastModified = modifiedMap.get(filename) || new Date(0);
+        // Extract task ID from filename (e.g., "task-1 - Test-task.md" → "TASK-1")
+        const idMatch = filename.match(/^([a-zA-Z]+-\d+(?:\.\d+)*)/i);
+        if (!idMatch) continue;
 
-      entries.push({ filename, taskId, lastModified, branch });
+        const taskId = idMatch[1].toUpperCase();
+        const lastModified = modifiedMap.get(filename) || new Date(0);
+
+        // State entry for all directories (used for filtering)
+        stateEntries.push({ taskId, type, branch, lastModified });
+
+        // Hydration entry only for active tasks
+        if (type === 'task') {
+          indexEntries.push({ filename, taskId, lastModified, branch });
+        }
+      }
     }
 
-    return entries;
+    return { indexEntries, stateEntries };
   }
 
   /**
@@ -275,6 +348,66 @@ export class CrossBranchTaskLoader {
       );
       return null;
     }
+  }
+
+  /**
+   * Collect state entries from the current branch's non-task directories
+   * (completed, archived, drafts). Uses git to list files and get timestamps.
+   */
+  private async collectLocalStateEntries(currentBranch: string): Promise<BranchTaskStateEntry[]> {
+    const entries: BranchTaskStateEntry[] = [];
+    const dirsToScan: Array<{ path: string; type: TaskDirectoryType }> = [
+      { path: 'backlog/completed', type: 'completed' },
+      { path: 'backlog/archive/tasks', type: 'archived' },
+      { path: 'backlog/drafts', type: 'draft' },
+    ];
+
+    const results = await Promise.all(
+      dirsToScan.map(async (dir) => {
+        const [files, modifiedMap] = await Promise.all([
+          this.gitService.listFilesInPath(currentBranch, dir.path),
+          this.gitService.getFileModifiedMap(currentBranch, dir.path),
+        ]);
+        return { files, modifiedMap, type: dir.type };
+      })
+    );
+
+    for (const { files, modifiedMap, type } of results) {
+      for (const filename of files) {
+        if (!filename.endsWith('.md')) continue;
+        const idMatch = filename.match(/^([a-zA-Z]+-\d+(?:\.\d+)*)/i);
+        if (!idMatch) continue;
+
+        const taskId = idMatch[1].toUpperCase();
+        const lastModified = modifiedMap.get(filename) || new Date(0);
+        entries.push({ taskId, type, branch: currentBranch, lastModified });
+      }
+    }
+
+    return entries;
+  }
+
+  /**
+   * Build a latest-state map and filter tasks whose latest state is not 'task'.
+   * This prevents completed/archived tasks from appearing as live when found
+   * on ancestor branches — matching upstream's state snapshot pattern.
+   */
+  private filterByLatestState(tasks: Task[], stateEntries: BranchTaskStateEntry[]): Task[] {
+    // Build latest state map: for each task ID, keep the entry with most recent lastModified
+    const latestStateMap = new Map<string, BranchTaskStateEntry>();
+    for (const entry of stateEntries) {
+      const existing = latestStateMap.get(entry.taskId);
+      if (!existing || entry.lastModified.getTime() > existing.lastModified.getTime()) {
+        latestStateMap.set(entry.taskId, entry);
+      }
+    }
+
+    // Filter: only include tasks whose latest state is an active task
+    return tasks.filter((task) => {
+      const latestState = latestStateMap.get(task.id);
+      if (!latestState) return true;
+      return latestState.type === 'task';
+    });
   }
 
   /**
