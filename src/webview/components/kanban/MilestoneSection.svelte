@@ -45,7 +45,7 @@
   let displayName = $derived(milestoneLabel);
 
   // Progress calculation
-  let doneTasks = $derived(tasks.filter((t) => t.status === 'Done').length);
+  let doneTasks = $derived(tasks.filter((t) => t.status.toLowerCase() === 'done').length);
   let totalTasks = $derived(tasks.length);
   let progressPct = $derived(totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0);
 
@@ -92,7 +92,7 @@
   <div class="milestone-content">
     <div class="kanban-board nested">
       {#each columns as col (col.status)}
-        {@const columnTasks = tasks.filter((t) => t.status === col.status)}
+        {@const columnTasks = tasks.filter((t) => t.status.toLowerCase() === col.status.toLowerCase())}
         <KanbanColumn
           status={col.status}
           label={col.label}

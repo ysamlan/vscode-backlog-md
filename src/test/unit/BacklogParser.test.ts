@@ -2514,6 +2514,27 @@ status: To Do
       computeSubtasks(tasks);
       expect(tasks).toEqual([]);
     });
+
+    it('should populate subtaskSummaries with title and status', () => {
+      const tasks = [
+        makeTask({ id: 'TASK-1', title: 'Parent', status: 'In Progress' }),
+        makeTask({ id: 'TASK-1.1', title: 'Child One', status: 'Done', parentTaskId: 'TASK-1' }),
+        makeTask({ id: 'TASK-1.2', title: 'Child Two', status: 'To Do', parentTaskId: 'TASK-1' }),
+      ];
+
+      computeSubtasks(tasks);
+
+      expect(tasks[0].subtaskSummaries).toEqual([
+        { id: 'TASK-1.1', title: 'Child One', status: 'Done' },
+        { id: 'TASK-1.2', title: 'Child Two', status: 'To Do' },
+      ]);
+    });
+
+    it('should not set subtaskSummaries for tasks without children', () => {
+      const tasks = [makeTask({ id: 'TASK-1' })];
+      computeSubtasks(tasks);
+      expect(tasks[0].subtaskSummaries).toBeUndefined();
+    });
   });
 
   describe('getArchivedTasks', () => {

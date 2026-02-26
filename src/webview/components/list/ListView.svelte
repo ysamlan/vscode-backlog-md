@@ -22,6 +22,7 @@
     currentFilter: string;
     currentMilestone: string;
     currentLabel: string;
+    currentPriority: string;
     searchQuery: string;
     isDraftsView?: boolean;
     isArchivedView?: boolean;
@@ -30,6 +31,7 @@
     onFilterChange: (filter: string) => void;
     onMilestoneChange: (milestone: string) => void;
     onLabelChange: (label: string) => void;
+    onPriorityChange: (priority: string) => void;
     onSearchChange: (query: string) => void;
     onReorderTasks?: (updates: Array<{ taskId: string; ordinal: number }>) => void;
     onReadOnlyDragAttempt?: (task: TaskWithBlocks) => void;
@@ -44,6 +46,7 @@
     currentFilter,
     currentMilestone,
     currentLabel,
+    currentPriority,
     searchQuery,
     isDraftsView = false,
     isArchivedView = false,
@@ -52,13 +55,14 @@
     onFilterChange,
     onMilestoneChange,
     onLabelChange,
+    onPriorityChange,
     onSearchChange,
     onReorderTasks,
     onReadOnlyDragAttempt,
   }: Props = $props();
 
   let statusOrder = $derived(
-    Object.fromEntries(statuses.map((status, index) => [status, index])) as Record<string, number>
+    Object.fromEntries(statuses.map((status, index) => [status.toLowerCase(), index])) as Record<string, number>
   );
 
   let currentSort = $state<{ field: string; direction: 'asc' | 'desc' }>({
@@ -98,11 +102,11 @@
     if (!isDraftsView && !isArchivedView) {
       const filterStatus = getFilterStatus(currentFilter);
       if (filterStatus) {
-        filtered = filtered.filter((t) => t.status === filterStatus);
+        filtered = filtered.filter((t) => t.status.toLowerCase() === filterStatus.toLowerCase());
       } else if (currentFilter === 'not-done') {
         const lastStatus = statuses[statuses.length - 1];
         if (lastStatus) {
-          filtered = filtered.filter((t) => t.status !== lastStatus);
+          filtered = filtered.filter((t) => t.status.toLowerCase() !== lastStatus.toLowerCase());
         }
       }
     }
@@ -125,6 +129,10 @@
       filtered = filtered.filter((t) => t.labels.includes(currentLabel));
     }
 
+    if (currentPriority) {
+      filtered = filtered.filter((t) => (t.priority || '') === currentPriority);
+    }
+
     return filtered;
   });
 
@@ -142,8 +150,8 @@
       }
 
       if (currentSort.field === 'status') {
-        aVal = statusOrder[aVal as string] ?? statuses.length;
-        bVal = statusOrder[bVal as string] ?? statuses.length;
+        aVal = statusOrder[(aVal as string).toLowerCase()] ?? statuses.length;
+        bVal = statusOrder[(bVal as string).toLowerCase()] ?? statuses.length;
       }
 
       let cmp: number;
@@ -158,8 +166,8 @@
 
       // Ordinal tiebreaker when sorting by status (matches kanban ordering)
       if (currentSort.field === 'status') {
-        const cardA: CardData = { taskId: a.id, ordinal: a.ordinal };
-        const cardB: CardData = { taskId: b.id, ordinal: b.ordinal };
+        const cardA: CardData = { taskId: a.id, ordinal: a.ordinal, priority: a.priority };
+        const cardB: CardData = { taskId: b.id, ordinal: b.ordinal, priority: b.priority };
         return compareByOrdinal(cardA, cardB);
       }
 
@@ -303,7 +311,7 @@
     if (
       !draggedTask ||
       !targetTask ||
-      draggedTask.status !== targetTask.status ||
+      draggedTask.status.toLowerCase() !== targetTask.status.toLowerCase() ||
       isReadOnlyTask(draggedTask) ||
       isReadOnlyTask(targetTask)
     ) {
@@ -344,7 +352,7 @@
     if (
       !draggedTask ||
       !targetTask ||
-      draggedTask.status !== targetTask.status ||
+      draggedTask.status.toLowerCase() !== targetTask.status.toLowerCase() ||
       isReadOnlyTask(draggedTask) ||
       isReadOnlyTask(targetTask)
     ) {
@@ -353,7 +361,7 @@
     }
 
     // Get tasks in the same status group (in current sorted order)
-    const statusGroup = sortedTasks.filter((t) => t.status === draggedTask.status);
+    const statusGroup = sortedTasks.filter((t) => t.status.toLowerCase() === draggedTask.status.toLowerCase());
 
     // Build card data for the status group
     const existingCards: CardData[] = statusGroup.map((t) => ({
@@ -455,6 +463,17 @@
           {/each}
         </select>
       {/if}
+      <select
+        class="priority-filter"
+        value={currentPriority}
+        onchange={(e) => onPriorityChange((e.target as HTMLSelectElement).value)}
+        data-testid="priority-filter"
+      >
+        <option value="">All Priorities</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
     </div>
   {/if}
 

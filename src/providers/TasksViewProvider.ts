@@ -10,9 +10,11 @@ import {
   isReadOnlyTask,
   getReadOnlyTaskContext,
 } from '../core/types';
+import * as fs from 'fs';
 import { BacklogWriter } from '../core/BacklogWriter';
 import { computeSubtasks } from '../core/BacklogParser';
 import { TaskDetailProvider } from './TaskDetailProvider';
+import { StatusCallbackRunner } from '../core/StatusCallbackRunner';
 import { detectIntegration } from '../core/AgentIntegrationDetector';
 import { BacklogCli } from '../core/BacklogCli';
 
@@ -380,6 +382,26 @@ export class TasksViewProvider extends BaseViewProvider {
             updates.ordinal = message.ordinal;
           }
           await this.writer.updateTask(taskId, updates, this.parser);
+
+          // Run status change callback
+          if (task && this.parser) {
+            const config = await this.parser.getConfig();
+            const backlogPath = this.parser.getBacklogPath();
+            const taskContent = task.filePath ? fs.readFileSync(task.filePath, 'utf-8') : '';
+            const taskFm = taskContent.match(/onStatusChange:\s*(.+)/);
+            const taskCallback = taskFm?.[1]?.trim().replace(/^['"]|['"]$/g, '');
+            await StatusCallbackRunner.run(
+              backlogPath,
+              taskCallback,
+              config.on_status_change,
+              {
+                taskId,
+                oldStatus: originalStatus,
+                newStatus: message.status,
+                taskTitle: task.title,
+              }
+            );
+          }
 
           // Also update any additional cards that needed ordinals assigned
           if (message.additionalOrdinalUpdates && message.additionalOrdinalUpdates.length > 0) {

@@ -71,6 +71,7 @@ export interface Task {
   lastModified?: Date; // Last modification timestamp for conflict resolution
   reporter?: string; // Task reporter (upstream field)
   subtasks?: string[]; // IDs of subtask children
+  subtaskSummaries?: Array<{ id: string; title: string; status: string }>; // Enriched subtask data
   blocksTaskIds?: string[]; // Reverse dependencies: tasks that depend on this task
   blockingDependencyIds?: string[]; // Dependency IDs currently blocking this task in views
 }
@@ -230,6 +231,7 @@ export type WebviewMessage =
   | { type: 'filterByLabel'; label: string }
   | { type: 'completeTask'; taskId: string }
   | { type: 'promoteDraft'; taskId: string }
+  | { type: 'demoteTask'; taskId: string }
   | { type: 'discardDraft'; taskId: string }
   | { type: 'requestCompletedTasks' }
   | { type: 'createSubtask'; parentTaskId: string }

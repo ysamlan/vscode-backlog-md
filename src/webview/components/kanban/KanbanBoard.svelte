@@ -100,10 +100,8 @@
     }));
 
     if (uncategorized.length > 0) {
-      // Insert before empty milestones, after non-empty ones
-      const firstEmptyIdx = groups.findIndex((g) => g.tasks.length === 0);
-      const insertIdx = firstEmptyIdx === -1 ? groups.length : firstEmptyIdx;
-      groups.splice(insertIdx, 0, { id: null, label: 'Uncategorized', tasks: uncategorized });
+      // Always place uncategorized group first (upstream behavior)
+      groups.unshift({ id: null, label: 'Uncategorized', tasks: uncategorized });
     }
 
     return groups;
@@ -185,7 +183,7 @@
 {:else}
   <div class="kanban-board">
     {#each columns as col (col.status)}
-      {@const columnTasks = topLevelTasks.filter((t) => t.status === col.status)}
+      {@const columnTasks = topLevelTasks.filter((t) => t.status.toLowerCase() === col.status.toLowerCase())}
       <KanbanColumn
         status={col.status}
         label={col.label}

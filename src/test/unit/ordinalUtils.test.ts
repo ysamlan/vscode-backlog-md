@@ -47,6 +47,53 @@ describe('ordinalUtils', () => {
       const b: CardData = { taskId: 'A', ordinal: 1000 };
       expect(compareByOrdinal(a, b)).toBe(0);
     });
+
+    describe('priority tiebreaker', () => {
+      it('should use priority as tiebreaker when ordinals are equal', () => {
+        const a: CardData = { taskId: 'A', ordinal: 1000, priority: 'high' };
+        const b: CardData = { taskId: 'B', ordinal: 1000, priority: 'low' };
+        expect(compareByOrdinal(a, b)).toBeLessThan(0);
+        expect(compareByOrdinal(b, a)).toBeGreaterThan(0);
+      });
+
+      it('should use priority as tiebreaker when both have no ordinal', () => {
+        const a: CardData = { taskId: 'A', ordinal: undefined, priority: 'medium' };
+        const b: CardData = { taskId: 'B', ordinal: undefined, priority: 'low' };
+        expect(compareByOrdinal(a, b)).toBeLessThan(0);
+      });
+
+      it('should rank high > medium > low > undefined priority', () => {
+        const high: CardData = { taskId: 'D', ordinal: undefined, priority: 'high' };
+        const medium: CardData = { taskId: 'C', ordinal: undefined, priority: 'medium' };
+        const low: CardData = { taskId: 'B', ordinal: undefined, priority: 'low' };
+        const none: CardData = { taskId: 'A', ordinal: undefined };
+
+        expect(compareByOrdinal(high, medium)).toBeLessThan(0);
+        expect(compareByOrdinal(medium, low)).toBeLessThan(0);
+        expect(compareByOrdinal(low, none)).toBeLessThan(0);
+      });
+
+      it('should fall back to ID when ordinals and priorities are equal', () => {
+        const a: CardData = { taskId: 'TASK-1', ordinal: 1000, priority: 'high' };
+        const b: CardData = { taskId: 'TASK-2', ordinal: 1000, priority: 'high' };
+        expect(compareByOrdinal(a, b)).toBeLessThan(0);
+        expect(compareByOrdinal(b, a)).toBeGreaterThan(0);
+      });
+
+      it('should not use priority when ordinals differ', () => {
+        // Low-priority card with lower ordinal should come first
+        const a: CardData = { taskId: 'A', ordinal: 1000, priority: 'low' };
+        const b: CardData = { taskId: 'B', ordinal: 2000, priority: 'high' };
+        expect(compareByOrdinal(a, b)).toBeLessThan(0);
+      });
+
+      it('should treat undefined priority same as no priority', () => {
+        const a: CardData = { taskId: 'A', ordinal: undefined, priority: undefined };
+        const b: CardData = { taskId: 'B', ordinal: undefined };
+        // Both should be equivalent (same priority rank), so tiebreak by ID
+        expect(compareByOrdinal(a, b)).toBeLessThan(0);
+      });
+    });
   });
 
   describe('sortCardsByOrdinal', () => {
@@ -90,6 +137,46 @@ describe('ordinalUtils', () => {
       expect(sorted[0].taskId).toBe('A');
       expect(sorted[1].taskId).toBe('B');
       expect(sorted[2].taskId).toBe('C');
+    });
+
+    it('should use priority as tiebreaker for cards with same ordinal', () => {
+      const cards: CardData[] = [
+        { taskId: 'A', ordinal: 1000, priority: 'low' },
+        { taskId: 'B', ordinal: 1000, priority: 'high' },
+        { taskId: 'C', ordinal: 1000, priority: 'medium' },
+      ];
+
+      const sorted = sortCardsByOrdinal(cards);
+
+      expect(sorted[0].taskId).toBe('B'); // high
+      expect(sorted[1].taskId).toBe('C'); // medium
+      expect(sorted[2].taskId).toBe('A'); // low
+    });
+
+    it('should use priority as tiebreaker for no-ordinal cards', () => {
+      const cards: CardData[] = [
+        { taskId: 'C', ordinal: undefined, priority: 'low' },
+        { taskId: 'A', ordinal: undefined, priority: 'high' },
+        { taskId: 'B', ordinal: undefined },
+      ];
+
+      const sorted = sortCardsByOrdinal(cards);
+
+      expect(sorted[0].taskId).toBe('A'); // high priority
+      expect(sorted[1].taskId).toBe('C'); // low priority
+      expect(sorted[2].taskId).toBe('B'); // no priority
+    });
+
+    it('should respect ordinal over priority', () => {
+      const cards: CardData[] = [
+        { taskId: 'A', ordinal: 2000, priority: 'high' },
+        { taskId: 'B', ordinal: 1000, priority: 'low' },
+      ];
+
+      const sorted = sortCardsByOrdinal(cards);
+
+      expect(sorted[0].taskId).toBe('B'); // lower ordinal wins
+      expect(sorted[1].taskId).toBe('A');
     });
   });
 

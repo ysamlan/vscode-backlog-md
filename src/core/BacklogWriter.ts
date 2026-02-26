@@ -13,6 +13,29 @@ export function computeContentHash(content: string): string {
 }
 
 /**
+ * Detect whether content uses CRLF line endings.
+ * Returns true if the content contains \r\n (CRLF).
+ */
+export function detectCRLF(content: string): boolean {
+  return content.includes('\r\n');
+}
+
+/**
+ * Normalize line endings to LF for internal processing.
+ */
+export function normalizeToLF(content: string): string {
+  return content.replace(/\r\n/g, '\n');
+}
+
+/**
+ * Restore CRLF line endings if the original content used them.
+ */
+export function restoreLineEndings(content: string, useCRLF: boolean): string {
+  if (!useCRLF) return content;
+  return content.replace(/\n/g, '\r\n');
+}
+
+/**
  * Error thrown when a file has been modified externally
  */
 export class FileConflictError extends Error {
@@ -121,10 +144,182 @@ export class BacklogWriter {
   }
 
   /**
+   * Delete a milestone file from disk.
+   */
+  async deleteMilestone(milestoneId: string, parser: BacklogParser): Promise<void> {
+    const milestones = await parser.getMilestones();
+    const milestone = milestones.find(
+      (m) => m.id.toLowerCase() === milestoneId.toLowerCase()
+    );
+    if (!milestone) {
+      throw new Error(`Milestone ${milestoneId} not found`);
+    }
+
+    const milestonesDir = path.join(parser.getBacklogPath(), 'milestones');
+    const files = fs.existsSync(milestonesDir) ? fs.readdirSync(milestonesDir) : [];
+    const file = files.find((f) => f.toLowerCase().startsWith(milestone.id.toLowerCase()));
+    if (!file) {
+      throw new Error(`Milestone file for ${milestoneId} not found`);
+    }
+
+    fs.unlinkSync(path.join(milestonesDir, file));
+    parser.invalidateMilestoneCache();
+  }
+
+  /**
+   * Archive a milestone file to archive/milestones/.
+   */
+  async archiveMilestone(milestoneId: string, parser: BacklogParser): Promise<void> {
+    const milestones = await parser.getMilestones();
+    const milestone = milestones.find(
+      (m) => m.id.toLowerCase() === milestoneId.toLowerCase()
+    );
+    if (!milestone) {
+      throw new Error(`Milestone ${milestoneId} not found`);
+    }
+
+    const backlogPath = parser.getBacklogPath();
+    const milestonesDir = path.join(backlogPath, 'milestones');
+    const archiveDir = path.join(backlogPath, 'archive', 'milestones');
+
+    const files = fs.existsSync(milestonesDir) ? fs.readdirSync(milestonesDir) : [];
+    const file = files.find((f) => f.toLowerCase().startsWith(milestone.id.toLowerCase()));
+    if (!file) {
+      throw new Error(`Milestone file for ${milestoneId} not found`);
+    }
+
+    if (!fs.existsSync(archiveDir)) {
+      fs.mkdirSync(archiveDir, { recursive: true });
+    }
+
+    fs.renameSync(path.join(milestonesDir, file), path.join(archiveDir, file));
+    parser.invalidateMilestoneCache();
+  }
+
+  /**
+   * Rename a milestone: updates the milestone file and all tasks referencing it.
+   */
+  async renameMilestone(
+    milestoneId: string,
+    newName: string,
+    parser: BacklogParser
+  ): Promise<void> {
+    const milestones = await parser.getMilestones();
+    const milestone = milestones.find(
+      (m) => m.id.toLowerCase() === milestoneId.toLowerCase()
+    );
+    if (!milestone) {
+      throw new Error(`Milestone ${milestoneId} not found`);
+    }
+
+    const backlogPath = parser.getBacklogPath();
+    const milestonesDir = path.join(backlogPath, 'milestones');
+
+    const files = fs.existsSync(milestonesDir) ? fs.readdirSync(milestonesDir) : [];
+    const file = files.find((f) => f.toLowerCase().startsWith(milestone.id.toLowerCase()));
+    if (!file) {
+      throw new Error(`Milestone file for ${milestoneId} not found`);
+    }
+
+    const filePath = path.join(milestonesDir, file);
+    const rawContent = fs.readFileSync(filePath, 'utf-8');
+    const hasCRLF = detectCRLF(rawContent);
+    const content = normalizeToLF(rawContent);
+    const { frontmatter, body } = this.extractFrontmatter(content);
+
+    const oldName = milestone.name;
+    frontmatter.title = newName.trim();
+    const updatedContent = restoreLineEndings(
+      this.reconstructFile(frontmatter, body),
+      hasCRLF
+    );
+
+    // Rename the milestone file
+    const safeTitle = this.sanitizeMilestoneTitle(newName.trim());
+    const newFileName = `${milestone.id} - ${safeTitle}.md`;
+    const newFilePath = path.join(milestonesDir, newFileName);
+    fs.writeFileSync(newFilePath, updatedContent, 'utf-8');
+    if (newFilePath !== filePath) {
+      fs.unlinkSync(filePath);
+    }
+
+    // Update all tasks that reference the old milestone name or ID
+    const tasks = await parser.getTasks();
+    for (const task of tasks) {
+      if (
+        task.milestone &&
+        (task.milestone === oldName ||
+          task.milestone.toLowerCase() === milestone.id.toLowerCase())
+      ) {
+        await this.updateTask(task.id, { milestone: milestone.id }, parser);
+      }
+    }
+
+    parser.invalidateMilestoneCache();
+  }
+
+  /**
+   * Update a milestone's description.
+   */
+  async updateMilestone(
+    milestoneId: string,
+    updates: { title?: string; description?: string },
+    parser: BacklogParser
+  ): Promise<void> {
+    const milestones = await parser.getMilestones();
+    const milestone = milestones.find(
+      (m) => m.id.toLowerCase() === milestoneId.toLowerCase()
+    );
+    if (!milestone) {
+      throw new Error(`Milestone ${milestoneId} not found`);
+    }
+
+    const milestonesDir = path.join(parser.getBacklogPath(), 'milestones');
+    const files = fs.existsSync(milestonesDir) ? fs.readdirSync(milestonesDir) : [];
+    const file = files.find((f) => f.toLowerCase().startsWith(milestone.id.toLowerCase()));
+    if (!file) {
+      throw new Error(`Milestone file for ${milestoneId} not found`);
+    }
+
+    const filePath = path.join(milestonesDir, file);
+    const rawContent = fs.readFileSync(filePath, 'utf-8');
+    const hasCRLF = detectCRLF(rawContent);
+    const content = normalizeToLF(rawContent);
+    const { frontmatter, body } = this.extractFrontmatter(content);
+
+    if (updates.title) {
+      frontmatter.title = updates.title.trim();
+    }
+
+    let updatedBody = body;
+    if (updates.description !== undefined) {
+      // Replace description section content
+      const descRegex = /^## Description\n\n[\s\S]*$/m;
+      if (descRegex.test(updatedBody)) {
+        updatedBody = updatedBody.replace(
+          /^(## Description\n\n)[\s\S]*$/m,
+          `$1${updates.description}\n`
+        );
+      } else {
+        updatedBody = `\n## Description\n\n${updates.description}\n`;
+      }
+    }
+
+    const updatedContent = restoreLineEndings(
+      this.reconstructFile(frontmatter, updatedBody),
+      hasCRLF
+    );
+    fs.writeFileSync(filePath, updatedContent, 'utf-8');
+    parser.invalidateMilestoneCache();
+  }
+
+  /**
    * Move a completed task to the completed/ folder
    */
   async completeTask(taskId: string, parser: BacklogParser): Promise<string> {
-    return this.moveTaskToFolder(taskId, 'completed', parser);
+    const destinationPath = await this.moveTaskToFolder(taskId, 'completed', parser);
+    await this.sanitizeArchivedTaskLinks(taskId, parser);
+    return destinationPath;
   }
 
   /**
@@ -160,7 +355,11 @@ export class BacklogWriter {
    * Promote a draft to a regular task: assigns new TASK-N ID, moves from drafts/ to tasks/,
    * and updates status to the config default (or 'To Do').
    */
-  async promoteDraft(taskId: string, parser: BacklogParser): Promise<string> {
+  async promoteDraft(
+    taskId: string,
+    parser: BacklogParser,
+    crossBranchIds?: string[]
+  ): Promise<string> {
     const task = await parser.getTask(taskId);
     if (!task) {
       throw new Error(`Task ${taskId} not found`);
@@ -177,7 +376,7 @@ export class BacklogWriter {
     const config = await parser.getConfig();
     const taskPrefix = config.task_prefix || 'TASK';
     const zeroPadding = config.zero_padded_ids || 0;
-    const nextId = this.getNextTaskId(destDir, taskPrefix);
+    const nextId = this.getNextTaskId(destDir, taskPrefix, crossBranchIds);
     const paddedId = zeroPadding > 0 ? String(nextId).padStart(zeroPadding, '0') : String(nextId);
     const newTaskId = `${taskPrefix}-${paddedId}`.toUpperCase();
     const lowerPrefix = taskPrefix.toLowerCase();
@@ -195,16 +394,66 @@ export class BacklogWriter {
     parser.invalidateTaskCache(task.filePath);
 
     // Update frontmatter: new ID, status, and updated_date
-    const content = fs.readFileSync(destPath, 'utf-8');
+    const rawContent = fs.readFileSync(destPath, 'utf-8');
+    const hasCRLF = detectCRLF(rawContent);
+    const content = normalizeToLF(rawContent);
     const { frontmatter, body } = this.extractFrontmatter(content);
     frontmatter.id = newTaskId;
     frontmatter.status = config.default_status || 'To Do';
     frontmatter.updated_date = new Date().toISOString().split('T')[0];
-    const updatedContent = this.reconstructFile(frontmatter, body);
+    const updatedContent = restoreLineEndings(this.reconstructFile(frontmatter, body), hasCRLF);
     fs.writeFileSync(destPath, updatedContent, 'utf-8');
     parser.invalidateTaskCache(destPath);
 
     return newTaskId;
+  }
+
+  /**
+   * Demote a task to a draft: assigns new DRAFT-N ID, moves from tasks/ to drafts/,
+   * and sets status to "Draft". Mirrors upstream Backlog.md demote semantics.
+   */
+  async demoteTask(taskId: string, parser: BacklogParser): Promise<string> {
+    const task = await parser.getTask(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+
+    const backlogPath = path.dirname(path.dirname(task.filePath));
+    const destDir = path.join(backlogPath, 'drafts');
+
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+    }
+
+    // Generate a new draft ID
+    const nextId = this.getNextDraftId(destDir);
+    const newDraftId = `DRAFT-${nextId}`;
+
+    // Build new filename from task title
+    const sanitizedTitle = (task.title || 'Untitled')
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50);
+    const newFileName = `draft-${nextId} - ${sanitizedTitle}.md`;
+    const destPath = path.join(destDir, newFileName);
+
+    // Move task file to drafts/ with new name
+    fs.renameSync(task.filePath, destPath);
+    parser.invalidateTaskCache(task.filePath);
+
+    // Update frontmatter: new ID, status Draft, and updated_date
+    const rawContent = fs.readFileSync(destPath, 'utf-8');
+    const hasCRLF = detectCRLF(rawContent);
+    const content = normalizeToLF(rawContent);
+    const { frontmatter, body } = this.extractFrontmatter(content);
+    frontmatter.id = newDraftId;
+    frontmatter.status = 'Draft';
+    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    const updatedContent = restoreLineEndings(this.reconstructFile(frontmatter, body), hasCRLF);
+    fs.writeFileSync(destPath, updatedContent, 'utf-8');
+    parser.invalidateTaskCache(destPath);
+
+    return newDraftId;
   }
 
   /**
@@ -314,15 +563,18 @@ export class BacklogWriter {
       throw new Error(`Task ${taskId} not found`);
     }
 
-    const content = fs.readFileSync(task.filePath, 'utf-8');
+    const rawContent = fs.readFileSync(task.filePath, 'utf-8');
 
     // Conflict detection: if expectedHash is provided, verify file hasn't changed
     if (expectedHash) {
-      const currentHash = computeContentHash(content);
+      const currentHash = computeContentHash(rawContent);
       if (currentHash !== expectedHash) {
-        throw new FileConflictError('File has been modified externally', content);
+        throw new FileConflictError('File has been modified externally', rawContent);
       }
     }
+
+    const hasCRLF = detectCRLF(rawContent);
+    const content = normalizeToLF(rawContent);
 
     const { frontmatter, body } = this.extractFrontmatter(content);
 
@@ -408,8 +660,11 @@ export class BacklogWriter {
       );
     }
 
-    // Reconstruct the file
-    const updatedContent = this.reconstructFile(frontmatter, updatedBody);
+    // Reconstruct the file, preserving original line endings
+    const updatedContent = restoreLineEndings(
+      this.reconstructFile(frontmatter, updatedBody),
+      hasCRLF
+    );
     fs.writeFileSync(task.filePath, updatedContent, 'utf-8');
     parser.invalidateTaskCache(task.filePath);
   }
@@ -423,7 +678,8 @@ export class BacklogWriter {
   async createTask(
     backlogPath: string,
     options: CreateTaskOptions,
-    parser?: BacklogParser
+    parser?: BacklogParser,
+    crossBranchIds?: string[]
   ): Promise<{ id: string; filePath: string }> {
     const tasksDir = path.join(backlogPath, 'tasks');
 
@@ -437,8 +693,8 @@ export class BacklogWriter {
     const taskPrefix = config.task_prefix || 'TASK';
     const zeroPadding = config.zero_padded_ids || 0;
 
-    // Generate next task ID
-    const nextId = this.getNextTaskId(tasksDir, taskPrefix);
+    // Generate next task ID (considering cross-branch IDs to avoid collisions)
+    const nextId = this.getNextTaskId(tasksDir, taskPrefix, crossBranchIds);
     const paddedId = zeroPadding > 0 ? String(nextId).padStart(zeroPadding, '0') : String(nextId);
     const taskId = `${taskPrefix}-${paddedId}`.toUpperCase();
     const lowerPrefix = taskPrefix.toLowerCase();
@@ -653,9 +909,14 @@ export class BacklogWriter {
   }
 
   /**
-   * Get the next available task ID number
+   * Get the next available task ID number.
+   * Optionally scans cross-branch task IDs to avoid collisions.
    */
-  private getNextTaskId(tasksDir: string, prefix: string = 'task'): number {
+  private getNextTaskId(
+    tasksDir: string,
+    prefix: string = 'task',
+    crossBranchIds?: string[]
+  ): number {
     const files = fs.existsSync(tasksDir) ? fs.readdirSync(tasksDir) : [];
     let maxId = 0;
 
@@ -666,6 +927,20 @@ export class BacklogWriter {
         const id = parseInt(match[1], 10);
         if (id > maxId) {
           maxId = id;
+        }
+      }
+    }
+
+    // Also check cross-branch task IDs to avoid collisions
+    if (crossBranchIds) {
+      const idPattern = new RegExp(`^${prefix}-(\\d+)$`, 'i');
+      for (const taskId of crossBranchIds) {
+        const match = taskId.match(idPattern);
+        if (match) {
+          const id = parseInt(match[1], 10);
+          if (id > maxId) {
+            maxId = id;
+          }
         }
       }
     }
@@ -927,7 +1202,9 @@ export class BacklogWriter {
       throw new Error(`Task ${taskId} not found`);
     }
 
-    let content = fs.readFileSync(task.filePath, 'utf-8');
+    const rawContent = fs.readFileSync(task.filePath, 'utf-8');
+    const hasCRLF = detectCRLF(rawContent);
+    let content = normalizeToLF(rawContent);
 
     // Find and toggle the specific checklist item by its #id
     // This is in the markdown body, not YAML, so regex is appropriate here
@@ -937,7 +1214,7 @@ export class BacklogWriter {
       return `${prefix}${newCheck}${suffix}`;
     });
 
-    fs.writeFileSync(task.filePath, content, 'utf-8');
+    fs.writeFileSync(task.filePath, restoreLineEndings(content, hasCRLF), 'utf-8');
     parser.invalidateTaskCache(task.filePath);
   }
 
@@ -1059,6 +1336,261 @@ export class BacklogWriter {
   /**
    * Format a YAML value, quoting strings if necessary
    */
+  /**
+   * Get the next available document ID number
+   */
+  private getNextDocId(docsDir: string): number {
+    if (!fs.existsSync(docsDir)) return 1;
+    const files = this.getMarkdownFilesRecursive(docsDir);
+    let maxId = 0;
+    for (const file of files) {
+      const match = path.basename(file).match(/^doc-(\d+)/i);
+      if (match) {
+        const id = parseInt(match[1], 10);
+        if (id > maxId) maxId = id;
+      }
+    }
+    return maxId + 1;
+  }
+
+  /**
+   * Get the next available decision ID number
+   */
+  private getNextDecisionId(decisionsDir: string): number {
+    if (!fs.existsSync(decisionsDir)) return 1;
+    const files = fs.readdirSync(decisionsDir).filter((f) => f.endsWith('.md'));
+    let maxId = 0;
+    for (const file of files) {
+      const match = file.match(/^decision-(\d+)/i);
+      if (match) {
+        const id = parseInt(match[1], 10);
+        if (id > maxId) maxId = id;
+      }
+    }
+    return maxId + 1;
+  }
+
+  private getMarkdownFilesRecursive(dirPath: string): string[] {
+    const results: string[] = [];
+    if (!fs.existsSync(dirPath)) return results;
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...this.getMarkdownFilesRecursive(fullPath));
+      } else if (entry.name.endsWith('.md')) {
+        results.push(fullPath);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Create a new document in backlog/docs/
+   */
+  async createDocument(
+    backlogPath: string,
+    title: string,
+    options?: { type?: string; tags?: string[]; content?: string }
+  ): Promise<{ id: string; filePath: string }> {
+    const docsDir = path.join(backlogPath, 'docs');
+    if (!fs.existsSync(docsDir)) {
+      fs.mkdirSync(docsDir, { recursive: true });
+    }
+
+    const nextId = this.getNextDocId(docsDir);
+    const paddedId = String(nextId).padStart(3, '0');
+    const docId = `doc-${paddedId}`;
+
+    const sanitizedTitle = title
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50);
+    const fileName = `${docId} - ${sanitizedTitle}.md`;
+    const filePath = path.join(docsDir, fileName);
+
+    const today = new Date().toISOString().split('T')[0];
+    const frontmatter: FrontmatterData = {
+      id: docId.toUpperCase(),
+      title,
+      type: options?.type || 'other',
+      created_date: today,
+      updated_date: today,
+    };
+    if (options?.tags && options.tags.length > 0) {
+      frontmatter['tags'] = options.tags;
+    }
+
+    const body = `\n${options?.content || ''}\n`;
+    const content = this.reconstructFile(frontmatter, body);
+    fs.writeFileSync(filePath, content, 'utf-8');
+
+    return { id: docId.toUpperCase(), filePath };
+  }
+
+  /**
+   * Update an existing document
+   */
+  async updateDocument(
+    docId: string,
+    updates: { title?: string; content?: string; type?: string; tags?: string[] },
+    parser: BacklogParser
+  ): Promise<void> {
+    const doc = await parser.getDocument(docId);
+    if (!doc) {
+      throw new Error(`Document ${docId} not found`);
+    }
+
+    const rawContent = fs.readFileSync(doc.filePath, 'utf-8');
+    const hasCRLF = detectCRLF(rawContent);
+    const content = normalizeToLF(rawContent);
+    const { frontmatter, body } = this.extractFrontmatter(content);
+
+    if (updates.title !== undefined) frontmatter.title = updates.title;
+    if (updates.type !== undefined) frontmatter.type = updates.type;
+    if (updates.tags !== undefined) frontmatter['tags'] = updates.tags;
+    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+
+    const updatedBody = updates.content !== undefined ? `\n${updates.content}\n` : body;
+    const updatedContent = restoreLineEndings(
+      this.reconstructFile(frontmatter, updatedBody),
+      hasCRLF
+    );
+    fs.writeFileSync(doc.filePath, updatedContent, 'utf-8');
+  }
+
+  /**
+   * Delete a document
+   */
+  async deleteDocument(docId: string, parser: BacklogParser): Promise<void> {
+    const doc = await parser.getDocument(docId);
+    if (!doc) {
+      throw new Error(`Document ${docId} not found`);
+    }
+    fs.unlinkSync(doc.filePath);
+  }
+
+  /**
+   * Create a new decision in backlog/decisions/
+   */
+  async createDecision(
+    backlogPath: string,
+    title: string,
+    options?: {
+      status?: string;
+      context?: string;
+      decision?: string;
+      consequences?: string;
+      alternatives?: string;
+    }
+  ): Promise<{ id: string; filePath: string }> {
+    const decisionsDir = path.join(backlogPath, 'decisions');
+    if (!fs.existsSync(decisionsDir)) {
+      fs.mkdirSync(decisionsDir, { recursive: true });
+    }
+
+    const nextId = this.getNextDecisionId(decisionsDir);
+    const paddedId = String(nextId).padStart(3, '0');
+    const decisionId = `decision-${paddedId}`;
+
+    const sanitizedTitle = title
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50);
+    const fileName = `${decisionId} - ${sanitizedTitle}.md`;
+    const filePath = path.join(decisionsDir, fileName);
+
+    const today = new Date().toISOString().split('T')[0];
+    const frontmatter: FrontmatterData = {
+      id: decisionId.toUpperCase(),
+      title,
+      ['date']: today,
+      status: options?.status || 'proposed',
+    };
+
+    let body = '';
+    body += `\n## Context\n\n${options?.context || ''}\n`;
+    body += `\n## Decision\n\n${options?.decision || ''}\n`;
+    body += `\n## Consequences\n\n${options?.consequences || ''}\n`;
+    body += `\n## Alternatives\n\n${options?.alternatives || ''}\n`;
+
+    const content = this.reconstructFile(frontmatter, body);
+    fs.writeFileSync(filePath, content, 'utf-8');
+
+    return { id: decisionId.toUpperCase(), filePath };
+  }
+
+  /**
+   * Update an existing decision
+   */
+  async updateDecision(
+    decisionId: string,
+    updates: {
+      title?: string;
+      status?: string;
+      context?: string;
+      decision?: string;
+      consequences?: string;
+      alternatives?: string;
+    },
+    parser: BacklogParser
+  ): Promise<void> {
+    const dec = await parser.getDecision(decisionId);
+    if (!dec) {
+      throw new Error(`Decision ${decisionId} not found`);
+    }
+
+    const rawContent = fs.readFileSync(dec.filePath, 'utf-8');
+    const hasCRLF = detectCRLF(rawContent);
+    const content = normalizeToLF(rawContent);
+    const { frontmatter, body } = this.extractFrontmatter(content);
+
+    if (updates.title !== undefined) frontmatter.title = updates.title;
+    if (updates.status !== undefined) frontmatter.status = updates.status;
+
+    // Update sections in body
+    let updatedBody = body;
+    const sections: Record<string, string | undefined> = {
+      Context: updates.context,
+      Decision: updates.decision,
+      Consequences: updates.consequences,
+      Alternatives: updates.alternatives,
+    };
+
+    for (const [sectionName, sectionContent] of Object.entries(sections)) {
+      if (sectionContent === undefined) continue;
+      const sectionRegex = new RegExp(
+        `(## ${sectionName}\\n\\n)[\\s\\S]*?(?=\\n## |$)`,
+        'g'
+      );
+      if (sectionRegex.test(updatedBody)) {
+        updatedBody = updatedBody.replace(
+          new RegExp(`(## ${sectionName}\\n\\n)[\\s\\S]*?(?=\\n## |$)`),
+          `$1${sectionContent}\n`
+        );
+      } else {
+        updatedBody += `\n## ${sectionName}\n\n${sectionContent}\n`;
+      }
+    }
+
+    const updatedContent = restoreLineEndings(
+      this.reconstructFile(frontmatter, updatedBody),
+      hasCRLF
+    );
+    fs.writeFileSync(dec.filePath, updatedContent, 'utf-8');
+  }
+
+  /**
+   * Delete a decision
+   */
+  async deleteDecision(decisionId: string, parser: BacklogParser): Promise<void> {
+    const dec = await parser.getDecision(decisionId);
+    if (!dec) {
+      throw new Error(`Decision ${decisionId} not found`);
+    }
+    fs.unlinkSync(dec.filePath);
+  }
+
   private formatYamlValue(value: unknown): string {
     if (typeof value === 'string') {
       // Quote if contains special characters or looks like other YAML types

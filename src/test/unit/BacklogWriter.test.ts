@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BacklogWriter, computeContentHash, FileConflictError } from '../../core/BacklogWriter';
+import {
+  BacklogWriter,
+  computeContentHash,
+  FileConflictError,
+  detectCRLF,
+  normalizeToLF,
+  restoreLineEndings,
+} from '../../core/BacklogWriter';
 import { BacklogParser } from '../../core/BacklogParser';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
@@ -2886,6 +2893,196 @@ Summary
       expect(writtenContent).toContain('Updated legacy notes');
       expect(writtenContent).toContain('<!-- SECTION:NOTES:END -->');
       expect(writtenContent).toContain('## Final Summary');
+    });
+  });
+
+  describe('line ending preservation', () => {
+    it('detectCRLF should detect CRLF line endings', () => {
+      expect(detectCRLF('line1\r\nline2')).toBe(true);
+      expect(detectCRLF('line1\nline2')).toBe(false);
+      expect(detectCRLF('')).toBe(false);
+    });
+
+    it('normalizeToLF should convert CRLF to LF', () => {
+      expect(normalizeToLF('line1\r\nline2\r\n')).toBe('line1\nline2\n');
+      expect(normalizeToLF('line1\nline2\n')).toBe('line1\nline2\n');
+    });
+
+    it('restoreLineEndings should restore CRLF when useCRLF is true', () => {
+      expect(restoreLineEndings('line1\nline2\n', true)).toBe('line1\r\nline2\r\n');
+      expect(restoreLineEndings('line1\nline2\n', false)).toBe('line1\nline2\n');
+    });
+
+    it('should preserve CRLF line endings when updating tasks', async () => {
+      const content = '---\r\nid: TASK-1\r\ntitle: Test\r\nstatus: To Do\r\n---\r\n\r\n## Description\r\nHello\r\n';
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('\r\n');
+      expect(writtenContent).toContain('status: Done');
+    });
+
+    it('should preserve LF line endings when updating tasks', async () => {
+      const content = '---\nid: TASK-1\ntitle: Test\nstatus: To Do\n---\n\n## Description\nHello\n';
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).not.toContain('\r\n');
+      expect(writtenContent).toContain('status: Done');
+    });
+  });
+
+  describe('completeTask (3.4: sanitize on complete)', () => {
+    it('should call moveTaskToFolder and sanitizeArchivedTaskLinks', async () => {
+      // completeTask now calls sanitizeArchivedTaskLinks just like archiveTask
+      const content = '---\nid: TASK-1\ntitle: Done Task\nstatus: Done\n---\n';
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1 - Done-Task.md']);
+
+      await writer.completeTask('TASK-1', mockParser);
+
+      // moveTaskToFolder should rename the file
+      expect(fs.renameSync).toHaveBeenCalled();
+    });
+  });
+
+  describe('demoteTask', () => {
+    it('should demote a task to a draft', async () => {
+      const taskContent = '---\nid: TASK-5\ntitle: Some Task\nstatus: In Progress\n---\n\n## Description\nContent\n';
+      vi.mocked(fs.readFileSync).mockReturnValue(taskContent);
+      mockReaddirSync(['task-5 - Some-Task.md']);
+
+      const newDraftId = await writer.demoteTask('TASK-5', mockParser);
+
+      expect(newDraftId).toBe('DRAFT-1');
+      expect(fs.renameSync).toHaveBeenCalled();
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('id: DRAFT-1');
+      expect(writtenContent).toContain('status: Draft');
+    });
+  });
+
+  describe('cross-branch ID collision prevention', () => {
+    it('should skip IDs already used on other branches', async () => {
+      mockReaddirSync(['task-1 - First.md', 'task-2 - Second.md']);
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFileSync).mockReturnValue('');
+
+      const result = await writer.createTask(
+        '/fake/backlog',
+        { title: 'New Task' },
+        undefined,
+        ['TASK-3', 'TASK-5'] // cross-branch IDs
+      );
+
+      // Should skip TASK-1, TASK-2 (local), TASK-3, TASK-5 (cross-branch) → TASK-6
+      expect(result.id).toBe('TASK-6');
+    });
+  });
+
+  describe('document CRUD', () => {
+    it('should create a new document', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.readdirSync).mockReturnValue([] as unknown as ReturnType<typeof fs.readdirSync>);
+
+      const result = await writer.createDocument('/fake/backlog', 'API Reference', {
+        type: 'guide',
+        tags: ['api'],
+      });
+
+      expect(result.id).toBe('DOC-001');
+      expect(fs.writeFileSync).toHaveBeenCalled();
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('title: API Reference');
+      expect(writtenContent).toContain('type: guide');
+    });
+
+    it('should delete a document', async () => {
+      vi.spyOn(mockParser, 'getDocument').mockResolvedValue({
+        id: 'DOC-001',
+        title: 'Test',
+        tags: [],
+        content: 'Content',
+        filePath: '/fake/backlog/docs/doc-001 - Test.md',
+      });
+
+      await writer.deleteDocument('DOC-001', mockParser);
+
+      expect(fs.unlinkSync).toHaveBeenCalledWith('/fake/backlog/docs/doc-001 - Test.md');
+    });
+  });
+
+  describe('decision CRUD', () => {
+    it('should create a new decision', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.readdirSync).mockReturnValue([] as unknown as ReturnType<typeof fs.readdirSync>);
+
+      const result = await writer.createDecision('/fake/backlog', 'Use React', {
+        status: 'proposed',
+        context: 'We need a UI framework',
+      });
+
+      expect(result.id).toBe('DECISION-001');
+      expect(fs.writeFileSync).toHaveBeenCalled();
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('title: Use React');
+      expect(writtenContent).toContain('status: proposed');
+      expect(writtenContent).toContain('## Context');
+      expect(writtenContent).toContain('We need a UI framework');
+      expect(writtenContent).toContain('## Decision');
+      expect(writtenContent).toContain('## Consequences');
+      expect(writtenContent).toContain('## Alternatives');
+    });
+
+    it('should delete a decision', async () => {
+      vi.spyOn(mockParser, 'getDecision').mockResolvedValue({
+        id: 'DECISION-001',
+        title: 'Test',
+        filePath: '/fake/backlog/decisions/decision-001 - Test.md',
+      });
+
+      await writer.deleteDecision('DECISION-001', mockParser);
+
+      expect(fs.unlinkSync).toHaveBeenCalledWith('/fake/backlog/decisions/decision-001 - Test.md');
+    });
+  });
+
+  describe('milestone lifecycle', () => {
+    it('should archive a milestone', async () => {
+      // Mock getMilestones to return a milestone
+      vi.spyOn(mockParser, 'getMilestones').mockResolvedValue([
+        { id: 'm-1', name: 'v1.0' },
+      ]);
+      vi.spyOn(mockParser, 'getBacklogPath').mockReturnValue('/fake/backlog');
+      vi.mocked(fs.readdirSync).mockReturnValue(
+        ['m-1 - v1.0.md'] as unknown as ReturnType<typeof fs.readdirSync>
+      );
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      await writer.archiveMilestone('m-1', mockParser);
+
+      expect(fs.renameSync).toHaveBeenCalled();
+    });
+
+    it('should delete a milestone', async () => {
+      vi.spyOn(mockParser, 'getMilestones').mockResolvedValue([
+        { id: 'm-1', name: 'v1.0' },
+      ]);
+      vi.spyOn(mockParser, 'getBacklogPath').mockReturnValue('/fake/backlog');
+      vi.mocked(fs.readdirSync).mockReturnValue(
+        ['m-1 - v1.0.md'] as unknown as ReturnType<typeof fs.readdirSync>
+      );
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      await writer.deleteMilestone('m-1', mockParser);
+
+      expect(fs.unlinkSync).toHaveBeenCalled();
     });
   });
 });

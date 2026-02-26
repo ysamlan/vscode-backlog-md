@@ -102,8 +102,10 @@ function preprocessFrontmatter(raw: string): string {
  */
 export function computeSubtasks(tasks: Task[]): void {
   const parentToChildren = new Map<string, string[]>();
+  const taskById = new Map<string, Task>();
 
   for (const task of tasks) {
+    taskById.set(task.id, task);
     if (task.parentTaskId) {
       const children = parentToChildren.get(task.parentTaskId);
       if (children) {
@@ -118,6 +120,14 @@ export function computeSubtasks(tasks: Task[]): void {
     const children = parentToChildren.get(task.id);
     if (children) {
       task.subtasks = children.sort();
+      task.subtaskSummaries = children.sort().map((childId) => {
+        const child = taskById.get(childId);
+        return {
+          id: childId,
+          title: child?.title ?? childId,
+          status: child?.status ?? '',
+        };
+      });
     }
   }
 }
@@ -133,6 +143,13 @@ export class BacklogParser {
   private milestonesDirMtime: number | undefined;
 
   constructor(private backlogPath: string) {}
+
+  /**
+   * Get the backlog directory path.
+   */
+  getBacklogPath(): string {
+    return this.backlogPath;
+  }
 
   /**
    * Invalidate the config cache, forcing the next getConfig() call to re-read from disk.
@@ -890,6 +907,14 @@ export class BacklogParser {
     if (lower.includes('progress')) return 'In Progress';
     if (lower.includes('draft')) return 'Draft';
     if (lower === 'to do' || lower === 'todo') return 'To Do';
+
+    // Case-insensitive match against configured statuses
+    if (this.cachedConfig?.statuses) {
+      const match = this.cachedConfig.statuses.find(
+        (s) => s.toLowerCase() === lower
+      );
+      if (match) return match;
+    }
 
     // Preserve custom statuses as-is
     return cleanValue;

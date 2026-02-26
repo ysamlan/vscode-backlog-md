@@ -39,11 +39,28 @@
 
   let dropIndicatorIndex = $state<number | null>(null);
 
-  // Sort tasks by ordinal (tasks with ordinal first, then by ID)
+  // Detect "done"/"complete" columns for special sorting
+  let isDoneColumn = $derived(/done|complete/i.test(status));
+
+  // Sort tasks: done/complete columns by updatedAt DESC, others by ordinal
   let sortedTasks = $derived.by(() => {
+    if (isDoneColumn) {
+      return [...tasks].sort((a, b) => {
+        const aDate = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const bDate = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        // Both without dates go to end, sorted by ID
+        if (!aDate && !bDate) return a.id.localeCompare(b.id);
+        // Tasks without dates go to end
+        if (!aDate) return 1;
+        if (!bDate) return -1;
+        // Newest first (descending)
+        return bDate - aDate;
+      });
+    }
     const cardData: CardData[] = tasks.map((t) => ({
       taskId: t.id,
       ordinal: t.ordinal,
+      priority: t.priority,
     }));
     const sortedData = sortCardsByOrdinal(cardData);
     return sortedData.map((cd) => tasks.find((t) => t.id === cd.taskId)!);

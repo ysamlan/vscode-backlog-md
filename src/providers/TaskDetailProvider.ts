@@ -5,6 +5,7 @@ import { BacklogParser, computeSubtasks } from '../core/BacklogParser';
 import { BacklogWriter, computeContentHash, FileConflictError } from '../core/BacklogWriter';
 import { isReadOnlyTask, getReadOnlyTaskContext, type Task, type TaskSource } from '../core/types';
 import { sanitizeMarkdownSource } from '../core/sanitizeMarkdown';
+import { StatusCallbackRunner } from '../core/StatusCallbackRunner';
 
 // Dynamic import for marked (ESM module)
 let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
@@ -592,12 +593,32 @@ export class TaskDetailProvider {
             } else {
               updates[message.field] = message.value;
             }
+            const oldStatus = task.status;
             await this.writer.updateTask(
               TaskDetailProvider.currentTaskId,
               updates,
               this.parser,
               TaskDetailProvider.currentFileHash
             );
+            // Run status change callback if status was updated
+            if (message.field === 'status' && this.parser) {
+              const config = await this.parser.getConfig();
+              const backlogPath = path.dirname(path.dirname(task.filePath));
+              const taskContent = fs.readFileSync(task.filePath, 'utf-8');
+              const taskFm = taskContent.match(/onStatusChange:\s*(.+)/);
+              const taskCallback = taskFm?.[1]?.trim().replace(/^['"]|['"]$/g, '');
+              await StatusCallbackRunner.run(
+                backlogPath,
+                taskCallback,
+                config.on_status_change,
+                {
+                  taskId: TaskDetailProvider.currentTaskId,
+                  oldStatus,
+                  newStatus: String(message.value),
+                  taskTitle: task.title,
+                }
+              );
+            }
             // Update stored hash after successful write
             const newContent = fs.readFileSync(task.filePath, 'utf-8');
             TaskDetailProvider.currentFileHash = computeContentHash(newContent);
@@ -629,6 +650,24 @@ export class TaskDetailProvider {
           await this.openTask(newTaskId);
         } catch (error) {
           vscode.window.showErrorMessage(`Failed to promote draft: ${error}`);
+        }
+        break;
+      }
+
+      case 'demoteTask': {
+        if (!TaskDetailProvider.currentTaskId || !this.parser) break;
+        const taskToDemote = await this.getCurrentTaskFromContext();
+        if (this.blockReadOnlyMutation(taskToDemote, 'demote this task')) break;
+
+        try {
+          const newDraftId = await this.writer.demoteTask(
+            TaskDetailProvider.currentTaskId,
+            this.parser
+          );
+          vscode.window.showInformationMessage(`Task demoted to draft: ${newDraftId}`);
+          await this.openTask(newDraftId);
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to demote task: ${error}`);
         }
         break;
       }

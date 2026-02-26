@@ -47,6 +47,7 @@
   let currentFilter = $state('not-done');
   let currentMilestone = $state('');
   let currentLabel = $state('');
+  let currentPriority = $state('');
   let searchQuery = $state('');
 
   // Toast state
@@ -428,6 +429,10 @@
     currentLabel = label;
   }
 
+  function handlePriorityChange(priority: string) {
+    currentPriority = priority;
+  }
+
 
   function handleReadOnlyDragAttempt(task: TaskWithBlocks) {
     showToast(`Cannot reorder task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`);
@@ -530,6 +535,7 @@
       {currentFilter}
       {currentMilestone}
       {currentLabel}
+      {currentPriority}
       {searchQuery}
       isDraftsView={activeTab === 'drafts'}
       onSelectTask={handleSelectTask}
@@ -537,6 +543,7 @@
       onFilterChange={handleFilterChange}
       onMilestoneChange={handleMilestoneChange}
       onLabelChange={handleLabelChange}
+      onPriorityChange={handlePriorityChange}
       onSearchChange={handleSearchChange}
       onReorderTasks={handleReorderTasks}
       onReadOnlyDragAttempt={handleReadOnlyDragAttempt}
@@ -553,6 +560,7 @@
       {currentFilter}
       {currentMilestone}
       {currentLabel}
+      {currentPriority}
       {searchQuery}
       isArchivedView={true}
       onSelectTask={handleSelectTask}
@@ -560,6 +568,7 @@
       onFilterChange={handleFilterChange}
       onMilestoneChange={handleMilestoneChange}
       onLabelChange={handleLabelChange}
+      onPriorityChange={handlePriorityChange}
       onSearchChange={handleSearchChange}
     />
   </div>

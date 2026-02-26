@@ -6,6 +6,7 @@
 export interface CardData {
   taskId: string;
   ordinal: number | undefined;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export interface OrdinalUpdate {
@@ -114,17 +115,30 @@ export function calculateOrdinalsForDrop(
   return updates;
 }
 
+const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+const NO_PRIORITY = 3;
+
 /**
  * Compare two cards by ordinal (matching upstream Backlog.md behavior):
  * - Cards WITH ordinal come first, sorted by ordinal ascending
- * - Cards WITHOUT ordinal come last, sorted by ID
+ * - Cards WITHOUT ordinal come last
+ * - When ordinals are equal (or both undefined), use priority as tiebreaker:
+ *   high (0) > medium (1) > low (2) > none/undefined (3)
+ * - Final tiebreaker is ID comparison
  *
  * Usable as a standalone comparator (e.g. as a tiebreaker in list view sorting).
  */
 export function compareByOrdinal(a: CardData, b: CardData): number {
   if (hasOrdinal(a) && !hasOrdinal(b)) return -1;
   if (!hasOrdinal(a) && hasOrdinal(b)) return 1;
-  if (hasOrdinal(a) && hasOrdinal(b)) return a.ordinal! - b.ordinal!;
+  if (hasOrdinal(a) && hasOrdinal(b)) {
+    const ordDiff = a.ordinal! - b.ordinal!;
+    if (ordDiff !== 0) return ordDiff;
+  }
+  // Ordinals are equal or both undefined — use priority tiebreaker
+  const aPri = a.priority ? (PRIORITY_ORDER[a.priority] ?? NO_PRIORITY) : NO_PRIORITY;
+  const bPri = b.priority ? (PRIORITY_ORDER[b.priority] ?? NO_PRIORITY) : NO_PRIORITY;
+  if (aPri !== bPri) return aPri - bPri;
   return a.taskId.localeCompare(b.taskId);
 }
 
