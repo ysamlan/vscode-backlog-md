@@ -29,8 +29,6 @@
   let editingText = $state('');
   let newItemText = $state('');
   let prevTaskId = '';
-  let batchSelectMode = $state(false);
-  let selectedIds = $state(new Set<number>());
 
   // Reset state when switching tasks
   $effect(() => {
@@ -38,8 +36,6 @@
       prevTaskId = taskId;
       editingItemId = null;
       newItemText = '';
-      batchSelectMode = false;
-      selectedIds = new Set();
     }
   });
 
@@ -78,30 +74,6 @@
   function deleteItem(itemId: number) {
     const remaining = items.filter((item) => item.id !== itemId);
     const renumbered = remaining.map((item, i) => ({ ...item, id: i + 1 }));
-    reconstructAndSave(renumbered);
-  }
-
-  function toggleBatchMode() {
-    batchSelectMode = !batchSelectMode;
-    selectedIds = new Set();
-  }
-
-  function toggleSelection(itemId: number) {
-    const next = new Set(selectedIds);
-    if (next.has(itemId)) {
-      next.delete(itemId);
-    } else {
-      next.add(itemId);
-    }
-    selectedIds = next;
-  }
-
-  function deleteSelected() {
-    if (selectedIds.size === 0) return;
-    const remaining = items.filter((item) => !selectedIds.has(item.id));
-    const renumbered = remaining.map((item, i) => ({ ...item, id: i + 1 }));
-    selectedIds = new Set();
-    batchSelectMode = false;
     reconstructAndSave(renumbered);
   }
 
@@ -144,18 +116,6 @@
           {progress}
         </span>
       {/if}
-      {#if onUpdateText && !isReadOnly && items.length > 1}
-        <button
-          type="button"
-          class="batch-select-btn"
-          class:active={batchSelectMode}
-          onclick={toggleBatchMode}
-          data-testid="{listType}-batch-select"
-          title={batchSelectMode ? 'Cancel selection' : 'Select items to remove'}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="m15 3 6 6"/><path d="m9 15 6-6"/></svg>
-        </button>
-      {/if}
     </div>
   </div>
   {#if items.length > 0}
@@ -164,32 +124,20 @@
         <li
           class="checklist-item"
           class:checked={item.checked}
-          class:selected={batchSelectMode && selectedIds.has(item.id)}
           data-list-type={listType}
           data-item-id={item.id}
           data-testid="{listType}-item-{item.id}"
         >
-          {#if batchSelectMode}
-            <button
-              type="button"
-              class="checklist-checkbox batch-checkbox"
-              onclick={() => toggleSelection(item.id)}
-              data-testid="{listType}-batch-toggle-{item.id}"
-            >
-              <span class="checkbox">{selectedIds.has(item.id) ? '☑' : '☐'}</span>
-            </button>
-          {:else}
-            <button
-              type="button"
-              class="checklist-checkbox"
-              onclick={() => !isReadOnly && onToggle(listType, item.id)}
-              aria-pressed={item.checked}
-              disabled={isReadOnly}
-              data-testid="{listType}-toggle-{item.id}"
-            >
-              <span class="checkbox">{item.checked ? '☑' : '☐'}</span>
-            </button>
-          {/if}
+          <button
+            type="button"
+            class="checklist-checkbox"
+            onclick={() => !isReadOnly && onToggle(listType, item.id)}
+            aria-pressed={item.checked}
+            disabled={isReadOnly}
+            data-testid="{listType}-toggle-{item.id}"
+          >
+            <span class="checkbox">{item.checked ? '☑' : '☐'}</span>
+          </button>
           {#if editingItemId === item.id}
             <input
               class="checklist-item-input"
@@ -231,18 +179,6 @@
         </li>
       {/each}
     </ul>
-    {#if batchSelectMode && selectedIds.size > 0}
-      <div class="batch-actions" data-testid="{listType}-batch-actions">
-        <button
-          type="button"
-          class="batch-delete-btn"
-          onclick={deleteSelected}
-          data-testid="{listType}-batch-delete"
-        >
-          Remove {selectedIds.size} selected
-        </button>
-      </div>
-    {/if}
   {:else}
     <span class="empty-value">None defined</span>
   {/if}
