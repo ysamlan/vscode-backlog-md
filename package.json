@@ -23,7 +23,7 @@
     "markdown"
   ],
   "engines": {
-    "vscode": "^1.108.0",
+    "vscode": "^1.110.0",
     "node": ">=22"
   },
   "categories": [
@@ -182,6 +182,7 @@
     "test:playwright:ui": "playwright test --ui",
     "demo:cross-branch-setup": "bash scripts/setup-cross-branch-demo.sh",
     "webview:serve": "vite",
+    "check:engines": "bun scripts/check-engine-version.ts",
     "lint": "eslint src e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
