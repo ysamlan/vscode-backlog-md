@@ -1,5 +1,18 @@
 # Changelog
 
+<a id="v0.3.6"></a>
+
+# [v0.3.6](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.6) - 2026-03-25
+
+## What's Changed
+
+- Support .backlog/, root backlog.config.yml, and custom backlog dirs by [@ysamlan](https://github.com/ysamlan) in [#12](https://github.com/ysamlan/vscode-backlog-md/pull/12) (see [MrLesk/Backlog.md#563](https://github.com/MrLesk/Backlog.md/pull/563))
+- align filters left so they don't look janky at narrow widths
+
+**Full Changelog**: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.5...v0.3.6
+
+[Changes][v0.3.6]
+
 <a id="v0.3.5"></a>
 
 # [v0.3.5](https://github.com/ysamlan/vscode-backlog-md/releases/tag/v0.3.5) - 2026-02-26
@@ -185,6 +198,7 @@ Initial public release.
 
 [Changes][v0.1.0]
 
+[v0.3.6]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.5...v0.3.6
 [v0.3.5]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.4...v0.3.5
 [v0.3.4]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.3...v0.3.4
 [v0.3.3]: https://github.com/ysamlan/vscode-backlog-md/compare/v0.3.2...v0.3.3
