@@ -138,11 +138,16 @@ export function computeSubtasks(tasks: Task[]): void {
 export class BacklogParser {
   private cachedConfig: BacklogConfig | undefined;
   private cachedConfigMtime: number | undefined;
+  private cachedConfigFilePath: string | undefined;
   private taskCache = new Map<string, { mtimeMs: number; task: Task }>();
   private cachedMilestones: Milestone[] | null = null;
   private milestonesDirMtime: number | undefined;
 
-  constructor(private backlogPath: string) {}
+  constructor(
+    private backlogPath: string,
+    private resolvedConfigPath?: string,
+    private workspaceRoot?: string
+  ) {}
 
   /**
    * Get the backlog directory path.
@@ -157,6 +162,7 @@ export class BacklogParser {
   invalidateConfigCache(): void {
     this.cachedConfig = undefined;
     this.cachedConfigMtime = undefined;
+    this.cachedConfigFilePath = undefined;
   }
 
   /**
@@ -339,14 +345,25 @@ export class BacklogParser {
   /**
    * Get the backlog configuration from config.yml
    */
-  async getConfig(): Promise<BacklogConfig> {
-    // Try both .yml and .yaml extensions
+  private resolveConfigFilePath(): string | undefined {
+    if (this.resolvedConfigPath && fs.existsSync(this.resolvedConfigPath)) {
+      return this.resolvedConfigPath;
+    }
     const ymlPath = path.join(this.backlogPath, 'config.yml');
+    if (fs.existsSync(ymlPath)) return ymlPath;
     const yamlPath = path.join(this.backlogPath, 'config.yaml');
-    const configPath = fs.existsSync(ymlPath) ? ymlPath : yamlPath;
+    if (fs.existsSync(yamlPath)) return yamlPath;
+    return undefined;
+  }
 
-    if (!fs.existsSync(configPath)) {
-      console.log(`[Backlog.md Parser] No config file found at ${ymlPath} or ${yamlPath}`);
+  async getConfig(): Promise<BacklogConfig> {
+    // Resolve config path once, then reuse (invalidateConfigCache resets it)
+    if (this.cachedConfigFilePath === undefined) {
+      this.cachedConfigFilePath = this.resolveConfigFilePath() ?? '';
+    }
+    const configPath = this.cachedConfigFilePath;
+
+    if (!configPath) {
       return {};
     }
 
@@ -436,18 +453,19 @@ export class BacklogParser {
       return this.getTasks();
     }
 
-    // Get workspace root (parent of backlog folder)
-    const workspaceRoot = path.dirname(this.backlogPath);
+    // Get workspace root (explicit if provided, otherwise parent of backlog folder)
+    const wsRoot = this.workspaceRoot ?? path.dirname(this.backlogPath);
 
     // Check if this is a git repository
-    const gitService = new GitBranchService(workspaceRoot);
+    const gitService = new GitBranchService(wsRoot);
     if (!(await gitService.isGitRepository())) {
       console.log('[Backlog.md Parser] Not a git repository, falling back to local-only');
       return this.getTasks();
     }
 
     try {
-      const loader = new CrossBranchTaskLoader(gitService, this, config, this.backlogPath);
+      const backlogDir = path.relative(wsRoot, this.backlogPath);
+      const loader = new CrossBranchTaskLoader(gitService, this, config, wsRoot, backlogDir);
       return await loader.loadTasksAcrossBranches();
     } catch (error) {
       // Fallback to local-only on git errors
@@ -910,9 +928,7 @@ export class BacklogParser {
 
     // Case-insensitive match against configured statuses
     if (this.cachedConfig?.statuses) {
-      const match = this.cachedConfig.statuses.find(
-        (s) => s.toLowerCase() === lower
-      );
+      const match = this.cachedConfig.statuses.find((s) => s.toLowerCase() === lower);
       if (match) return match;
     }
 

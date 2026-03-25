@@ -10,7 +10,7 @@ import { FileWatcher } from './core/FileWatcher';
 import { BacklogCli } from './core/BacklogCli';
 import { createDebouncedHandler } from './core/debounce';
 import type { TaskSource } from './core/types';
-import { BACKLOG_DOCUMENT_SELECTOR } from './language/documentSelector';
+import { createBacklogDocumentSelector } from './language/documentSelector';
 import { BacklogCompletionProvider } from './language/BacklogCompletionProvider';
 import { BacklogDocumentLinkProvider } from './language/BacklogDocumentLinkProvider';
 import { BacklogHoverProvider } from './language/BacklogHoverProvider';
@@ -45,39 +45,49 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   // Initialize parser (may be undefined if no backlog folder)
-  let parser = backlogFolder ? new BacklogParser(backlogFolder) : undefined;
+  let parser = activeRoot
+    ? new BacklogParser(
+        activeRoot.backlogPath,
+        activeRoot.configPath,
+        activeRoot.workspaceFolder.uri.fsPath
+      )
+    : undefined;
 
-  // Language providers: stored so we can call setParser() on switch
+  // Language providers: re-registered on backlog switch (selector varies per backlog dir)
   let completionProvider: BacklogCompletionProvider | undefined;
   let linkProvider: BacklogDocumentLinkProvider | undefined;
   let hoverProvider: BacklogHoverProvider | undefined;
-  let languageProvidersRegistered = false;
+  let languageProviderDisposables: vscode.Disposable[] = [];
 
-  function registerLanguageProviders(activeParser: BacklogParser) {
-    if (languageProvidersRegistered) return;
+  // Ensure language provider registrations are cleaned up on deactivation
+  context.subscriptions.push({
+    dispose: () => languageProviderDisposables.forEach((d) => d.dispose()),
+  });
+
+  function registerLanguageProviders(activeParser: BacklogParser, backlogDir: string) {
+    for (const d of languageProviderDisposables) d.dispose();
+    languageProviderDisposables = [];
+
+    const selector = createBacklogDocumentSelector(backlogDir);
     completionProvider = new BacklogCompletionProvider(activeParser);
     linkProvider = new BacklogDocumentLinkProvider(activeParser);
     hoverProvider = new BacklogHoverProvider(activeParser);
-    context.subscriptions.push(
+
+    languageProviderDisposables.push(
       vscode.languages.registerCompletionItemProvider(
-        BACKLOG_DOCUMENT_SELECTOR,
+        selector,
         completionProvider,
         '-' // Trigger on '-' for task ID prefixes like TASK-
-      )
+      ),
+      vscode.languages.registerDocumentLinkProvider(selector, linkProvider),
+      vscode.languages.registerHoverProvider(selector, hoverProvider)
     );
-    context.subscriptions.push(
-      vscode.languages.registerDocumentLinkProvider(BACKLOG_DOCUMENT_SELECTOR, linkProvider)
-    );
-    context.subscriptions.push(
-      vscode.languages.registerHoverProvider(BACKLOG_DOCUMENT_SELECTOR, hoverProvider)
-    );
-    languageProvidersRegistered = true;
-    console.log('[Backlog.md] Language providers registered');
+    console.log('[Backlog.md] Language providers registered for:', backlogDir);
   }
 
-  if (parser) {
+  if (parser && activeRoot) {
     console.log('[Backlog.md] Parser initialized');
-    registerLanguageProviders(parser);
+    registerLanguageProviders(parser, activeRoot.backlogDir);
   }
 
   // Initialize file watcher (only if backlog folder exists)
@@ -140,7 +150,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     // Create new parser and file watcher
-    parser = new BacklogParser(root.backlogPath);
+    parser = new BacklogParser(root.backlogPath, root.configPath, root.workspaceFolder.uri.fsPath);
     fileWatcher = new FileWatcher(root.backlogPath);
     context.subscriptions.push(fileWatcher);
 
@@ -165,14 +175,8 @@ export function activate(context: vscode.ExtensionContext) {
     taskDetailProvider.setBacklogPath(root.backlogPath);
     contentDetailProvider.setParser(parser);
 
-    // Update language providers (or register them for the first time)
-    if (languageProvidersRegistered) {
-      completionProvider!.setParser(parser);
-      linkProvider!.setParser(parser);
-      hoverProvider!.setParser(parser);
-    } else {
-      registerLanguageProviders(parser);
-    }
+    // Re-register language providers (selector may differ per backlog dir)
+    registerLanguageProviders(parser, root.backlogDir);
 
     // Refresh views
     tasksProvider.refresh();
@@ -397,13 +401,16 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       // Check if this specific folder already has a backlog
-      const existingPath = vscode.Uri.joinPath(selectedFolder.uri, 'backlog').fsPath;
-      const { existsSync } = await import('fs');
-      if (existsSync(existingPath)) {
-        vscode.window.showInformationMessage(
-          `A backlog folder already exists in ${selectedFolder.name}.`
-        );
-        return;
+      const { resolveBacklogDirectory } = await import('./core/resolveBacklogDirectory.js');
+      const existingResolution = resolveBacklogDirectory(selectedFolder.uri.fsPath);
+      if (existingResolution.backlogPath) {
+        const { existsSync } = await import('fs');
+        if (existsSync(existingResolution.backlogPath)) {
+          vscode.window.showInformationMessage(
+            `A backlog folder already exists in ${selectedFolder.name} at ${existingResolution.backlogDir}/.`
+          );
+          return;
+        }
       }
 
       const workspaceRoot = selectedFolder.uri.fsPath;
@@ -568,6 +575,7 @@ export function activate(context: vscode.ExtensionContext) {
         // Add the new root to the manager — this fires onDidChangeActiveRoot → switchActiveBacklog
         manager.addRoot({
           backlogPath: newBacklogPath,
+          backlogDir: 'backlog', // init always creates backlog/
           workspaceFolder: selectedFolder,
           label: selectedFolder.name,
         });

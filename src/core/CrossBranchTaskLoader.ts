@@ -71,17 +71,6 @@ interface BranchIndexResult {
 }
 
 /**
- * Directories to scan for state tracking on each branch.
- * Only 'task' entries are hydrated; others are used for filtering only.
- */
-const STATE_DIRECTORIES: Array<{ path: string; type: TaskDirectoryType }> = [
-  { path: 'backlog/tasks', type: 'task' },
-  { path: 'backlog/drafts', type: 'draft' },
-  { path: 'backlog/completed', type: 'completed' },
-  { path: 'backlog/archive/tasks', type: 'archived' },
-];
-
-/**
  * Loads and merges tasks from multiple git branches.
  * Uses an index-first strategy: builds a cheap file index per branch,
  * then only reads full content for tasks that need hydrating.
@@ -89,17 +78,27 @@ const STATE_DIRECTORIES: Array<{ path: string; type: TaskDirectoryType }> = [
 export class CrossBranchTaskLoader {
   private gitService: GitBranchService;
   private config: BacklogConfig;
-  private backlogPath: string;
+  private backlogDir: string;
+  private projectRoot: string;
+  private readonly _stateDirectories: Array<{ path: string; type: TaskDirectoryType }>;
 
   constructor(
     gitService: GitBranchService,
     private parser: BacklogParser,
     config: BacklogConfig,
-    backlogPath: string
+    projectRoot: string,
+    backlogDir: string = 'backlog'
   ) {
     this.gitService = gitService;
     this.config = config;
-    this.backlogPath = backlogPath;
+    this.projectRoot = projectRoot;
+    this.backlogDir = backlogDir;
+    this._stateDirectories = [
+      { path: `${backlogDir}/tasks`, type: 'task' },
+      { path: `${backlogDir}/drafts`, type: 'draft' },
+      { path: `${backlogDir}/completed`, type: 'completed' },
+      { path: `${backlogDir}/archive/tasks`, type: 'archived' },
+    ];
   }
 
   /**
@@ -119,7 +118,7 @@ export class CrossBranchTaskLoader {
       // Phase 0: Load current branch tasks from disk + get their git timestamps
       const [localTasks, localModifiedMap] = await Promise.all([
         this.parser.getTasks(),
-        this.gitService.getFileModifiedMap(currentBranch, 'backlog/tasks'),
+        this.gitService.getFileModifiedMap(currentBranch, `${this.backlogDir}/tasks`),
       ]);
       const localTaskMap = new Map<string, Task>();
       for (const task of localTasks) {
@@ -257,14 +256,14 @@ export class CrossBranchTaskLoader {
    * hydration entries for tasks/ (active tasks).
    */
   private async buildBranchIndex(branch: string): Promise<BranchIndexResult> {
-    const backlogExists = await this.gitService.pathExistsOnBranch(branch, 'backlog');
+    const backlogExists = await this.gitService.pathExistsOnBranch(branch, this.backlogDir);
     if (!backlogExists) {
       return { indexEntries: [], stateEntries: [] };
     }
 
     // Scan all state directories in parallel
     const dirResults = await Promise.all(
-      STATE_DIRECTORIES.map(async (dir) => {
+      this._stateDirectories.map(async (dir) => {
         const [files, modifiedMap] = await Promise.all([
           this.gitService.listFilesInPath(branch, dir.path),
           this.gitService.getFileModifiedMap(branch, dir.path),
@@ -325,14 +324,13 @@ export class CrossBranchTaskLoader {
    * Read full task content from a branch and parse it.
    */
   private async hydrateTask(entry: TaskFileIndexEntry): Promise<Task | null> {
-    const filePath = `backlog/tasks/${entry.filename}`;
-    const workspaceRoot = path.dirname(this.backlogPath);
+    const filePath = `${this.backlogDir}/tasks/${entry.filename}`;
 
     try {
       const content = await this.gitService.readFileFromBranch(entry.branch, filePath);
       if (!content) return null;
 
-      const absolutePath = path.join(workspaceRoot, filePath);
+      const absolutePath = path.join(this.projectRoot, filePath);
       const task = this.parser.parseTaskContent(content, absolutePath);
       if (!task) return null;
 
@@ -356,11 +354,7 @@ export class CrossBranchTaskLoader {
    */
   private async collectLocalStateEntries(currentBranch: string): Promise<BranchTaskStateEntry[]> {
     const entries: BranchTaskStateEntry[] = [];
-    const dirsToScan: Array<{ path: string; type: TaskDirectoryType }> = [
-      { path: 'backlog/completed', type: 'completed' },
-      { path: 'backlog/archive/tasks', type: 'archived' },
-      { path: 'backlog/drafts', type: 'draft' },
-    ];
+    const dirsToScan = this._stateDirectories.filter((d) => d.type !== 'task');
 
     const results = await Promise.all(
       dirsToScan.map(async (dir) => {

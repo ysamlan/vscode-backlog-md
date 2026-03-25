@@ -372,7 +372,7 @@ THE SOFTWARE.
 The following npm packages may be included in this product:
 
  - marked@16.4.2
- - marked@17.0.3
+ - marked@17.0.4
 
 These packages each contain the following license:
 
@@ -992,7 +992,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The following npm package may be included in this product:
 
- - svelte@5.53.3
+ - svelte@5.54.0
 
 This package contains the following license:
 
@@ -1064,7 +1064,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - devalue@5.6.3
+ - devalue@5.6.4
 
 This package contains the following license:
 
@@ -2428,11 +2428,12 @@ MIT
 
 -----------
 
-The following npm package may be included in this product:
+The following npm packages may be included in this product:
 
  - acorn@8.15.0
+ - acorn@8.16.0
 
-This package contains the following license:
+These packages each contain the following license:
 
 MIT License
 
@@ -2455,6 +2456,37 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+-----------
+
+The following npm package may be included in this product:
+
+ - @upsetjs/venn.js@2.0.0
+
+This package contains the following license:
+
+MIT License
+
+Copyright (c) 2013 Ben Frederickson
+Copyright (c) 2021 Samuel Gratzl
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 -----------
 
@@ -2702,7 +2734,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - tiny-markdown-editor@0.2.21
+ - tiny-markdown-editor@0.2.23
 
 This package contains the following license:
 
@@ -3342,7 +3374,7 @@ USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - dagre-d3-es@7.0.13
+ - dagre-d3-es@7.0.14
 
 This package contains the following license:
 
@@ -3422,7 +3454,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - mermaid@11.12.3
+ - mermaid@11.13.0
 
 This package contains the following license:
 
@@ -3482,7 +3514,7 @@ DEALINGS IN THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - @mermaid-js/parser@1.0.0
+ - @mermaid-js/parser@1.0.1
 
 This package contains the following license:
 

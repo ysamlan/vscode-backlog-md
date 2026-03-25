@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
+import { resolveBacklogDirectory } from './resolveBacklogDirectory';
 
 export interface BacklogRoot {
   backlogPath: string;
+  backlogDir: string;
+  configPath?: string;
   workspaceFolder: vscode.WorkspaceFolder;
   label: string;
 }
@@ -31,10 +33,12 @@ export class BacklogWorkspaceManager implements vscode.Disposable {
     if (!folders) return this.roots;
 
     for (const folder of folders) {
-      const backlogPath = vscode.Uri.joinPath(folder.uri, 'backlog').fsPath;
-      if (fs.existsSync(backlogPath)) {
+      const resolution = resolveBacklogDirectory(folder.uri.fsPath);
+      if (resolution.backlogPath) {
         this.roots.push({
-          backlogPath,
+          backlogPath: resolution.backlogPath,
+          backlogDir: resolution.backlogDir!,
+          configPath: resolution.configPath ?? undefined,
           workspaceFolder: folder,
           label: folder.name,
         });
