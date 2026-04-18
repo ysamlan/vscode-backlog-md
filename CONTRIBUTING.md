@@ -32,6 +32,26 @@ bun run build
 code --extensionDevelopmentPath="$(pwd)"
 ```
 
+### Installing from source into your main VS Code
+
+For testing a local build as a real installed extension (not the Extension
+Development Host), package it as a `.vsix` and install it with `--force` to
+overwrite any previously installed version:
+
+```bash
+# Build and package into a .vsix in the repo root
+bun run build
+bun run package
+
+# Install the freshly built .vsix, replacing any existing version
+code --install-extension "$(pwd)/vscode-backlog-md-$(node -p "require('./package.json').version").vsix" --force
+```
+
+After installing, reload any open VS Code windows
+(`Developer: Reload Window`) so the new extension is picked up. Uninstall
+with `code --uninstall-extension ysamlan.vscode-backlog-md` to revert to the
+Marketplace version.
+
 ## Project Structure
 
 ```
