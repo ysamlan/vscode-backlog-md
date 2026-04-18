@@ -10,21 +10,8 @@ import {
 } from '../core/types';
 import { BacklogWriter } from '../core/BacklogWriter';
 import { computeSubtasks } from '../core/BacklogParser';
-import { sanitizeMarkdownSource } from '../core/sanitizeMarkdown';
 import { openWorkspaceFile } from '../core/openWorkspaceFile';
-
-// Dynamic import for marked (ESM module)
-let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
-async function parseMarkdown(markdown: string): Promise<string> {
-  if (!markedParse) {
-    const { marked } = await import('marked');
-    marked.setOptions({ gfm: true, breaks: true });
-    markedParse = marked.parse;
-  }
-  const safe = sanitizeMarkdownSource(markdown);
-  const result = markedParse(safe);
-  return typeof result === 'string' ? result : await result;
-}
+import { parseMarkdown } from '../core/parseMarkdown';
 
 type TaskSelectionRef = {
   taskId: string;
