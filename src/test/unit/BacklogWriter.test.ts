@@ -2253,7 +2253,7 @@ updated_date: 2026-01-20
       // that it survives as a valid date string
       const { roundTripped } = await roundTrip(content);
       expect(roundTripped.updatedAt).toBeDefined();
-      expect(roundTripped.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(roundTripped.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
     });
 
     it('should preserve reporter field', async () => {
@@ -2446,7 +2446,7 @@ status: In Progress
 assignee:
   - '@alice'
 created_date: '2026-02-09 10:00'
-updated_date: '2026-02-10'
+updated_date: '2026-02-10 12:00'
 labels:
   - parser
   - upstream
@@ -2485,8 +2485,8 @@ id: TASK-11
 title: Minimal task
 status: To Do
 assignee: []
-created_date: '2026-02-10'
-updated_date: '2026-02-10'
+created_date: '2026-02-10 12:00'
+updated_date: '2026-02-10 12:00'
 labels: []
 dependencies: []
 ---

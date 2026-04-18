@@ -37,6 +37,15 @@ export function restoreLineEndings(content: string, useCRLF: boolean): string {
 }
 
 /**
+ * Produce a `created_date` / `updated_date` value in the upstream canonical
+ * format (`YYYY-MM-DD HH:MM`, UTC). Matches Backlog.md CLI so round-trips
+ * don't churn timestamps between tools.
+ */
+export function nowTimestamp(): string {
+  return new Date().toISOString().slice(0, 16).replace('T', ' ');
+}
+
+/**
  * Error thrown when a file has been modified externally
  */
 export class FileConflictError extends Error {
@@ -389,7 +398,7 @@ export class BacklogWriter {
     const { frontmatter, body } = this.extractFrontmatter(content);
     frontmatter.id = newTaskId;
     frontmatter.status = config.default_status || 'To Do';
-    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    frontmatter.updated_date = nowTimestamp();
     const updatedContent = restoreLineEndings(this.reconstructFile(frontmatter, body), hasCRLF);
     fs.writeFileSync(destPath, updatedContent, 'utf-8');
     parser.invalidateTaskCache(destPath);
@@ -437,7 +446,7 @@ export class BacklogWriter {
     const { frontmatter, body } = this.extractFrontmatter(content);
     frontmatter.id = newDraftId;
     frontmatter.status = 'Draft';
-    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    frontmatter.updated_date = nowTimestamp();
     const updatedContent = restoreLineEndings(this.reconstructFile(frontmatter, body), hasCRLF);
     fs.writeFileSync(destPath, updatedContent, 'utf-8');
     parser.invalidateTaskCache(destPath);
@@ -606,7 +615,7 @@ export class BacklogWriter {
     }
 
     // Update the updated_date
-    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    frontmatter.updated_date = nowTimestamp();
 
     // Handle body updates (description, AC, DoD are stored in body, not frontmatter)
     let updatedBody = body;
@@ -707,8 +716,8 @@ export class BacklogWriter {
       assignee: options.assignee || (config.default_assignee ? [config.default_assignee] : []),
       reporter: config.default_reporter,
       dependencies: [],
-      created_date: new Date().toISOString().split('T')[0],
-      updated_date: new Date().toISOString().split('T')[0],
+      created_date: nowTimestamp(),
+      updated_date: nowTimestamp(),
     };
 
     // Remove undefined values
@@ -767,7 +776,7 @@ export class BacklogWriter {
     const filePath = path.join(draftsDir, fileName);
 
     // Build frontmatter
-    const today = new Date().toISOString().split('T')[0];
+    const today = nowTimestamp();
     const frontmatter: FrontmatterData = {
       id: draftId,
       title: 'Untitled',
@@ -858,7 +867,7 @@ export class BacklogWriter {
     // Get config defaults
     const config = parser ? await parser.getConfig() : {};
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = nowTimestamp();
     const frontmatter: FrontmatterData = {
       id: taskId,
       title: 'Untitled',
@@ -1410,7 +1419,7 @@ export class BacklogWriter {
     const fileName = `${docId} - ${sanitizedTitle}.md`;
     const filePath = path.join(docsDir, fileName);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = nowTimestamp();
     const frontmatter: FrontmatterData = {
       id: docId.toUpperCase(),
       title,
@@ -1450,7 +1459,7 @@ export class BacklogWriter {
     if (updates.title !== undefined) frontmatter.title = updates.title;
     if (updates.type !== undefined) frontmatter.type = updates.type;
     if (updates.tags !== undefined) frontmatter['tags'] = updates.tags;
-    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    frontmatter.updated_date = nowTimestamp();
 
     const updatedBody = updates.content !== undefined ? `\n${updates.content}\n` : body;
     const updatedContent = restoreLineEndings(
@@ -1501,7 +1510,7 @@ export class BacklogWriter {
     const fileName = `${decisionId} - ${sanitizedTitle}.md`;
     const filePath = path.join(decisionsDir, fileName);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = nowTimestamp();
     const frontmatter: FrontmatterData = {
       id: decisionId.toUpperCase(),
       title,
