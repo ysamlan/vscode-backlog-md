@@ -1,6 +1,7 @@
 <script lang="ts">
   import { renderMermaidAction } from '../../lib/mermaidAction';
   import MarkdownEditor from '../shared/MarkdownEditor.svelte';
+  import { vscode } from '../../stores/vscode.svelte';
 
   interface Props {
     taskId: string;
@@ -54,6 +55,26 @@
     if (isReadOnly) return;
     isEditing = true;
   }
+
+  function handleContentClick(event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    const link = target?.closest?.('a') as HTMLAnchorElement | null;
+    if (link) {
+      const href = link.getAttribute('href');
+      if (href && !/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('#')) {
+        event.preventDefault();
+        event.stopPropagation();
+        const [relativePath, fragment] = href.split('#');
+        vscode.postMessage({
+          type: 'openWorkspaceFile',
+          relativePath,
+          fragment: fragment ?? null,
+        });
+        return;
+      }
+    }
+    handleViewClick();
+  }
 </script>
 
 <div class="section" data-testid="{fieldName}-section">
@@ -82,7 +103,7 @@
       <div
         class="markdown-content description-view"
         data-testid="{fieldName}-view"
-        onclick={handleViewClick}
+        onclick={handleContentClick}
         onkeydown={(e) => e.key === 'Enter' && handleViewClick()}
         role="button"
         tabindex={isReadOnly ? -1 : 0}

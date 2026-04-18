@@ -1,10 +1,10 @@
 ---
 id: TASK-153
 title: Open workspace-relative markdown links in VS Code editor
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-04-18 12:05'
-updated_date: '2026-04-18 12:05'
+updated_date: '2026-04-18 12:06'
 labels: []
 dependencies: []
 ---

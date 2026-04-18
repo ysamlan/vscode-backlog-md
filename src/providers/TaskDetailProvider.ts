@@ -6,6 +6,7 @@ import { BacklogWriter, computeContentHash, FileConflictError } from '../core/Ba
 import { isReadOnlyTask, getReadOnlyTaskContext, type Task, type TaskSource } from '../core/types';
 import { sanitizeMarkdownSource } from '../core/sanitizeMarkdown';
 import { StatusCallbackRunner } from '../core/StatusCallbackRunner';
+import { openWorkspaceFile } from '../core/openWorkspaceFile';
 
 // Dynamic import for marked (ESM module)
 let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
@@ -514,6 +515,8 @@ export class TaskDetailProvider {
     field?: string;
     value?: string | string[];
     label?: string;
+    relativePath?: string;
+    fragment?: string | null;
   }): Promise<void> {
     switch (message.type) {
       case 'refresh':
@@ -531,6 +534,10 @@ export class TaskDetailProvider {
             vscode.commands.executeCommand('vscode.open', vscode.Uri.file(task.filePath));
           }
         }
+        break;
+
+      case 'openWorkspaceFile':
+        await openWorkspaceFile(message.relativePath, message.fragment ?? null);
         break;
 
       case 'openTask':
@@ -607,17 +614,12 @@ export class TaskDetailProvider {
               const taskContent = fs.readFileSync(task.filePath, 'utf-8');
               const taskFm = taskContent.match(/onStatusChange:\s*(.+)/);
               const taskCallback = taskFm?.[1]?.trim().replace(/^['"]|['"]$/g, '');
-              await StatusCallbackRunner.run(
-                backlogPath,
-                taskCallback,
-                config.on_status_change,
-                {
-                  taskId: TaskDetailProvider.currentTaskId,
-                  oldStatus,
-                  newStatus: String(message.value),
-                  taskTitle: task.title,
-                }
-              );
+              await StatusCallbackRunner.run(backlogPath, taskCallback, config.on_status_change, {
+                taskId: TaskDetailProvider.currentTaskId,
+                oldStatus,
+                newStatus: String(message.value),
+                taskTitle: task.title,
+              });
             }
             // Update stored hash after successful write
             const newContent = fs.readFileSync(task.filePath, 'utf-8');

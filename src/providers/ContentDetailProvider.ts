@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { BacklogParser } from '../core/BacklogParser';
 import { sanitizeMarkdownSource } from '../core/sanitizeMarkdown';
+import { openWorkspaceFile } from '../core/openWorkspaceFile';
 
 // Dynamic import for marked (ESM module)
 let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
@@ -111,6 +112,8 @@ export class ContentDetailProvider {
     panel.webview.onDidReceiveMessage(async (message) => {
       if (message.type === 'openFile' && message.filePath) {
         vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.filePath));
+      } else if (message.type === 'openWorkspaceFile') {
+        await openWorkspaceFile(message.relativePath, message.fragment ?? null);
       }
     });
 

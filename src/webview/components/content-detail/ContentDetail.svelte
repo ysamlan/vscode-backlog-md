@@ -40,6 +40,21 @@
     }
   }
 
+  function handleMarkdownClick(event: MouseEvent) {
+    const target = event.target as HTMLElement | null;
+    const link = target?.closest?.('a') as HTMLAnchorElement | null;
+    if (!link) return;
+    const href = link.getAttribute('href');
+    if (!href || /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('#')) return;
+    event.preventDefault();
+    const [relativePath, fragment] = href.split('#');
+    vscode.postMessage({
+      type: 'openWorkspaceFile',
+      relativePath,
+      fragment: fragment ?? null,
+    });
+  }
+
   function getStatusBadgeClass(status?: string): string {
     switch (status) {
       case 'accepted': return 'status-accepted';
@@ -96,7 +111,13 @@
         </div>
       {/if}
     </div>
-    <div class="detail-body" data-testid="document-body" use:renderMermaidAction={contentHtml}>
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div
+      class="detail-body"
+      data-testid="document-body"
+      onclick={handleMarkdownClick}
+      use:renderMermaidAction={contentHtml}
+    >
       {@html contentHtml}
     </div>
 
@@ -125,25 +146,29 @@
       {#if decisionSections.context}
         <div class="decision-section">
           <h2>Context</h2>
-          <div class="section-content" use:renderMermaidAction={decisionSections.context}>{@html decisionSections.context}</div>
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="section-content" onclick={handleMarkdownClick} use:renderMermaidAction={decisionSections.context}>{@html decisionSections.context}</div>
         </div>
       {/if}
       {#if decisionSections.decision}
         <div class="decision-section">
           <h2>Decision</h2>
-          <div class="section-content" use:renderMermaidAction={decisionSections.decision}>{@html decisionSections.decision}</div>
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="section-content" onclick={handleMarkdownClick} use:renderMermaidAction={decisionSections.decision}>{@html decisionSections.decision}</div>
         </div>
       {/if}
       {#if decisionSections.consequences}
         <div class="decision-section">
           <h2>Consequences</h2>
-          <div class="section-content" use:renderMermaidAction={decisionSections.consequences}>{@html decisionSections.consequences}</div>
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="section-content" onclick={handleMarkdownClick} use:renderMermaidAction={decisionSections.consequences}>{@html decisionSections.consequences}</div>
         </div>
       {/if}
       {#if decisionSections.alternatives}
         <div class="decision-section">
           <h2>Alternatives</h2>
-          <div class="section-content" use:renderMermaidAction={decisionSections.alternatives}>{@html decisionSections.alternatives}</div>
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="section-content" onclick={handleMarkdownClick} use:renderMermaidAction={decisionSections.alternatives}>{@html decisionSections.alternatives}</div>
         </div>
       {/if}
     </div>
