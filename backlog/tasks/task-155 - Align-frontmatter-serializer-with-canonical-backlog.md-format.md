@@ -49,7 +49,7 @@ The VSCode extension's frontmatter serializer produces YAML that diverges from c
 <!-- SECTION:PLAN:BEGIN -->
 ## Canonical reference
 
-Upstream serializer: `../../Backlog.md/src/markdown/serializer.ts` (lines 11-64).
+Upstream serializer: `https://github.com/MrLesk/Backlog.md/blob/1679c03d1d3c872ed73dc11d3e4f10480cfb0e52/src/markdown/serializer.ts#L11-L64`
 
 Uses `gray-matter` via `matter.stringify(body, frontmatter)`, which wraps `js-yaml` dump with defaults: block-style arrays, auto-quoting (single quotes only when needed), no forced quote style.
 
