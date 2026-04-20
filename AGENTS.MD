@@ -215,33 +215,45 @@ Upstream source: **https://github.com/MrLesk/Backlog.md**.
 id: TASK-1 # string, auto-generated, uppercase prefix
 title: Example task # string, required
 status: To Do # string, from config statuses
-priority: high # "high" | "medium" | "low" (optional)
-assignee: ['@alice', '@bob'] # string[], @-prefixed values are quoted
+assignee:
+  - '@alice' # string[], @-prefixed values are quoted
+  - '@bob'
 reporter: '@carol' # string (optional)
-created_date: 2024-01-15 # YYYY-MM-DD or YYYY-MM-DD HH:mm
-updated_date: 2024-01-16 14:30 # same format (optional, set on updates)
-labels: [feature, ui] # string[], inline bracket format
+created_date: '2026-01-15 09:00' # quoted, YYYY-MM-DD or YYYY-MM-DD HH:mm
+updated_date: '2026-01-16 14:30' # same format (optional, set on updates)
+labels:
+  - feature # string[], block-style sequence
+  - ui
 milestone: v1.0 # string (optional)
-dependencies: [TASK-2, TASK-3] # string[], task IDs
-references: [https://example.com] # string[] (optional, if non-empty)
-documentation: [docs/spec.md] # string[] (optional, if non-empty)
+dependencies:
+  - TASK-2 # string[], task IDs
+  - TASK-3
+references:
+  - https://example.com # string[] (optional, omitted when empty)
+documentation:
+  - docs/spec.md # string[] (optional, omitted when empty)
 parent_task_id: TASK-5 # string (optional, for subtasks)
-subtasks: [TASK-5.1, TASK-5.2] # string[] (optional, dot notation)
+subtasks:
+  - TASK-5.1 # string[] (optional, dot notation)
+  - TASK-5.2
+priority: high # "high" | "medium" | "low" (optional)
 ordinal: 1500 # number (optional, for ordering)
 onStatusChange: './scripts/notify.sh' # string (optional, per-task callback)
 ---
 ```
 
-**Serialization field order**: id, title, status, assignee, reporter, created_date, updated_date, labels, milestone, dependencies, references, documentation, parent_task_id, subtasks, priority, ordinal, onStatusChange. Optional fields are omitted when empty/undefined.
+**Serialization field order**: id, title, status, assignee, reporter, created_date, updated_date, labels, milestone, dependencies, references, documentation, parent_task_id, subtasks, priority, ordinal, onStatusChange. This matches upstream Backlog.md's `matter.stringify` output byte-for-byte.
+
+**Empty-value handling**: `assignee` and `dependencies` are always emitted — as `[]` when empty — because upstream keeps them as required structural fields. All other optional fields (`reporter`, `updated_date`, `milestone`, `references`, `documentation`, `parent_task_id`, `subtasks`, `priority`, `ordinal`, `onStatusChange`) are omitted entirely when empty/undefined.
 
 **Formatting rules:**
 
-- Arrays: inline bracket format `[item1, item2]`
-- Dates: `YYYY-MM-DD` (date-only) or `YYYY-MM-DD HH:mm` (space separator, not T)
-- Legacy date formats auto-converted: `DD-MM-YY`, `DD/MM/YY`, `DD.MM.YY`
-- Assignees with `@` prefix: auto-quoted in arrays `["@alice"]`
-- Priority: always lowercase
-- Subtask IDs: dot notation `TASK-5.1`, `TASK-5.2`
+- Arrays: block-style sequence (one item per line, `  - value`). Emitted as `[]` only for `assignee`/`dependencies` when empty.
+- Dates: single-quoted strings, either `'YYYY-MM-DD'` or `'YYYY-MM-DD HH:mm'` (space separator, not T). `created_date`/`updated_date` use minute precision.
+- Legacy date formats auto-converted on write: `DD-MM-YY`, `DD/MM/YY`, `DD.MM.YY`.
+- Assignees with `@` prefix: auto-quoted (`'@alice'`).
+- Priority: always lowercase.
+- Subtask IDs: dot notation `TASK-5.1`, `TASK-5.2`.
 
 #### Body Sections
 
