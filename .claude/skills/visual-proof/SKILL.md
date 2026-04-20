@@ -227,9 +227,22 @@ uvx showboat exec tmp/pr15-proof.md bash 'diff <(git show main:backlog/tasks/tas
 
 ## Troubleshooting
 
-- **"Extension did not activate within 60000ms"** — the cached VS Code in `.vscode-test/` isn't triggering the extension's `workspaceContains:**/backlog/tasks/*.md` activation event. Sanity-check: `bun run test:cdp` should also fail the same way if the root cause is environmental. Remedies: `rm -rf .vscode-test && bun run test:e2e` to redownload, or confirm `dist/extension.js` is up to date with `bun run build`. The script prints a diagnostic failure screenshot alongside the requested output path (`<name>-failure.png`) — check it to see what VS Code is actually showing.
+- **"Extension did not activate within 60000ms"** — usually means the cached VS Code in `.vscode-test/` is older than the extension's `engines.vscode` floor. The launcher auto-redownloads latest stable VS Code when the cached binary is too old, so this should self-heal; if it doesn't, `rm -rf .vscode-test/VSCode-linux-x64 && bun run test:e2e` to force a fresh download. The script prints a diagnostic failure screenshot alongside the requested output path (`<name>-failure.png`) — check it to see what VS Code is actually showing.
 - **Chromium sandbox error on launch** — the launcher already passes `--no-sandbox`, so this shouldn't hit. If it does, you're running the binary directly; always go through the script.
 - **Agent-browser captured empty page** — the Vite fixture server must be running _before_ `agent-browser open`, and the fixture expects data to be injected via `postMessage` after navigation. `agent-browser snapshot -i` after injection to confirm elements rendered.
+
+### Known limitation: `click-link` on headless Linux CDP
+
+The `--action click-link` dispatches a synthetic click on the target anchor. The webview's Svelte handler fires (the anchor's `preventDefault()` runs, confirming the intercept). For **intra-extension** round-trips — status changes, task selection, priority updates, button-triggered postMessages, drag-and-drop — this works reliably and the extension host processes the message correctly.
+
+For the narrow case of **workspace-relative link clicks that trigger `vscode.commands.executeCommand('vscode.open', uri)` from the extension host** (the extension asks VS Code to open an external file in an editor tab), the round-trip does NOT complete on headless Linux + CDP. We tried synthetic `MouseEvent` dispatch, `element.click()`, focus + synthetic `KeyboardEvent(Enter)`, real `Input.dispatchKeyEvent`, and real `Input.dispatchMouseEvent` at both screen coordinates and webview-local coordinates via the webview's own CDP session — none trigger the file-open. The same interaction works fine with a real user click in a normal VS Code window (confirmed manually).
+
+**What this means for PR proof:**
+
+- **Intra-extension interactions** → `click-link` or `custom` action captures the full round-trip reliably.
+- **Link-click → external file opens in editor tab** → capture the before-state (task description with rendered links) via `click-link`; the "after" will show the focused link but the editor area will still be empty. Note this limitation in the proof doc and validate manually in a real VS Code window.
+
+If you find a workaround, please update this section — it's likely some transient-user-activation gate in Electron's input pipeline that only real OS-level input satisfies.
 
 ## When NOT to use this skill
 

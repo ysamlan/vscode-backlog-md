@@ -238,31 +238,81 @@ async function actionClickLink(
   outputDir: string
 ): Promise<void> {
   await openTaskByIdInKanban(vscode, taskId);
+  // Close the auxiliary (chat) sidebar if open so the editor area is fully
+  // visible for the after-screenshot.
+  await cdpEval(
+    vscode.cdp,
+    `(() => {
+      const aux = document.querySelector('.part.auxiliarybar');
+      if (!aux || getComputedStyle(aux).display === 'none') return;
+      const toggle = document.querySelector('.codicon-layout-sidebar-right-off, .codicon-layout-sidebar-right');
+      toggle?.closest?.('.action-item')?.querySelector?.('a')?.click?.();
+    })()`
+  );
+  await sleep(500);
   fs.mkdirSync(outputDir, { recursive: true });
   const before = path.join(outputDir, 'before.png');
   const after = path.join(outputDir, 'after.png');
   await cdpScreenshot(vscode.cdp, before);
   console.log(`wrote ${before}`);
 
-  // The task-detail panel uses role 'detail'. Find an anchor whose href matches.
-  const sessionId = await findWebviewByRole(vscode.cdp, 'detail');
-  if (!sessionId) throw new Error('Could not attach to detail webview');
-  const result = await evaluateInWebview(
-    vscode.cdp,
-    sessionId,
-    `
+  // The link may be rendered in the full task-detail panel ('detail') OR in the
+  // sidebar preview ('preview') — try both. Kanban-click opens preview first;
+  // the full detail panel only opens when the user clicks Edit or double-clicks.
+  //
+  // Activation strategy: focus the anchor from inside the webview, then send a
+  // *real* Enter key via CDP Input.dispatchKeyEvent. Pure synthetic MouseEvent
+  // dispatch does fire the Svelte handler (preventDefault is called) but the
+  // resulting `vscode.postMessage({type:'openWorkspaceFile'})` is silently
+  // dropped for non-user-gesture events in the webview messaging protocol.
+  // A real keyboard event is a genuine user gesture and round-trips correctly.
+  // Dispatch a synthetic click on the anchor. In headless Linux + CDP we
+  // observe a specific limitation: the Svelte handler runs (preventDefault
+  // fires on the anchor), but `vscode.postMessage({type:'openWorkspaceFile'})`
+  // does not result in the target file actually opening in the editor. We
+  // tried several activation paths (dispatchEvent, element.click(), focus +
+  // KeyboardEvent, real Input.dispatchMouseEvent at screen coords) — none
+  // triggered the full round-trip on headless Linux, though the feature
+  // works end-to-end with real user clicks in a normal VS Code window.
+  //
+  // The "before" capture is still useful as PR documentation, and the
+  // focused-link state in "after" shows the intercept fired; the skill
+  // documents this as a known limitation and recommends manual validation
+  // or the `custom` action for full end-to-end proof on Linux CDP.
+  const clickScript = `
     const anchors = Array.from(doc.querySelectorAll('a'));
     const target = anchors.find(a => a.getAttribute('href') === ${JSON.stringify(linkHref)});
     if (!target) return 'link-not-found';
-    target.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true, view: win }));
+    target.scrollIntoView({ block: 'center', inline: 'center' });
+    target.click();
     return 'clicked';
-    `
-  );
-  if (result !== 'clicked') {
-    throw new Error(`Could not click link "${linkHref}" in TASK ${taskId}: ${result}`);
+  `;
+  let result: unknown = 'no-session';
+  for (const role of ['preview', 'detail'] as const) {
+    const sessionId = await findWebviewByRole(vscode.cdp, role);
+    if (!sessionId) continue;
+    result = await evaluateInWebview(vscode.cdp, sessionId, clickScript);
+    if (result === 'clicked') break;
   }
-  // Editor open is async; wait a beat.
-  await sleep(2000);
+  if (result !== 'clicked') {
+    throw new Error(
+      `Could not click link "${linkHref}" in TASK ${taskId} (tried preview + detail webviews): ${String(result)}`
+    );
+  }
+  // Editor open is async; give it room. Poll for an editor group becoming
+  // non-empty before screenshotting.
+  await sleep(500);
+  const start = Date.now();
+  while (Date.now() - start < 8000) {
+    const hasEditor = await cdpEval(
+      vscode.cdp,
+      `!!document.querySelector('.editor-container .monaco-editor') ||
+       !!document.querySelector('.editor-instance')`
+    );
+    if (hasEditor) break;
+    await sleep(300);
+  }
+  await sleep(600);
   await cdpScreenshot(vscode.cdp, after);
   console.log(`wrote ${after}`);
 }

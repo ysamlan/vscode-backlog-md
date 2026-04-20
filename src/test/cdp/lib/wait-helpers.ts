@@ -57,17 +57,11 @@ export async function waitForExtensionReady(cdp: CdpClient, timeoutMs = 60_000):
   await waitForWorkbench(cdp);
   await dismissNotifications(cdp);
 
-  // Close secondary sidebar (chat/copilot panel) if open
-  await cdpEval(
-    cdp,
-    `(() => {
-      const auxBar = document.querySelector('.part.auxiliarybar');
-      if (auxBar && getComputedStyle(auxBar).display !== 'none') {
-        const toggleBtn = document.querySelector('.codicon-layout-sidebar-right-off, .codicon-layout-sidebar-right');
-        if (toggleBtn) toggleBtn.closest('.action-item')?.querySelector('a')?.click();
-      }
-    })()`
-  );
+  // Close secondary sidebar (chat/copilot panel) if open. Prefer the official
+  // workbench command over codicon selectors — the class names change between
+  // VS Code versions (e.g. `codicon-layout-sidebar-right-off` was renamed in
+  // 1.11x), but the command ID is stable.
+  await executeCommand(cdp, 'workbench.action.closeAuxiliaryBar');
   await sleep(300);
 
   // Focus the Backlog sidebar by clicking its activity bar icon.
