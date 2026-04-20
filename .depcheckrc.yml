@@ -1,0 +1,35 @@
+# Depcheck config. Each entry below is a justified false positive — depcheck
+# cannot detect the usage because it's outside the files/parsers it scans. If
+# you're cleaning this list up, verify the package is still not directly
+# imported anywhere before removing.
+
+ignores:
+  # Dynamic `import('tiny-markdown-editor')` in a .svelte file. Depcheck has no
+  # Svelte parser, so the import is invisible to it.
+  - tiny-markdown-editor
+
+  # Invoked via `bunx @tailwindcss/cli` in the `build:css` script.
+  - '@tailwindcss/cli'
+
+  # Peer dependency of @tailwindcss/cli (Tailwind v4 splits the CLI into its
+  # own package). The tailwind pipeline needs both installed.
+  - tailwindcss
+
+  # Invoked via `bunx generate-license-file` inside scripts/generate-licenses.sh.
+  - generate-license-file
+
+  # Consumed by scripts/screenshots/generate.ts for PNG optimization. The
+  # import sometimes resolves via a binary path lookup that depcheck misses.
+  - oxipng-bin
+
+  # `vscode` is the VS Code extension runtime module, provided by the host at
+  # load time. It is never an npm dependency. Types come from @types/vscode.
+  # Depcheck flags the `import * as vscode from 'vscode'` in src/extension.ts
+  # as a missing dependency; this ignore silences that false positive.
+  - vscode
+
+ignorePatterns:
+  - dist
+  - out
+  - tmp
+  - .vscode-test
