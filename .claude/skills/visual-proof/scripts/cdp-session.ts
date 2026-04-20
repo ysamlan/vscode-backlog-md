@@ -43,6 +43,7 @@ import {
 import {
   findWebviewByRole,
   evaluateInWebview,
+  clickInWebview,
   clearWebviewSessionCache,
 } from '../../../../src/test/cdp/lib/webview-helpers';
 import { waitForExtensionReady } from '../../../../src/test/cdp/lib/wait-helpers';
@@ -199,24 +200,8 @@ async function actionScreenshot(vscode: VsCodeInstance, output: string): Promise
 }
 
 async function openTaskByIdInKanban(vscode: VsCodeInstance, taskId: string): Promise<void> {
-  // Click the task card whose data-testid equals "task-<id>" (the TaskCard component pattern).
-  const role = 'tasks';
-  const sessionId = await findWebviewByRole(vscode.cdp, role);
-  if (!sessionId) throw new Error(`Could not attach to ${role} webview`);
-  const selector = `[data-testid="task-${taskId}"]`;
-  const result = await evaluateInWebview(
-    vscode.cdp,
-    sessionId,
-    `
-    const el = doc.querySelector(${JSON.stringify(selector)});
-    if (!el) return 'not-found';
-    el.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true, view: win }));
-    return 'clicked';
-    `
-  );
-  if (result !== 'clicked') {
-    throw new Error(`Could not click task card for ${taskId}: ${result}`);
-  }
+  const clicked = await clickInWebview(vscode.cdp, 'tasks', `[data-testid="task-${taskId}"]`);
+  if (!clicked) throw new Error(`Could not click task card for ${taskId}`);
   // Detail panel opens asynchronously; give it a beat to render.
   await sleep(1500);
 }
@@ -238,47 +223,18 @@ async function actionClickLink(
   outputDir: string
 ): Promise<void> {
   await openTaskByIdInKanban(vscode, taskId);
-  // Close the auxiliary (chat) sidebar if open so the editor area is fully
-  // visible for the after-screenshot.
-  await cdpEval(
-    vscode.cdp,
-    `(() => {
-      const aux = document.querySelector('.part.auxiliarybar');
-      if (!aux || getComputedStyle(aux).display === 'none') return;
-      const toggle = document.querySelector('.codicon-layout-sidebar-right-off, .codicon-layout-sidebar-right');
-      toggle?.closest?.('.action-item')?.querySelector?.('a')?.click?.();
-    })()`
-  );
-  await sleep(500);
   fs.mkdirSync(outputDir, { recursive: true });
   const before = path.join(outputDir, 'before.png');
   const after = path.join(outputDir, 'after.png');
   await cdpScreenshot(vscode.cdp, before);
   console.log(`wrote ${before}`);
 
-  // The link may be rendered in the full task-detail panel ('detail') OR in the
-  // sidebar preview ('preview') — try both. Kanban-click opens preview first;
-  // the full detail panel only opens when the user clicks Edit or double-clicks.
-  //
-  // Activation strategy: focus the anchor from inside the webview, then send a
-  // *real* Enter key via CDP Input.dispatchKeyEvent. Pure synthetic MouseEvent
-  // dispatch does fire the Svelte handler (preventDefault is called) but the
-  // resulting `vscode.postMessage({type:'openWorkspaceFile'})` is silently
-  // dropped for non-user-gesture events in the webview messaging protocol.
-  // A real keyboard event is a genuine user gesture and round-trips correctly.
-  // Dispatch a synthetic click on the anchor. In headless Linux + CDP we
-  // observe a specific limitation: the Svelte handler runs (preventDefault
-  // fires on the anchor), but `vscode.postMessage({type:'openWorkspaceFile'})`
-  // does not result in the target file actually opening in the editor. We
-  // tried several activation paths (dispatchEvent, element.click(), focus +
-  // KeyboardEvent, real Input.dispatchMouseEvent at screen coords) — none
-  // triggered the full round-trip on headless Linux, though the feature
-  // works end-to-end with real user clicks in a normal VS Code window.
-  //
-  // The "before" capture is still useful as PR documentation, and the
-  // focused-link state in "after" shows the intercept fired; the skill
-  // documents this as a known limitation and recommends manual validation
-  // or the `custom` action for full end-to-end proof on Linux CDP.
+  // The link may be in the full task-detail panel or the sidebar preview
+  // depending on whether the user has opened the full panel yet.
+  // Known limitation on headless Linux CDP: this click fires the Svelte
+  // handler (preventDefault runs) but the resulting extension-host call
+  // to `vscode.commands.executeCommand('vscode.open', uri)` doesn't
+  // complete the file-open. See SKILL.md Troubleshooting for details.
   const clickScript = `
     const anchors = Array.from(doc.querySelectorAll('a'));
     const target = anchors.find(a => a.getAttribute('href') === ${JSON.stringify(linkHref)});
@@ -371,6 +327,27 @@ async function main(): Promise<void> {
   const vscode = await launchVsCode({
     workspacePath,
     cdpPort: opts.cdpPort,
+  });
+
+  // Ensure the spawned VS Code process and temp workspace are torn down on
+  // Ctrl+C / SIGTERM — the `finally` block below only runs on normal return.
+  const teardown = (): void => {
+    try {
+      closeVsCode(vscode);
+    } catch {
+      /* best effort */
+    }
+    if (createdWorkspace && !opts.keepWorkspace) {
+      cleanupTestWorkspace(workspacePath);
+    }
+  };
+  process.once('SIGINT', () => {
+    teardown();
+    process.exit(130);
+  });
+  process.once('SIGTERM', () => {
+    teardown();
+    process.exit(143);
   });
 
   let exitCode = 0;
