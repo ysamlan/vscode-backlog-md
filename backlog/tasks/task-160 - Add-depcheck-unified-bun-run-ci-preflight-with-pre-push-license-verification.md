@@ -4,7 +4,7 @@ title: Add depcheck + unified bun run ci preflight with pre-push license verific
 status: Done
 assignee: []
 created_date: '2026-04-20 19:56'
-updated_date: '2026-04-20 20:03'
+updated_date: '2026-04-20 20:30'
 labels:
   - tooling
   - ci
@@ -116,6 +116,43 @@ See the approved implementation plan at `/home/node/.claude/plans/re-the-unused-
 - [x] #12 Synthetic missing-dep test passes: temporarily removing `chai` from devDependencies (manifest only) makes `bun run depcheck` fail and list it as missing
 - [ ] #13 GitHub Actions CI run on the PR passes with both new steps (Dependency check, Extension e2e smoke tests) executing and succeeding
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Follow-up fix: VS Code 1.116 onboarding overlay
+
+When CI first ran with the new `Extension e2e smoke tests` step (and when the user reproduced locally on macOS), 2 of 4 e2e tests failed with `ElementClickInterceptedError`: VS Code 1.116's new "Welcome to VS Code / sign in to continue with AI-powered development" overlay (CSS class `.onboarding-a-overlay`) was covering the activity bar.
+
+Root cause: upstream VS Code `src/vs/workbench/contrib/welcomeGettingStarted/browser/startupPage.ts` gates this overlay on the setting `workbench.welcomePage.experimentalOnboarding`. First-launch users without that setting disabled get the modal.
+
+Fix (commit `5078948`):
+- Added `scripts/e2e-vscode-settings.json` with `workbench.welcomePage.experimentalOnboarding: false` plus a handful of belt-and-suspenders welcome/experiments/telemetry flags (startupEditor=none, walkthroughs.openOnInstall=false, enableExperiments=false, telemetryLevel=off, update.mode=none, extensions auto-update off, chat.commandCenter.enabled=false).
+- Wired `--code_settings "$CODE_SETTINGS"` into the `extest run-tests` invocation in `scripts/run-e2e.sh`.
+- Pinned `@vscode/vsce` to `3.9.1` in the same script so bunx cache drift doesn't leave contributors on differently-warning builds (the Mac run that surfaced this was packaging with cached 3.7.1).
+
+Verified locally on Linux + xvfb + VS Code 1.116.0: 4/4 e2e tests pass.
+
+## Follow-up: bunx → direct-invocation cleanup
+
+User flagged that several scripts were calling tools via `bunx` even though those tools were already in devDependencies, creating an ambiguous version story. Established the rule:
+
+- **In package.json scripts and shell scripts run via `bun run`**: use the bare binary name. `node_modules/.bin` is on PATH and the version is authoritatively the one in `bun.lock`.
+- **For tools NOT in package.json**: always pin via `bunx pkg@ver` so bunx cache drift can't hand different contributors different versions.
+- **Git hooks**: keep `bunx` or `bun run` for PATH robustness.
+
+Changes (commit to follow):
+- `package.json`: `bunx @tailwindcss/cli` → `tailwindcss`; `bunx depcheck` → `depcheck`; added `depcheck` as a devDependency.
+- `scripts/generate-licenses.sh`: `bunx generate-license-file` → `generate-license-file`.
+- `scripts/run-e2e.sh`: four `bunx extest` → `extest`.
+- `scripts/run-cdp-tests.sh`: `bunx vitest` → `vitest`.
+- `.github/workflows/release.yml`: `bunx vsce publish` → `bunx "@vscode/vsce@3.9.1" publish`; `bunx ovsx publish` → `bunx "ovsx@0.10.11" publish` (matching the vsce pin already in `scripts/run-e2e.sh`).
+- `.depcheckrc.yml`: dropped the `@tailwindcss/cli` ignore — depcheck now resolves the `tailwindcss` bin back to `@tailwindcss/cli`. Updated comments on remaining entries to reflect the rule.
+- Left `bunx playwright`/`bunx vitest` in `.github/workflows/ci.yml` and `bunx lint-staged` in `.husky/pre-commit` alone: GitHub Actions steps and git hooks both have no reliable PATH, and bunx already resolves to the local install.
+- Left `bunx actions-up@v1.12.0` and `bunx "@vscode/vsce@3.9.1"` alone: already pinned; not in devDeps by design (maintenance / release-only tooling).
+
+Verified: `bun run depcheck` / `typecheck` / `lint` / `licenses:check` / unit tests (823 passing) / `build` / `test:e2e` (4/4 passing) all green.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

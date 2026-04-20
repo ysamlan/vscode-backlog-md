@@ -68,12 +68,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Publish to VS Code Marketplace
-        run: bunx vsce publish --packagePath *.vsix
+        run: bunx "@vscode/vsce@3.9.1" publish --packagePath *.vsix
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
       - name: Publish to Open VSX
-        run: bunx ovsx publish *.vsix -p ${{ secrets.OVSX_PAT }}
+        run: bunx "ovsx@0.10.11" publish *.vsix -p ${{ secrets.OVSX_PAT }}
 
       - name: Push version bump to main
         run: |

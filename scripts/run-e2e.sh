@@ -24,8 +24,8 @@ bunx "@vscode/vsce@$VSCE_VERSION" package --no-dependencies -o "$VSIX_FILE"
 CODE_SETTINGS="$(cd "$(dirname "$0")" && pwd)/e2e-vscode-settings.json"
 
 # Split setup-and-run into separate steps so we can provide our pre-built vsix
-SETUP_CMD="bunx extest get-vscode --storage $STORAGE_PATH && bunx extest get-chromedriver --storage $STORAGE_PATH && bunx extest install-vsix --vsix_file $VSIX_FILE --storage $STORAGE_PATH --extensions_dir $EXTENSIONS_DIR"
-RUN_CMD="bunx extest run-tests 'out/test/e2e/*.test.js' --mocha_config .mocharc.json --storage $STORAGE_PATH --extensions_dir $EXTENSIONS_DIR --code_settings $CODE_SETTINGS"
+SETUP_CMD="extest get-vscode --storage $STORAGE_PATH && extest get-chromedriver --storage $STORAGE_PATH && extest install-vsix --vsix_file $VSIX_FILE --storage $STORAGE_PATH --extensions_dir $EXTENSIONS_DIR"
+RUN_CMD="extest run-tests 'out/test/e2e/*.test.js' --mocha_config .mocharc.json --storage $STORAGE_PATH --extensions_dir $EXTENSIONS_DIR --code_settings $CODE_SETTINGS"
 CMD="$SETUP_CMD && $RUN_CMD"
 
 # Check if we need xvfb:

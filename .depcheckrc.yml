@@ -1,21 +1,23 @@
-# Depcheck config. Each entry below is a justified false positive — depcheck
-# cannot detect the usage because it's outside the files/parsers it scans. If
-# you're cleaning this list up, verify the package is still not directly
-# imported anywhere before removing.
+# Depcheck config. Entries below are justified false positives — the package
+# IS used, but depcheck can't see the usage because of how it's imported (not
+# because we invoke it via bunx; tools in devDependencies are called directly
+# by their bin name so depcheck can resolve them). If you're cleaning this
+# list up, verify the package is still not directly imported anywhere before
+# removing.
 
 ignores:
   # Dynamic `import('tiny-markdown-editor')` in a .svelte file. Depcheck has no
   # Svelte parser, so the import is invisible to it.
   - tiny-markdown-editor
 
-  # Invoked via `bunx @tailwindcss/cli` in the `build:css` script.
-  - '@tailwindcss/cli'
-
   # Peer dependency of @tailwindcss/cli (Tailwind v4 splits the CLI into its
-  # own package). The tailwind pipeline needs both installed.
+  # own package). Used at CSS-compile time by the `tailwindcss` binary; not
+  # directly imported by our source.
   - tailwindcss
 
-  # Invoked via `bunx generate-license-file` inside scripts/generate-licenses.sh.
+  # Used by scripts/generate-licenses.sh via the `generate-license-file` bin.
+  # Depcheck finds bin usages in package.json "scripts" entries but not in
+  # standalone shell scripts, so this stays ignored.
   - generate-license-file
 
   # Consumed by scripts/screenshots/generate.ts for PNG optimization. The
