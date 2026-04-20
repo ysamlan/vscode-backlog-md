@@ -13,6 +13,13 @@
     "allowJs": true,
     "types": ["svelte", "node"]
   },
-  "include": ["src/**/*.ts", "e2e/**/*.ts", "scripts/**/*.ts", "*.config.ts", "*.config.mts"],
+  "include": [
+    "src/**/*.ts",
+    "e2e/**/*.ts",
+    "scripts/**/*.ts",
+    ".claude/skills/**/*.ts",
+    "*.config.ts",
+    "*.config.mts"
+  ],
   "exclude": ["node_modules", "dist"]
 }
