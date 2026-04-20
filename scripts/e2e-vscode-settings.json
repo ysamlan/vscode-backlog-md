@@ -1,0 +1,12 @@
+{
+  "$comment": "Settings injected into VS Code when running e2e tests via vscode-extension-tester. Passed to `extest run-tests --code_settings`. Keep this minimal; see scripts/run-e2e.sh for wiring. Blocks the VS Code 1.116+ 'Welcome to VS Code / sign in to continue with AI-powered development' onboarding overlay (CSS class .onboarding-a-overlay) that otherwise intercepts activity-bar clicks and fails the tests.",
+  "workbench.welcomePage.experimentalOnboarding": false,
+  "workbench.welcomePage.walkthroughs.openOnInstall": false,
+  "workbench.startupEditor": "none",
+  "workbench.enableExperiments": false,
+  "telemetry.telemetryLevel": "off",
+  "update.mode": "none",
+  "extensions.autoCheckUpdates": false,
+  "extensions.autoUpdate": false,
+  "chat.commandCenter.enabled": false
+}
