@@ -71,6 +71,7 @@ Completes TASK-XX.
 
 Co-Authored-By: ${model}
 ```
+
 (where ${model} is the contributing agent's model, like "Claude 4.5-Opus" or "OpenAI 5.3-Codex)
 
 **Adding dependencies**: Always use `bun add` to add new packages rather than manually editing package.json. This ensures the latest version is installed and bun.lockb is updated correctly.
@@ -406,15 +407,9 @@ This project uses [Mise](https://mise.jdx.dev/) to manage Node.js and Bun versio
 
 Mise automatically activates when you enter the project directory (if shell integration is set up).
 
-### Visual proof for PRs
+### Visual proof for PRs and Features
 
-When a change produces visible UI or observable behavior (clicking something has an effect, a file gets written, status propagates), invoke the `visual-proof` skill at `.claude/skills/visual-proof/` to produce a `showboat` markdown doc with embedded screenshots and verifiable command output. The skill covers:
-
-- **Vite fixture + agent-browser** — fast, headless, component-level visuals
-- **CDP-driven real VS Code** — end-to-end behavior (e.g., click → file opens in editor)
-- **`showboat exec`** — pure file/command output, no browser, for format-change proofs
-
-Includes a decision matrix for picking between them. Output lands in `tmp/` (gitignored) and can be linked from PR descriptions. See the skill's SKILL.md for the full command reference.
+When a change produces visible UI or observable behavior (clicking something has an effect, a file gets written, status propagates), invoke the `visual-proof` skill at `.claude/skills/visual-proof/` to produce a `showboat` markdown doc with embedded extension screenshots and verifiable command output. Do this for any UI-impacting or visually explainable feature before declaring it complete or pull-request-ready.
 
 ### Exploratory Testing with agent-browser
 

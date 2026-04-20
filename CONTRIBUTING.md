@@ -57,35 +57,13 @@ Marketplace version.
 If your change affects what users see or how they interact with the
 extension, a short "before/after" or "demo" section in your PR description
 helps reviewers enormously. The repo ships a `visual-proof` Claude Code
-skill at `.claude/skills/visual-proof/` that captures screenshots and
-assembles them into a [`showboat`](https://github.com/simonw/showboat)
-markdown doc you can paste (or link) into your PR.
+skill at `.claude/skills/visual-proof/` that can capture screenshots of the
+extension via CDP and assemble them into a
+[`showboat`](https://github.com/simonw/showboat) markdown doc; you can
+paste relevant screenshots from that into your PR.
 
-The skill has three paths:
-
-- **Vite fixture + agent-browser** — fast, headless, component visuals
-  (kanban layout, theme variations, empty/error states)
-- **CDP-driven real VS Code** — end-to-end behavior where the fixture
-  can't follow through (e.g. clicking a link and having the editor
-  actually open the target file)
-- **`showboat exec`** — pure file/command output for format-change proofs
-  (no browser at all)
-
-Quickstart:
-
-```bash
-# One-time: ensure uv is installed (mise users get it from mise.toml)
-uvx showboat --version
-
-# Invoke the skill in a Claude Code session and describe what you
-# changed. It produces tmp/visual-proof.md with screenshots and
-# verifiable command output.
-```
-
-You don't have to use the skill — a hand-taken screenshot pasted into
-the PR body is fine for a one-off. But the skill's output is verifiable
-(`uvx showboat verify <file>` re-runs the embedded commands), which
-makes review faster and more reliable.
+We highly recommend all agents use the `visual-proof` skill flow. Humans
+can also feel free to just use hand-taken screenshots.
 
 ## Project Structure
 
