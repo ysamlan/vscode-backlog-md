@@ -17,9 +17,9 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
           experimental: true
 
@@ -27,7 +27,7 @@ jobs:
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
 
       - name: Update changelog from GitHub releases
-        uses: rhysd/changelog-from-release/action@v3
+        uses: rhysd/changelog-from-release/action@78b335bb7d059f35ad04c5428d50711726feee50 # v3.9.1
         with:
           file: CHANGELOG.md
           github_token: ${{ github.token }}
