@@ -13,3 +13,9 @@ test-results/
 
 # https://github.com/obra/superpowers/blob/main/skills/using-git-worktrees/SKILL.md
 .worktrees/
+
+# Lockfiles from non-Bun package managers. This project uses bun.lock;
+# block accidental commits if someone runs npm/yarn/pnpm install.
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
