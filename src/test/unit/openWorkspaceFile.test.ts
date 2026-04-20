@@ -323,4 +323,126 @@ describe('openWorkspaceFile', () => {
     expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
     expect(showTextDocument).not.toHaveBeenCalled();
   });
+
+  it('jumps to a setext H1 heading (Title\\n=====)', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['Intro', '=====', '', 'Some body text.', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'intro');
+
+    expect(showTextDocument).toHaveBeenCalledTimes(1);
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 0, character: 0 });
+  });
+
+  it('jumps to a setext H2 heading (Title\\n-----)', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['# Top', '', 'Section Two', '-----------', '', 'Body.', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'section-two');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 2, character: 0 });
+  });
+
+  it('counts setext headings toward the duplicate-slug counter', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['Notes', '=====', '', '## Notes', 'body', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'notes-1');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 3, character: 0 });
+  });
+
+  it('ignores heading-shaped lines inside HTML comments', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['<!--', '# Target', '-->', '', '## Target', 'real heading', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'target');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 4, character: 0 });
+  });
+
+  it('ignores heading-shaped lines inside 4-space indented code blocks', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = [
+      'Paragraph line.',
+      '',
+      '    # Not a heading',
+      '    more code',
+      '',
+      '## Target',
+      '',
+    ].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'target');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 5, character: 0 });
+  });
+
+  it('treats L0 as invalid and opens the file at the default position', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+
+    await openWorkspaceFile('src/file.ts', 'L0');
+
+    expect(showTextDocument).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/src/file.ts' })
+    );
+  });
+
+  it('swaps reversed line ranges (L50-L10) into a valid range', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+
+    await openWorkspaceFile('src/file.ts', 'L50-L10');
+
+    expect(showTextDocument).toHaveBeenCalledTimes(1);
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 9, character: 0 });
+    expect(optionsArg.selection.end).toMatchObject({ line: 49, character: 0 });
+  });
+
+  it('falls back to default open for malformed line fragments like bare L', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+
+    await openWorkspaceFile('src/file.ts', 'L');
+
+    expect(showTextDocument).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/src/file.ts' })
+    );
+  });
+
+  it('does not decode + as space in percent-encoded paths', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+
+    await openWorkspaceFile('docs/c+%2B-notes.md', null);
+
+    expect(vscode.workspace.fs.stat).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: '/repo/docs/c++-notes.md' })
+    );
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/docs/c++-notes.md' })
+    );
+  });
 });

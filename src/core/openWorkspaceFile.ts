@@ -124,8 +124,13 @@ async function resolveRange(
 function parseLineRange(fragment: string): vscode.Range | undefined {
   const match = fragment.match(/^L(\d+)(?:-L?(\d+))?$/i);
   if (!match) return undefined;
-  const start = Math.max(0, parseInt(match[1], 10) - 1);
-  const end = match[2] ? Math.max(start, parseInt(match[2], 10) - 1) : start;
+  const startLine = parseInt(match[1], 10);
+  const endLine = match[2] ? parseInt(match[2], 10) : startLine;
+  // L0 (and any other non-positive line) is invalid — fall back to default open.
+  if (startLine <= 0 || endLine <= 0) return undefined;
+  // Reversed ranges like L50-L10 are swapped rather than collapsed.
+  const start = Math.min(startLine, endLine) - 1;
+  const end = Math.max(startLine, endLine) - 1;
   return new vscode.Range(new vscode.Position(start, 0), new vscode.Position(end, 0));
 }
 
@@ -146,8 +151,23 @@ async function findHeadingRange(
   const slugger = new Slugger();
   let inFence = false;
   let fenceMarker = '';
+  let inHtmlComment = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+
+    if (inHtmlComment) {
+      if (line.includes('-->')) inHtmlComment = false;
+      continue;
+    }
+    // Only treat `<!--` as a comment boundary when the line doesn't also close
+    // it — otherwise single-line comments like `<!-- note -->` would be skipped
+    // unnecessarily.
+    const openIdx = line.indexOf('<!--');
+    if (openIdx >= 0 && line.indexOf('-->', openIdx + 4) === -1) {
+      inHtmlComment = true;
+      continue;
+    }
+
     const fence = line.match(/^(\s*)(`{3,}|~{3,})/);
     if (fence) {
       if (!inFence) {
@@ -159,10 +179,27 @@ async function findHeadingRange(
       continue;
     }
     if (inFence) continue;
-    const heading = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
-    if (!heading) continue;
-    if (slugger.slug(heading[1]) === target) {
-      return new vscode.Range(new vscode.Position(i, 0), new vscode.Position(i, 0));
+
+    // ATX heading: up to 3 spaces of indentation, then 1–6 `#` and space.
+    // 4+ leading spaces already falls out (treated as indented code block).
+    const atx = line.match(/^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+    if (atx) {
+      if (slugger.slug(atx[1]) === target) {
+        return new vscode.Range(new vscode.Position(i, 0), new vscode.Position(i, 0));
+      }
+      continue;
+    }
+
+    // Setext heading: current line is `===` (H1) or `---` (H2), previous line
+    // holds the heading text. Require a non-blank, non-heading previous line.
+    if (i > 0 && (/^ {0,3}=+\s*$/.test(line) || /^ {0,3}-+\s*$/.test(line))) {
+      const prev = lines[i - 1];
+      if (prev.trim() && !/^ {0,3}#{1,6}\s/.test(prev)) {
+        const text = prev.trim();
+        if (slugger.slug(text) === target) {
+          return new vscode.Range(new vscode.Position(i - 1, 0), new vscode.Position(i - 1, 0));
+        }
+      }
     }
   }
   return undefined;

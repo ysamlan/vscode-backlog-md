@@ -49,8 +49,8 @@ Non-goals: changing the message contract between webview and extension host; cha
 - [x] #3 Absolute paths in link hrefs are rejected with a user-visible warning and do not open files outside the workspace
 - [x] #4 Links authored with backslash separators resolve to the same file as forward-slash equivalents on all platforms
 - [x] #5 Links that resolve to a directory show a warning instead of silently failing
-- [ ] #6 Setext-style headings are matched by slug fragments the same as ATX headings
-- [ ] #7 `#` lines inside 4-space indented code blocks and HTML comments are not treated as headings
-- [ ] #8 `L0`, reversed ranges, and malformed line fragments behave deterministically and are covered by unit tests
-- [ ] #9 Unit tests pin the `+`-is-not-space decoding behavior and the directory/absolute-path rejections
+- [x] #6 Setext-style headings are matched by slug fragments the same as ATX headings
+- [x] #7 `#` lines inside 4-space indented code blocks and HTML comments are not treated as headings
+- [x] #8 `L0`, reversed ranges, and malformed line fragments behave deterministically and are covered by unit tests
+- [x] #9 Unit tests pin the `+`-is-not-space decoding behavior and the directory/absolute-path rejections
 <!-- AC:END -->
