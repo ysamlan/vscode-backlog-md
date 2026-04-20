@@ -151,9 +151,13 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
           branch: message.branch,
         });
         return;
-      case 'openWorkspaceFile':
-        await openWorkspaceFile(message.relativePath, message.fragment);
+      case 'openWorkspaceFile': {
+        const sourceFilePath = this.selectedTaskRef
+          ? (await this.resolveTask(this.selectedTaskRef))?.filePath
+          : undefined;
+        await openWorkspaceFile(message.relativePath, message.fragment, sourceFilePath);
         return;
+      }
       case 'updateTask': {
         const task = await this.parser.getTask(message.taskId);
         if (!task) return;

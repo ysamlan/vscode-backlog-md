@@ -15,6 +15,7 @@ import { parseMarkdown } from '../core/parseMarkdown';
 export class ContentDetailProvider {
   private static currentPanel: vscode.WebviewPanel | undefined;
   private static currentEntityId: string | undefined;
+  private static currentEntityFilePath: string | undefined;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -42,6 +43,7 @@ export class ContentDetailProvider {
 
     const panel = this.ensurePanel(`${doc.id}: ${doc.title}`);
     ContentDetailProvider.currentEntityId = docId;
+    ContentDetailProvider.currentEntityFilePath = doc.filePath;
 
     const contentHtml = doc.content ? await parseMarkdown(doc.content) : '';
     panel.webview.postMessage({ type: 'documentData', document: doc, contentHtml });
@@ -64,6 +66,7 @@ export class ContentDetailProvider {
 
     const panel = this.ensurePanel(`${decision.id}: ${decision.title}`);
     ContentDetailProvider.currentEntityId = decisionId;
+    ContentDetailProvider.currentEntityFilePath = decision.filePath;
 
     // Render each section to HTML
     const sections: Record<string, string> = {};
@@ -100,13 +103,18 @@ export class ContentDetailProvider {
       if (message.type === 'openFile' && message.filePath) {
         vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.filePath));
       } else if (message.type === 'openWorkspaceFile') {
-        await openWorkspaceFile(message.relativePath, message.fragment ?? null);
+        await openWorkspaceFile(
+          message.relativePath,
+          message.fragment ?? null,
+          ContentDetailProvider.currentEntityFilePath
+        );
       }
     });
 
     panel.onDidDispose(() => {
       ContentDetailProvider.currentPanel = undefined;
       ContentDetailProvider.currentEntityId = undefined;
+      ContentDetailProvider.currentEntityFilePath = undefined;
     });
 
     return panel;

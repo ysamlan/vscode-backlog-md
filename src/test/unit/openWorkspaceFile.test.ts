@@ -202,4 +202,73 @@ describe('openWorkspaceFile', () => {
     );
     expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
   });
+
+  it('URL-decodes percent-encoded paths before resolving', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+
+    await openWorkspaceFile('task-041%20-%20Decide-testing.md', null);
+
+    expect(vscode.workspace.fs.stat).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: '/repo/task-041 - Decide-testing.md' })
+    );
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/task-041 - Decide-testing.md' })
+    );
+  });
+
+  it('resolves parent-traversal paths relative to the source file directory', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+
+    await openWorkspaceFile(
+      '../../contributing/conventions/report-format.md',
+      null,
+      '/repo/backlog/tasks/task-153.md'
+    );
+
+    expect(vscode.workspace.fs.stat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fsPath: '/repo/contributing/conventions/report-format.md',
+      })
+    );
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({
+        fsPath: '/repo/contributing/conventions/report-format.md',
+      })
+    );
+  });
+
+  it('falls back to workspace folders when the source-relative lookup misses', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock)
+      .mockRejectedValueOnce(new Error('ENOENT'))
+      .mockResolvedValueOnce({ type: 1 });
+
+    await openWorkspaceFile('src/file.ts', null, '/repo/backlog/tasks/task-153.md');
+
+    expect(vscode.workspace.fs.stat).toHaveBeenCalledTimes(2);
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/src/file.ts' })
+    );
+  });
+
+  it('prefers a source-relative sibling over a workspace-root file with the same name', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+
+    await openWorkspaceFile('task-041.md', null, '/repo/backlog/tasks/task-153.md');
+
+    // First candidate should be resolved against the source file's directory
+    expect(vscode.workspace.fs.stat).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: '/repo/backlog/tasks/task-041.md' })
+    );
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/backlog/tasks/task-041.md' })
+    );
+  });
 });

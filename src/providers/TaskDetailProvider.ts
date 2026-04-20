@@ -524,7 +524,11 @@ export class TaskDetailProvider {
         break;
 
       case 'openWorkspaceFile':
-        await openWorkspaceFile(message.relativePath, message.fragment ?? null);
+        await openWorkspaceFile(
+          message.relativePath,
+          message.fragment ?? null,
+          TaskDetailProvider.currentFilePath
+        );
         break;
 
       case 'openTask':

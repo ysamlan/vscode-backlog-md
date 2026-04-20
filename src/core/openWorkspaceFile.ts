@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 
 interface SluggerInstance {
   slug(value: string, maintainCase?: boolean): string;
@@ -17,31 +18,49 @@ async function loadSlugger(): Promise<SluggerModule> {
 }
 
 /**
- * Open a workspace-relative file path in a VS Code editor, honoring an optional
+ * Open a relative file path in a VS Code editor, honoring an optional
  * fragment: either a `Lstart[-Lend]` line range, or — for markdown files — a
- * GitHub-style heading slug (`#my-heading`). Tries each workspace folder until
- * the file is found.
+ * GitHub-style heading slug (`#my-heading`).
+ *
+ * Resolution order: if `sourceFilePath` is given, the path is resolved relative
+ * to that file's directory first (so `../../foo.md` in a task file lands where
+ * a markdown reader would expect). Falls back to each workspace folder.
+ *
+ * The path is URL-decoded so links written as `task-041%20-%20foo.md` resolve
+ * to the literal filename `task-041 - foo.md`.
  */
 export async function openWorkspaceFile(
   relativePath: string | undefined,
-  fragment: string | null
+  fragment: string | null,
+  sourceFilePath?: string
 ): Promise<void> {
   if (!relativePath) return;
 
+  const decodedPath = safeDecode(relativePath);
   const folders = vscode.workspace.workspaceFolders;
-  if (!folders || folders.length === 0) {
+
+  const candidates: vscode.Uri[] = [];
+  if (sourceFilePath) {
+    candidates.push(vscode.Uri.file(path.resolve(path.dirname(sourceFilePath), decodedPath)));
+  }
+  if (folders) {
+    for (const folder of folders) {
+      candidates.push(vscode.Uri.joinPath(folder.uri, decodedPath));
+    }
+  }
+
+  if (candidates.length === 0) {
     vscode.window.showWarningMessage('No workspace folder is open.');
     return;
   }
 
-  for (const folder of folders) {
-    const uri = vscode.Uri.joinPath(folder.uri, relativePath);
+  for (const uri of candidates) {
     try {
       await vscode.workspace.fs.stat(uri);
     } catch {
       continue;
     }
-    const range = await resolveRange(uri, relativePath, fragment);
+    const range = await resolveRange(uri, decodedPath, fragment);
     if (range) {
       const editor = await vscode.window.showTextDocument(uri, { selection: range });
       editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
@@ -51,7 +70,15 @@ export async function openWorkspaceFile(
     return;
   }
 
-  vscode.window.showWarningMessage(`File not found in workspace: ${relativePath}`);
+  vscode.window.showWarningMessage(`File not found in workspace: ${decodedPath}`);
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 async function resolveRange(
