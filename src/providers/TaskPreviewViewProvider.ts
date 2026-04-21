@@ -10,7 +10,7 @@ import {
 } from '../core/types';
 import { BacklogWriter } from '../core/BacklogWriter';
 import { computeSubtasks } from '../core/BacklogParser';
-import { openWorkspaceFile } from '../core/openWorkspaceFile';
+import { openWorkspaceFile, isValidLinkString } from '../core/openWorkspaceFile';
 import { parseMarkdown } from '../core/parseMarkdown';
 
 type TaskSelectionRef = {
@@ -152,10 +152,13 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
         });
         return;
       case 'openWorkspaceFile': {
+        if (!isValidLinkString(message.relativePath)) return;
+        const fragment = message.fragment ?? null;
+        if (fragment !== null && !isValidLinkString(fragment)) return;
         const sourceFilePath = this.selectedTaskRef
           ? (await this.resolveTask(this.selectedTaskRef))?.filePath
           : undefined;
-        await openWorkspaceFile(message.relativePath, message.fragment, sourceFilePath);
+        await openWorkspaceFile(message.relativePath, fragment, sourceFilePath);
         return;
       }
       case 'updateTask': {

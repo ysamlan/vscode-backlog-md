@@ -5,7 +5,7 @@ import { BacklogParser, computeSubtasks } from '../core/BacklogParser';
 import { BacklogWriter, computeContentHash, FileConflictError } from '../core/BacklogWriter';
 import { isReadOnlyTask, getReadOnlyTaskContext, type Task, type TaskSource } from '../core/types';
 import { StatusCallbackRunner } from '../core/StatusCallbackRunner';
-import { openWorkspaceFile } from '../core/openWorkspaceFile';
+import { openWorkspaceFile, isValidLinkString } from '../core/openWorkspaceFile';
 import { parseMarkdown } from '../core/parseMarkdown';
 
 /**
@@ -523,13 +523,16 @@ export class TaskDetailProvider {
         }
         break;
 
-      case 'openWorkspaceFile':
-        await openWorkspaceFile(
-          message.relativePath,
-          message.fragment ?? null,
-          TaskDetailProvider.currentFilePath
-        );
+      case 'openWorkspaceFile': {
+        // Shape-check the IPC payload: a compromised or buggy webview could
+        // post a non-string / oversized value. Drop it silently rather than
+        // letting it coerce via `decodeURIComponent` downstream.
+        if (!isValidLinkString(message.relativePath)) break;
+        const fragment = message.fragment ?? null;
+        if (fragment !== null && !isValidLinkString(fragment)) break;
+        await openWorkspaceFile(message.relativePath, fragment, TaskDetailProvider.currentFilePath);
         break;
+      }
 
       case 'openTask':
         if (message.taskId) {

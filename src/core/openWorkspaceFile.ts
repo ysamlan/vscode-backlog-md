@@ -17,6 +17,23 @@ async function loadSlugger(): Promise<SluggerModule> {
   return sluggerModule;
 }
 
+// Cap inbound link strings from the webview. Real paths and fragments are tiny;
+// anything longer is almost certainly a malformed or adversarial message.
+export const MAX_LINK_LENGTH = 4096;
+
+// Files larger than this are opened without scanning for a heading anchor — a
+// `[x](huge-file.md#anchor)` click shouldn't load hundreds of MB into memory.
+const MAX_HEADING_SCAN_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Type-guard for values posted over the webview→host IPC channel: a string
+ * bounded by {@link MAX_LINK_LENGTH}. Providers use this before forwarding a
+ * message to {@link openWorkspaceFile}.
+ */
+export function isValidLinkString(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= MAX_LINK_LENGTH;
+}
+
 /**
  * Open a relative file path in a VS Code editor, honoring an optional
  * fragment: either a `Lstart[-Lend]` line range, or — for markdown files — a
@@ -29,7 +46,8 @@ async function loadSlugger(): Promise<SluggerModule> {
  * The path is URL-decoded so links written as `task-041%20-%20foo.md` resolve
  * to the literal filename `task-041 - foo.md`. Backslash separators are
  * normalized to forward slashes so Windows-authored links work cross-platform.
- * Absolute paths and directory targets are rejected with a warning.
+ * Absolute paths, `..`-escaped paths that resolve outside every workspace
+ * folder, and directory targets are rejected with a warning.
  */
 export async function openWorkspaceFile(
   relativePath: string | undefined,
@@ -37,6 +55,10 @@ export async function openWorkspaceFile(
   sourceFilePath?: string
 ): Promise<void> {
   if (!relativePath) return;
+  // Defense-in-depth: providers also validate shape at the IPC boundary, but a
+  // non-string slipping through would explode on `.replace`/`decodeURIComponent`.
+  if (!isValidLinkString(relativePath)) return;
+  if (fragment !== null && !isValidLinkString(fragment)) return;
 
   const decodedPath = safeDecode(relativePath).replace(/\\/g, '/');
 
@@ -49,18 +71,31 @@ export async function openWorkspaceFile(
 
   const folders = vscode.workspace.workspaceFolders;
 
-  const candidates: vscode.Uri[] = [];
+  const allCandidates: vscode.Uri[] = [];
   if (sourceFilePath) {
-    candidates.push(vscode.Uri.file(path.resolve(path.dirname(sourceFilePath), decodedPath)));
+    allCandidates.push(vscode.Uri.file(path.resolve(path.dirname(sourceFilePath), decodedPath)));
   }
   if (folders) {
     for (const folder of folders) {
-      candidates.push(vscode.Uri.joinPath(folder.uri, decodedPath));
+      allCandidates.push(vscode.Uri.joinPath(folder.uri, decodedPath));
     }
   }
 
-  if (candidates.length === 0) {
+  if (allCandidates.length === 0) {
     vscode.window.showWarningMessage('No workspace folder is open.');
+    return;
+  }
+
+  // Reject candidates that resolve outside every workspace folder. `path.resolve`
+  // on the source-relative candidate and `Uri.joinPath` both normalize `..`, so
+  // a link like `../../../etc/passwd` from a task file can escape — this check
+  // closes that gap. Without workspace folders we have nothing to bound against.
+  const candidates = folders
+    ? allCandidates.filter((uri) => isInsideWorkspace(uri.fsPath, folders))
+    : [];
+
+  if (candidates.length === 0) {
+    vscode.window.showWarningMessage(`Refusing to open path outside workspace: ${decodedPath}`);
     return;
   }
 
@@ -78,7 +113,7 @@ export async function openWorkspaceFile(
     if ((stat.type & vscode.FileType.File) === 0) {
       continue;
     }
-    const range = await resolveRange(uri, decodedPath, fragment);
+    const range = await resolveRange(uri, decodedPath, fragment, stat.size);
     if (range) {
       const editor = await vscode.window.showTextDocument(uri, { selection: range });
       editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
@@ -99,6 +134,17 @@ function isAbsolutePath(value: string): boolean {
   return false;
 }
 
+function isInsideWorkspace(
+  resolvedFsPath: string,
+  folders: readonly vscode.WorkspaceFolder[]
+): boolean {
+  return folders.some((folder) => {
+    const rel = path.relative(folder.uri.fsPath, resolvedFsPath);
+    // Empty rel = the folder itself; `..`-prefixed or absolute = escape.
+    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+  });
+}
+
 function safeDecode(value: string): string {
   try {
     return decodeURIComponent(value);
@@ -110,12 +156,16 @@ function safeDecode(value: string): string {
 async function resolveRange(
   uri: vscode.Uri,
   relativePath: string,
-  fragment: string | null
+  fragment: string | null,
+  fileSize: number
 ): Promise<vscode.Range | undefined> {
   if (!fragment) return undefined;
   const lineRange = parseLineRange(fragment);
   if (lineRange) return lineRange;
   if (/\.(md|markdown)$/i.test(relativePath)) {
+    // Skip heading lookup for oversized files — fall back to a plain open so
+    // a `#anchor` link can't trigger loading hundreds of MB into memory.
+    if (fileSize > MAX_HEADING_SCAN_BYTES) return undefined;
     return await findHeadingRange(uri, fragment);
   }
   return undefined;

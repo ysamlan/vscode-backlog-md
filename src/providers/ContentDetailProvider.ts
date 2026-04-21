@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { BacklogParser } from '../core/BacklogParser';
-import { openWorkspaceFile } from '../core/openWorkspaceFile';
+import { openWorkspaceFile, isValidLinkString } from '../core/openWorkspaceFile';
 import { parseMarkdown } from '../core/parseMarkdown';
 
 /**
@@ -103,9 +103,12 @@ export class ContentDetailProvider {
       if (message.type === 'openFile' && message.filePath) {
         vscode.commands.executeCommand('vscode.open', vscode.Uri.file(message.filePath));
       } else if (message.type === 'openWorkspaceFile') {
+        if (!isValidLinkString(message.relativePath)) return;
+        const fragment = message.fragment ?? null;
+        if (fragment !== null && !isValidLinkString(fragment)) return;
         await openWorkspaceFile(
           message.relativePath,
-          message.fragment ?? null,
+          fragment,
           ContentDetailProvider.currentEntityFilePath
         );
       }

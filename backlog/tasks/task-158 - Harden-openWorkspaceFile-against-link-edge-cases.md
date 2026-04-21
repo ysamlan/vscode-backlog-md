@@ -4,7 +4,7 @@ title: Harden openWorkspaceFile against link edge cases
 status: In Progress
 assignee: []
 created_date: '2026-04-20 12:00'
-updated_date: '2026-04-20 14:45'
+updated_date: '2026-04-21 09:30'
 labels: []
 dependencies:
   - TASK-153
@@ -25,8 +25,17 @@ Areas to address:
 ### Path resolution
 
 - Reject absolute paths (`/etc/passwd`, `C:\\...`) rather than opening files outside the workspace.
+- Reject traversal paths that resolve outside every workspace folder (`../../../etc/passwd` from inside a task file). The absolute-path check covers literal roots but not `..`-escaped ones; verify each resolved candidate with `path.relative` against workspace folders before `fs.stat`.
 - Normalize Windows-style separators (`docs\\guide.md`) so cross-platform-authored links resolve on Linux/macOS.
 - Verify the resolved target is a regular file via `FileType.File`; currently a directory passes `fs.stat` and then fails silently in `vscode.open`.
+
+### IPC boundary
+
+- Validate the `openWorkspaceFile` message shape at each webview→host handler (`TaskDetailProvider`, `ContentDetailProvider`, `TaskPreviewViewProvider`). A compromised or buggy webview could post `relativePath: {}` / an array / an over-long string; reject non-string or over-length values instead of letting them reach the resolver and coerce via `decodeURIComponent`.
+
+### Denial-of-service on heading resolution
+
+- `findHeadingRange` currently reads the target file in full to scan for the matching slug. A link like `[big](some-huge-file.md#anything)` would load the entire file into memory on click. Stat the file first and skip heading lookup for files above a reasonable cap (e.g. 5 MB) — fall back to a plain open without the anchor.
 
 ### Fragment parsing
 
@@ -53,4 +62,7 @@ Non-goals: changing the message contract between webview and extension host; cha
 - [x] #7 `#` lines inside 4-space indented code blocks and HTML comments are not treated as headings
 - [x] #8 `L0`, reversed ranges, and malformed line fragments behave deterministically and are covered by unit tests
 - [x] #9 Unit tests pin the `+`-is-not-space decoding behavior and the directory/absolute-path rejections
+- [x] #10 Links that resolve outside every workspace folder (via `../` traversal) are rejected with a user-visible warning and do not open files outside the workspace
+- [x] #11 The `openWorkspaceFile` message is shape-validated at each provider's webview→host handler — non-string or over-length `relativePath` / `fragment` values are dropped without reaching the resolver
+- [x] #12 Markdown heading resolution is bounded by file size: files above the configured cap fall back to a plain open (no `readFile`) instead of loading the whole document to scan for a slug
 <!-- AC:END -->

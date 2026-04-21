@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import * as vscode from 'vscode';
-import { openWorkspaceFile } from '../../core/openWorkspaceFile';
+import {
+  MAX_LINK_LENGTH,
+  isValidLinkString,
+  openWorkspaceFile,
+} from '../../core/openWorkspaceFile';
 import { resetAllMocks } from '../mocks/vscode';
 
 // `showTextDocument` is not on the shared mock — install it once for this suite.
@@ -444,5 +448,138 @@ describe('openWorkspaceFile', () => {
       'vscode.open',
       expect.objectContaining({ fsPath: '/repo/docs/c++-notes.md' })
     );
+  });
+
+  // AC #10 — workspace-boundary: reject `..`-traversal escapes
+  it('rejects `..`-traversal that escapes every workspace folder', async () => {
+    setWorkspaceFolders(['/repo']);
+
+    await openWorkspaceFile('../../../etc/passwd', null, '/repo/backlog/tasks/task-153.md');
+
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+      'Refusing to open path outside workspace: ../../../etc/passwd'
+    );
+    expect(vscode.workspace.fs.stat).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+  });
+
+  it('rejects workspace-root `..` escapes even without a source file', async () => {
+    setWorkspaceFolders(['/repo']);
+
+    await openWorkspaceFile('../etc/passwd', null);
+
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+      'Refusing to open path outside workspace: ../etc/passwd'
+    );
+    expect(vscode.workspace.fs.stat).not.toHaveBeenCalled();
+  });
+
+  it('accepts a traversal that still lands inside some workspace folder', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+
+    await openWorkspaceFile('../src/file.ts', null, '/repo/backlog/tasks/task-153.md');
+
+    expect(vscode.workspace.fs.stat).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: '/repo/backlog/src/file.ts' })
+    );
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/backlog/src/file.ts' })
+    );
+  });
+
+  // AC #11 — IPC boundary: validate payload shape
+  it('isValidLinkString rejects non-strings and over-length strings', () => {
+    expect(isValidLinkString('ok.md')).toBe(true);
+    expect(isValidLinkString('')).toBe(true);
+    expect(isValidLinkString(undefined)).toBe(false);
+    expect(isValidLinkString(null)).toBe(false);
+    expect(isValidLinkString({})).toBe(false);
+    expect(isValidLinkString(['arr'])).toBe(false);
+    expect(isValidLinkString(42)).toBe(false);
+    expect(isValidLinkString('x'.repeat(MAX_LINK_LENGTH))).toBe(true);
+    expect(isValidLinkString('x'.repeat(MAX_LINK_LENGTH + 1))).toBe(false);
+  });
+
+  it('drops non-string relativePath silently without statting or warning', async () => {
+    setWorkspaceFolders(['/repo']);
+
+    // Simulate a malformed IPC payload slipping through. The function's
+    // typed signature says `string | undefined`, but defense-in-depth still
+    // rejects runtime garbage rather than coercing via decodeURIComponent.
+    await openWorkspaceFile({} as unknown as string, null);
+    await openWorkspaceFile(['arr'] as unknown as string, null);
+
+    expect(vscode.workspace.fs.stat).not.toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+  });
+
+  it('drops over-length relativePath silently', async () => {
+    setWorkspaceFolders(['/repo']);
+
+    await openWorkspaceFile('a'.repeat(MAX_LINK_LENGTH + 1), null);
+
+    expect(vscode.workspace.fs.stat).not.toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+  });
+
+  it('drops non-string fragment silently', async () => {
+    setWorkspaceFolders(['/repo']);
+
+    await openWorkspaceFile('docs/guide.md', {} as unknown as string);
+
+    expect(vscode.workspace.fs.stat).not.toHaveBeenCalled();
+    expect(vscode.window.showWarningMessage).not.toHaveBeenCalled();
+  });
+
+  // AC #12 — bound heading scan by file size
+  it('skips heading scan for oversized markdown files and falls back to plain open', async () => {
+    setWorkspaceFolders(['/repo']);
+    // 6 MB — above the 5 MB scan cap.
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({
+      type: 1,
+      size: 6 * 1024 * 1024,
+    });
+
+    await openWorkspaceFile('docs/huge.md', 'some-heading');
+
+    expect(vscode.workspace.fs.readFile).not.toHaveBeenCalled();
+    expect(showTextDocument).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/docs/huge.md' })
+    );
+  });
+
+  it('still honors a line-range fragment on an oversized file without reading it', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({
+      type: 1,
+      size: 6 * 1024 * 1024,
+    });
+
+    await openWorkspaceFile('docs/huge.md', 'L100');
+
+    expect(vscode.workspace.fs.readFile).not.toHaveBeenCalled();
+    expect(showTextDocument).toHaveBeenCalledTimes(1);
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 99, character: 0 });
+  });
+
+  it('still scans headings for small markdown files under the cap', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({
+      type: 1,
+      size: 4 * 1024 * 1024,
+    });
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(
+      new TextEncoder().encode('# Target\n')
+    );
+
+    await openWorkspaceFile('docs/small.md', 'target');
+
+    expect(vscode.workspace.fs.readFile).toHaveBeenCalledTimes(1);
+    expect(showTextDocument).toHaveBeenCalledTimes(1);
   });
 });
