@@ -52,6 +52,11 @@ export default defineConfig({
     sourcemap: true,
     // Minify for production
     minify: true,
+    // Mermaid (~600 kB core + sub-diagrams) is lazy-imported from
+    // src/webview/lib/mermaid.ts and only fetched when a task contains
+    // a ```mermaid block, so it never blocks initial webview paint.
+    // Raise the warning threshold to silence expected noise.
+    chunkSizeWarningLimit: 700,
   },
   resolve: {
     alias: {
