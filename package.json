@@ -189,7 +189,7 @@
     "typecheck": "tsc --noEmit",
     "package": "vsce package --no-dependencies",
     "licenses:generate": "bash scripts/generate-licenses.sh",
-    "licenses:check": "bun run licenses:generate && git diff --exit-code ThirdPartyNotices.txt",
+    "licenses:check": "bash scripts/check-licenses.sh",
     "depcheck": "depcheck",
     "ci": "bun run check:engines && bun run lint && bun run typecheck && bun run depcheck && bun run licenses:check && bun run test && bun run build && bun run test:playwright && bun run test:cdp && bun run test:e2e",
     "update:actions": "bunx actions-up@v1.12.0 --min-age 7",
