@@ -31,12 +31,12 @@ SOFTWARE.
 
 The following npm packages may be included in this product:
 
- - @chevrotain/cst-dts-gen@12.0.0
- - @chevrotain/gast@12.0.0
- - @chevrotain/regexp-to-ast@12.0.0
- - @chevrotain/types@12.0.0
- - @chevrotain/utils@12.0.0
- - chevrotain@12.0.0
+ - @chevrotain/cst-dts-gen@11.1.1
+ - @chevrotain/gast@11.1.1
+ - @chevrotain/regexp-to-ast@11.1.1
+ - @chevrotain/types@11.1.1
+ - @chevrotain/utils@11.1.1
+ - chevrotain@11.1.1
 
 These packages each contain the following license:
 
@@ -992,7 +992,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 The following npm package may be included in this product:
 
- - core-js@3.49.0
+ - core-js@3.48.0
 
 This package contains the following license:
 
@@ -1086,11 +1086,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 The following npm package may be included in this product:
 
- - cytoscape@3.33.2
+ - cytoscape@3.33.1
 
 This package contains the following license:
 
-Copyright (c) 2016-2026, The Cytoscape Consortium.
+Copyright (c) 2016-2025, The Cytoscape Consortium.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the “Software”), to deal in
@@ -1142,7 +1142,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - devalue@5.7.1
+ - devalue@5.6.4
 
 This package contains the following license:
 
@@ -1719,11 +1719,12 @@ SOFTWARE.
 
 -----------
 
-The following npm package may be included in this product:
+The following npm packages may be included in this product:
 
  - internmap@1.0.1
+ - internmap@2.0.3
 
-This package contains the following license:
+These packages each contain the following license:
 
 Copyright 2021 Mike Bostock
 
@@ -1743,7 +1744,7 @@ THIS SOFTWARE.
 
 The following npm package may be included in this product:
 
- - langium@4.2.2
+ - langium@4.2.1
 
 This package contains the following license:
 
@@ -1784,7 +1785,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 The following npm package may be included in this product:
 
- - chevrotain-allstar@0.4.1
+ - chevrotain-allstar@0.3.1
 
 This package contains the following license:
 
@@ -1870,7 +1871,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 The following npm package may be included in this product:
 
- - lodash-es@4.18.1
+ - lodash-es@4.17.23
 
 This package contains the following license:
 
@@ -1926,7 +1927,7 @@ terms above.
 
 The following npm package may be included in this product:
 
- - dompurify@3.4.0
+ - dompurify@3.3.1
 
 This package contains the following license:
 
@@ -2502,13 +2503,13 @@ Exhibit B - “Incompatible With Secondary Licenses” Notice
 
 The following npm package may be included in this product:
 
- - delaunator@5.1.0
+ - delaunator@5.0.1
 
 This package contains the following license:
 
 ISC License
 
-Copyright (c) 2026, Mapbox
+Copyright (c) 2021, Mapbox
 
 Permission to use, copy, modify, and/or distribute this software for any purpose
 with or without fee is hereby granted, provided that the above copyright notice
@@ -2535,11 +2536,12 @@ MIT
 
 -----------
 
-The following npm package may be included in this product:
+The following npm packages may be included in this product:
 
+ - acorn@8.15.0
  - acorn@8.16.0
 
-This package contains the following license:
+These packages each contain the following license:
 
 MIT License
 
@@ -2718,7 +2720,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - dayjs@1.11.20
+ - dayjs@1.11.19
 
 This package contains the following license:
 
@@ -2840,7 +2842,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - @typescript-eslint/types@8.58.2
+ - @typescript-eslint/types@8.58.1
 
 This package contains the following license:
 
@@ -3081,7 +3083,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - @sveltejs/acorn-typescript@1.0.9
+ - @sveltejs/acorn-typescript@1.0.8
 
 This package contains the following license:
 
@@ -3172,7 +3174,7 @@ SOFTWARE.
 
 The following npm package may be included in this product:
 
- - tinyexec@1.1.1
+ - tinyexec@1.0.2
 
 This package contains the following license:
 
@@ -3220,7 +3222,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 The following npm packages may be included in this product:
 
- - mlly@1.8.2
+ - mlly@1.8.0
  - ufo@1.6.3
 
 These packages each contain the following license:
@@ -3560,7 +3562,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 The following npm package may be included in this product:
 
- - katex@0.16.45
+ - katex@0.16.28
 
 This package contains the following license:
 
@@ -3878,7 +3880,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 The following npm package may be included in this product:
 
- - robust-predicates@3.0.3
+ - robust-predicates@3.0.2
 
 This package contains the following license:
 
