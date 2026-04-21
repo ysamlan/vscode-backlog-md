@@ -2504,6 +2504,78 @@ Body.
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
       expect(writtenContent).toBe(cliProduced);
     });
+
+    it('should write a decision in upstream order (id, title, date, status) with no blank line after frontmatter', async () => {
+      // Upstream serializeDecision emits id, title, date, status and does NOT
+      // apply the blank-line-after-frontmatter regex.
+      const cliProduced = `---
+id: DECISION-001
+title: Use TypeScript
+date: '2026-02-10 12:00'
+status: proposed
+---
+## Context
+
+We need type safety.
+
+## Decision
+
+Adopt TypeScript.
+
+## Consequences
+
+Steeper learning curve.
+
+## Alternatives
+
+`;
+
+      vi.spyOn(mockParser, 'getDecision').mockResolvedValue({
+        id: 'DECISION-001',
+        title: 'Use TypeScript',
+        filePath: '/fake/backlog/decisions/decision-001 - Use-TypeScript.md',
+      });
+      vi.mocked(fs.readFileSync).mockReturnValue(cliProduced);
+
+      // No-op update to trigger a reserialize pass.
+      await writer.updateDecision('DECISION-001', {}, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toBe(cliProduced);
+    });
+
+    it('should write a document in upstream order (id, title, type, created_date, ...) with no blank line after frontmatter', async () => {
+      // Upstream serializeDocument emits id, title, type, created_date,
+      // updated_date?, tags? and does NOT apply the blank-line regex.
+      const cliProduced = `---
+id: DOC-001
+title: API Guide
+type: guide
+created_date: '2026-02-09 10:00'
+updated_date: '2026-02-10 12:00'
+tags:
+  - api
+---
+Document body.
+`;
+
+      vi.spyOn(mockParser, 'getDocument').mockResolvedValue({
+        id: 'DOC-001',
+        title: 'API Guide',
+        type: 'guide',
+        tags: ['api'],
+        content: 'Document body.',
+        filePath: '/fake/backlog/docs/doc-001 - API-Guide.md',
+      });
+      vi.mocked(fs.readFileSync).mockReturnValue(cliProduced);
+
+      // updateDocument always bumps updated_date; the frozen clock matches the
+      // fixture value so the file round-trips with zero diff.
+      await writer.updateDocument('DOC-001', {}, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toBe(cliProduced);
+    });
   });
 
   describe('cache invalidation', () => {

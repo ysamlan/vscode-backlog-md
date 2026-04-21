@@ -230,7 +230,6 @@
     "vscode-extension-tester": "^8.23.0"
   },
   "dependencies": {
-    "github-slugger": "^2.0.0",
     "gray-matter": "^4.0.3",
     "js-yaml": "^4.1.1",
     "marked": "^17.0.6",

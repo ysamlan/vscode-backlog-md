@@ -1255,18 +1255,21 @@ export class BacklogWriter {
   }
 
   /**
-   * Canonical field order matching upstream Backlog.md serializeTask.
-   * Document-/decision-specific fields (`date`, `type`, `tags`) are appended so
-   * those entities keep a stable order too.
+   * Canonical field order covering tasks, decisions, and documents.
+   * `date` sits before `status` so decisions (`id, title, date, status`) match
+   * upstream exactly. `type` precedes `created_date` so documents
+   * (`id, title, type, created_date, updated_date, tags`) also match.
+   * Tasks have none of `type`/`date`/`tags`, so those slots are harmlessly
+   * skipped and task order stays upstream-identical.
    */
   private static readonly FRONTMATTER_FIELD_ORDER: readonly string[] = [
     'id',
     'title',
     'type',
+    'date',
     'status',
     'assignee',
     'reporter',
-    'date',
     'created_date',
     'updated_date',
     'labels',
@@ -1301,8 +1304,18 @@ export class BacklogWriter {
    * Reconstruct file from frontmatter and body using gray-matter to match
    * upstream Backlog.md byte-for-byte: single-quoted strings (only when needed),
    * block-style arrays, and consistently quoted dates.
+   *
+   * Upstream only inserts a blank line between frontmatter and body in
+   * `serializeTask`; `serializeDecision` and `serializeDocument` emit the
+   * gray-matter default (single newline). Callers pass `blankLineAfterFrontmatter: false`
+   * for decisions/documents to match that divergence.
    */
-  private reconstructFile(frontmatter: FrontmatterData, body: string): string {
+  private reconstructFile(
+    frontmatter: FrontmatterData,
+    body: string,
+    opts: { blankLineAfterFrontmatter?: boolean } = {}
+  ): string {
+    const { blankLineAfterFrontmatter = true } = opts;
     const ordered = this.orderFrontmatter(frontmatter);
     // Strip leading newlines — upstream trims rawContent on parse so
     // matter.stringify controls exactly one newline before the body. Without
@@ -1310,7 +1323,7 @@ export class BacklogWriter {
     // regex to produce a double blank line.
     const trimmedBody = body.replace(/^\n+/, '');
     const serialized = matter.stringify(trimmedBody, ordered);
-    // Ensure blank line between frontmatter and body (mirrors upstream).
+    if (!blankLineAfterFrontmatter) return serialized;
     return serialized.replace(/^(---\n(?:.*\n)*?---)\n(?!$)/, '$1\n\n');
   }
 
@@ -1432,7 +1445,7 @@ export class BacklogWriter {
     }
 
     const body = `\n${options?.content || ''}\n`;
-    const content = this.reconstructFile(frontmatter, body);
+    const content = this.reconstructFile(frontmatter, body, { blankLineAfterFrontmatter: false });
     fs.writeFileSync(filePath, content, 'utf-8');
 
     return { id: docId.toUpperCase(), filePath };
@@ -1463,7 +1476,7 @@ export class BacklogWriter {
 
     const updatedBody = updates.content !== undefined ? `\n${updates.content}\n` : body;
     const updatedContent = restoreLineEndings(
-      this.reconstructFile(frontmatter, updatedBody),
+      this.reconstructFile(frontmatter, updatedBody, { blankLineAfterFrontmatter: false }),
       hasCRLF
     );
     fs.writeFileSync(doc.filePath, updatedContent, 'utf-8');
@@ -1524,7 +1537,7 @@ export class BacklogWriter {
     body += `\n## Consequences\n\n${options?.consequences || ''}\n`;
     body += `\n## Alternatives\n\n${options?.alternatives || ''}\n`;
 
-    const content = this.reconstructFile(frontmatter, body);
+    const content = this.reconstructFile(frontmatter, body, { blankLineAfterFrontmatter: false });
     fs.writeFileSync(filePath, content, 'utf-8');
 
     return { id: decisionId.toUpperCase(), filePath };
@@ -1581,7 +1594,7 @@ export class BacklogWriter {
     }
 
     const updatedContent = restoreLineEndings(
-      this.reconstructFile(frontmatter, updatedBody),
+      this.reconstructFile(frontmatter, updatedBody, { blankLineAfterFrontmatter: false }),
       hasCRLF
     );
     fs.writeFileSync(dec.filePath, updatedContent, 'utf-8');

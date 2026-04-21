@@ -4,7 +4,7 @@ title: Align frontmatter serializer with canonical backlog.md format
 status: In Progress
 assignee: []
 created_date: '2026-04-18 13:49'
-updated_date: '2026-04-18'
+updated_date: '2026-04-21'
 labels:
   - parser
   - writer
@@ -44,6 +44,11 @@ The VSCode extension's frontmatter serializer produces YAML that diverges from c
 - [x] #4 Round-trip test reads a CLI-produced task file, writes it, and asserts zero diff
 - [x] #5 TASK-115.3's 'intentional divergence' notes on format are updated or superseded
 - [x] #6 `created_date` / `updated_date` values emitted as `YYYY-MM-DD HH:MM` (UTC) to match CLI precision
+- [x] #7 Decision frontmatter field order matches upstream `serializeDecision` exactly (id, title, date, status)
+- [x] #8 Document frontmatter field order matches upstream `serializeDocument` exactly (id, title, type, created_date, updated_date, tags)
+- [x] #9 Blank-line-after-frontmatter post-process is applied only to tasks; decisions and documents match upstream gray-matter default
+- [x] #10 Round-trip tests cover both decisions and documents (no-op update preserves byte-for-byte file content)
+- [x] #11 Unused `github-slugger` dependency is removed from package.json, bun.lock, and ThirdPartyNotices.txt
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -88,11 +93,26 @@ Option 1 is lower-risk and cheaper to maintain since field-order and quoting twe
 
 ## Post-processing step
 
-Upstream also applies a regex to ensure a blank line between frontmatter and body:
+Upstream applies a regex to ensure a blank line between frontmatter and body **only in `serializeTask`**:
 
 ```js
 serialized.replace(/^(---\n(?:.*\n)*?---)\n(?!$)/, "$1\n\n");
 ```
 
-Port this as-is.
+`serializeDecision` and `serializeDocument` emit the gray-matter default (single
+newline between `---` and body) — do not apply the regex there. The
+`reconstructFile` helper takes a `blankLineAfterFrontmatter` option (default
+`true`); decision/document call sites pass `false`.
+
+## Entity-specific field order (per PR #15 review)
+
+Upstream's three serializers diverge subtly on order:
+
+- **Task** (upstream `serializer.ts:13–31`): `id, title, status, assignee, reporter?, created_date, updated_date?, labels, milestone?, dependencies, references?, documentation?, parent_task_id?, subtasks?, priority?, ordinal?, onStatusChange?`
+- **Decision** (`serializer.ts:67–72`): `id, title, date, status` — `date` before `status`
+- **Document** (`serializer.ts:85–93`): `id, title, type, created_date, updated_date?, tags?`
+
+A single unified order works if `date` is placed before `status` and `type`
+before `created_date`. Tasks have neither `type` nor `date`, so those slots are
+harmlessly skipped.
 <!-- SECTION:PLAN:END -->
