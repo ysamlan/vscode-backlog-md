@@ -391,7 +391,12 @@ Old description
       });
 
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
-      expect(writtenContent).toContain('🚀 Feature with émojis and café');
+      // Mirrors upstream canonical serialization: js-yaml escapes astral-plane
+      // codepoints when dumped; YAML parsers decode them back to the original.
+      const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
+      expect(match).toBeTruthy();
+      const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
+      expect(frontmatter.title).toBe('🚀 Feature with émojis and café');
     });
 
     it('should handle very long title by truncating filename', async () => {
@@ -1152,7 +1157,7 @@ type: bug
       expect(frontmatter.type).toBe('bug');
     });
 
-    it('should handle empty references array', async () => {
+    it('should omit empty references array to match canonical format', async () => {
       const content = `---
 id: TASK-1
 title: Test
@@ -1167,14 +1172,17 @@ references:
       await writer.updateTask('TASK-1', { references: [] }, mockParser);
 
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      // Upstream omits empty optional arrays (references, documentation, etc.)
+      // entirely rather than emitting `references: []`.
+      expect(writtenContent).not.toMatch(/^references:/m);
       const match = writtenContent.match(/^---\n([\s\S]*?)\n---/);
       const frontmatter = yaml.load(match![1]) as Record<string, unknown>;
-      expect(frontmatter.references).toEqual([]);
+      expect(frontmatter.references).toBeUndefined();
     });
   });
 
   describe('Canonical Format Compatibility', () => {
-    it('should output arrays in inline bracket format', async () => {
+    it('should output arrays in block-style (upstream canonical format)', async () => {
       const content = `---
 id: TASK-1
 title: Test
@@ -1188,8 +1196,9 @@ labels: [feature, ui]
       await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
 
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
-      // Should use inline format [item1, item2] not block format
-      expect(writtenContent).toMatch(/labels: \[feature, ui\]/);
+      // Canonical backlog.md format uses block-style arrays with leading dash.
+      expect(writtenContent).toMatch(/labels:\n {2}- feature\n {2}- ui/);
+      expect(writtenContent).not.toMatch(/labels: \[/);
     });
 
     it('should preserve date strings without converting to timestamps', async () => {
@@ -1206,9 +1215,10 @@ created: 2026-02-01
       await writer.updateTask('TASK-1', { status: 'Done' }, mockParser);
 
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
-      // Should NOT convert to ISO timestamp like 2026-02-01T00:00:00.000Z
+      // Must not convert to ISO timestamp. Canonical format single-quotes dates
+      // to prevent YAML from parsing them as timestamps.
       expect(writtenContent).not.toContain('T00:00:00');
-      expect(writtenContent).toContain('created: 2026-02-01');
+      expect(writtenContent).toContain("created: '2026-02-01'");
     });
 
     it('should have newline between closing --- and body content', async () => {
@@ -2243,7 +2253,7 @@ updated_date: 2026-01-20
       // that it survives as a valid date string
       const { roundTripped } = await roundTrip(content);
       expect(roundTripped.updatedAt).toBeDefined();
-      expect(roundTripped.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(roundTripped.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
     });
 
     it('should preserve reporter field', async () => {
@@ -2342,7 +2352,7 @@ Full test description
       expect(roundTripped.description).toBe(original.description);
     });
 
-    it('should preserve empty arrays on round-trip', async () => {
+    it('should preserve always-emitted empty arrays and drop optional ones on round-trip', async () => {
       const content = `---
 id: TASK-1
 title: Empty Arrays Test
@@ -2355,11 +2365,14 @@ documentation: []
 ---
 `;
       const { roundTripped } = await roundTrip(content);
+      // Canonical format always emits labels, assignee, dependencies — even when empty.
       expect(roundTripped.labels).toEqual([]);
       expect(roundTripped.assignee).toEqual([]);
       expect(roundTripped.dependencies).toEqual([]);
-      expect(roundTripped.references).toEqual([]);
-      expect(roundTripped.documentation).toEqual([]);
+      // Optional arrays (references, documentation) are omitted when empty to
+      // match upstream's "only emit when non-empty" behaviour.
+      expect(roundTripped.references).toBeUndefined();
+      expect(roundTripped.documentation).toBeUndefined();
     });
 
     it('should preserve body sections on round-trip', async () => {
@@ -2406,6 +2419,162 @@ Summary text.
       expect(roundTripped.finalSummary).toBe(original.finalSummary);
       expect(roundTripped.acceptanceCriteria).toEqual(original.acceptanceCriteria);
       expect(roundTripped.definitionOfDone).toEqual(original.definitionOfDone);
+    });
+  });
+
+  describe('Canonical byte-for-byte round-trip (TASK-155)', () => {
+    /**
+     * Freeze Date.now so updated_date auto-bumping in updateTask matches the
+     * date embedded in the CLI fixture, letting us assert zero diff.
+     */
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-02-10T12:00:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should round-trip a CLI-produced task file with zero diff', async () => {
+      // Canonical backlog.md CLI output: single-quoted dates, block-style
+      // arrays, canonical field order, blank line between frontmatter and body.
+      const cliProduced = `---
+id: TASK-10
+title: Example task
+status: In Progress
+assignee:
+  - '@alice'
+created_date: '2026-02-09 10:00'
+updated_date: '2026-02-10 12:00'
+labels:
+  - parser
+  - upstream
+dependencies:
+  - TASK-5
+priority: high
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Canonical example.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 First criterion
+<!-- AC:END -->
+`;
+
+      vi.mocked(fs.readFileSync).mockReturnValue(cliProduced);
+      mockReaddirSync(['task-10.md']);
+
+      // No-op update: write the file back with no field changes.
+      await writer.updateTask('TASK-10', {}, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toBe(cliProduced);
+    });
+
+    it('should omit optional empty fields just like the CLI does', async () => {
+      // Minimal CLI-produced file — no references, documentation, reporter,
+      // milestone, parent_task_id, subtasks, ordinal, or onStatusChange.
+      const cliProduced = `---
+id: TASK-11
+title: Minimal task
+status: To Do
+assignee: []
+created_date: '2026-02-10 12:00'
+updated_date: '2026-02-10 12:00'
+labels: []
+dependencies: []
+---
+
+## Description
+
+Body.
+`;
+
+      vi.mocked(fs.readFileSync).mockReturnValue(cliProduced);
+      mockReaddirSync(['task-11.md']);
+
+      await writer.updateTask('TASK-11', {}, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toBe(cliProduced);
+    });
+
+    it('should write a decision in upstream order (id, title, date, status) with no blank line after frontmatter', async () => {
+      // Upstream serializeDecision emits id, title, date, status and does NOT
+      // apply the blank-line-after-frontmatter regex.
+      const cliProduced = `---
+id: DECISION-001
+title: Use TypeScript
+date: '2026-02-10 12:00'
+status: proposed
+---
+## Context
+
+We need type safety.
+
+## Decision
+
+Adopt TypeScript.
+
+## Consequences
+
+Steeper learning curve.
+
+## Alternatives
+
+`;
+
+      vi.spyOn(mockParser, 'getDecision').mockResolvedValue({
+        id: 'DECISION-001',
+        title: 'Use TypeScript',
+        filePath: '/fake/backlog/decisions/decision-001 - Use-TypeScript.md',
+      });
+      vi.mocked(fs.readFileSync).mockReturnValue(cliProduced);
+
+      // No-op update to trigger a reserialize pass.
+      await writer.updateDecision('DECISION-001', {}, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toBe(cliProduced);
+    });
+
+    it('should write a document in upstream order (id, title, type, created_date, ...) with no blank line after frontmatter', async () => {
+      // Upstream serializeDocument emits id, title, type, created_date,
+      // updated_date?, tags? and does NOT apply the blank-line regex.
+      const cliProduced = `---
+id: DOC-001
+title: API Guide
+type: guide
+created_date: '2026-02-09 10:00'
+updated_date: '2026-02-10 12:00'
+tags:
+  - api
+---
+Document body.
+`;
+
+      vi.spyOn(mockParser, 'getDocument').mockResolvedValue({
+        id: 'DOC-001',
+        title: 'API Guide',
+        type: 'guide',
+        tags: ['api'],
+        content: 'Document body.',
+        filePath: '/fake/backlog/docs/doc-001 - API-Guide.md',
+      });
+      vi.mocked(fs.readFileSync).mockReturnValue(cliProduced);
+
+      // updateDocument always bumps updated_date; the frozen clock matches the
+      // fixture value so the file round-trips with zero diff.
+      await writer.updateDocument('DOC-001', {}, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toBe(cliProduced);
     });
   });
 
@@ -2914,7 +3083,8 @@ Summary
     });
 
     it('should preserve CRLF line endings when updating tasks', async () => {
-      const content = '---\r\nid: TASK-1\r\ntitle: Test\r\nstatus: To Do\r\n---\r\n\r\n## Description\r\nHello\r\n';
+      const content =
+        '---\r\nid: TASK-1\r\ntitle: Test\r\nstatus: To Do\r\n---\r\n\r\n## Description\r\nHello\r\n';
       vi.mocked(fs.readFileSync).mockReturnValue(content);
       mockReaddirSync(['task-1.md']);
 
@@ -2954,7 +3124,8 @@ Summary
 
   describe('demoteTask', () => {
     it('should demote a task to a draft', async () => {
-      const taskContent = '---\nid: TASK-5\ntitle: Some Task\nstatus: In Progress\n---\n\n## Description\nContent\n';
+      const taskContent =
+        '---\nid: TASK-5\ntitle: Some Task\nstatus: In Progress\n---\n\n## Description\nContent\n';
       vi.mocked(fs.readFileSync).mockReturnValue(taskContent);
       mockReaddirSync(['task-5 - Some-Task.md']);
 
@@ -3056,13 +3227,11 @@ Summary
   describe('milestone lifecycle', () => {
     it('should archive a milestone', async () => {
       // Mock getMilestones to return a milestone
-      vi.spyOn(mockParser, 'getMilestones').mockResolvedValue([
-        { id: 'm-1', name: 'v1.0' },
-      ]);
+      vi.spyOn(mockParser, 'getMilestones').mockResolvedValue([{ id: 'm-1', name: 'v1.0' }]);
       vi.spyOn(mockParser, 'getBacklogPath').mockReturnValue('/fake/backlog');
-      vi.mocked(fs.readdirSync).mockReturnValue(
-        ['m-1 - v1.0.md'] as unknown as ReturnType<typeof fs.readdirSync>
-      );
+      vi.mocked(fs.readdirSync).mockReturnValue(['m-1 - v1.0.md'] as unknown as ReturnType<
+        typeof fs.readdirSync
+      >);
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
       await writer.archiveMilestone('m-1', mockParser);
@@ -3071,13 +3240,11 @@ Summary
     });
 
     it('should delete a milestone', async () => {
-      vi.spyOn(mockParser, 'getMilestones').mockResolvedValue([
-        { id: 'm-1', name: 'v1.0' },
-      ]);
+      vi.spyOn(mockParser, 'getMilestones').mockResolvedValue([{ id: 'm-1', name: 'v1.0' }]);
       vi.spyOn(mockParser, 'getBacklogPath').mockReturnValue('/fake/backlog');
-      vi.mocked(fs.readdirSync).mockReturnValue(
-        ['m-1 - v1.0.md'] as unknown as ReturnType<typeof fs.readdirSync>
-      );
+      vi.mocked(fs.readdirSync).mockReturnValue(['m-1 - v1.0.md'] as unknown as ReturnType<
+        typeof fs.readdirSync
+      >);
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
       await writer.deleteMilestone('m-1', mockParser);

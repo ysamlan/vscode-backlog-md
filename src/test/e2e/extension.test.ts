@@ -20,12 +20,19 @@ describe('Backlog.md Extension', function () {
   });
 
   it('should have the Backlog activity bar item', async function () {
+    // Extension activation can lag behind workbench-ready, so poll for the view control.
     const activityBar = new ActivityBar();
-    const controls = await activityBar.getViewControls();
-    const titles = await Promise.all(controls.map((c) => c.getTitle()));
-
-    // The Backlog view container should be present
-    const hasBacklog = titles.some((t) => t.includes('Backlog'));
+    const deadline = Date.now() + 15000;
+    let hasBacklog = false;
+    while (Date.now() < deadline) {
+      const controls = await activityBar.getViewControls();
+      const titles = await Promise.all(controls.map((c) => c.getTitle()));
+      if (titles.some((t) => t.includes('Backlog'))) {
+        hasBacklog = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
     expect(hasBacklog).to.be.true;
   });
 

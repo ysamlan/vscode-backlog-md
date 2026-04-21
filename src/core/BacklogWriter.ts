@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as yaml from 'js-yaml';
+import matter from 'gray-matter';
 import { Milestone, Task, TaskStatus } from './types';
 import { BacklogParser } from './BacklogParser';
 
@@ -33,6 +34,15 @@ export function normalizeToLF(content: string): string {
 export function restoreLineEndings(content: string, useCRLF: boolean): string {
   if (!useCRLF) return content;
   return content.replace(/\n/g, '\r\n');
+}
+
+/**
+ * Produce a `created_date` / `updated_date` value in the upstream canonical
+ * format (`YYYY-MM-DD HH:MM`, UTC). Matches Backlog.md CLI so round-trips
+ * don't churn timestamps between tools.
+ */
+export function nowTimestamp(): string {
+  return new Date().toISOString().slice(0, 16).replace('T', ' ');
 }
 
 /**
@@ -148,9 +158,7 @@ export class BacklogWriter {
    */
   async deleteMilestone(milestoneId: string, parser: BacklogParser): Promise<void> {
     const milestones = await parser.getMilestones();
-    const milestone = milestones.find(
-      (m) => m.id.toLowerCase() === milestoneId.toLowerCase()
-    );
+    const milestone = milestones.find((m) => m.id.toLowerCase() === milestoneId.toLowerCase());
     if (!milestone) {
       throw new Error(`Milestone ${milestoneId} not found`);
     }
@@ -171,9 +179,7 @@ export class BacklogWriter {
    */
   async archiveMilestone(milestoneId: string, parser: BacklogParser): Promise<void> {
     const milestones = await parser.getMilestones();
-    const milestone = milestones.find(
-      (m) => m.id.toLowerCase() === milestoneId.toLowerCase()
-    );
+    const milestone = milestones.find((m) => m.id.toLowerCase() === milestoneId.toLowerCase());
     if (!milestone) {
       throw new Error(`Milestone ${milestoneId} not found`);
     }
@@ -205,9 +211,7 @@ export class BacklogWriter {
     parser: BacklogParser
   ): Promise<void> {
     const milestones = await parser.getMilestones();
-    const milestone = milestones.find(
-      (m) => m.id.toLowerCase() === milestoneId.toLowerCase()
-    );
+    const milestone = milestones.find((m) => m.id.toLowerCase() === milestoneId.toLowerCase());
     if (!milestone) {
       throw new Error(`Milestone ${milestoneId} not found`);
     }
@@ -229,10 +233,7 @@ export class BacklogWriter {
 
     const oldName = milestone.name;
     frontmatter.title = newName.trim();
-    const updatedContent = restoreLineEndings(
-      this.reconstructFile(frontmatter, body),
-      hasCRLF
-    );
+    const updatedContent = restoreLineEndings(this.reconstructFile(frontmatter, body), hasCRLF);
 
     // Rename the milestone file
     const safeTitle = this.sanitizeMilestoneTitle(newName.trim());
@@ -248,8 +249,7 @@ export class BacklogWriter {
     for (const task of tasks) {
       if (
         task.milestone &&
-        (task.milestone === oldName ||
-          task.milestone.toLowerCase() === milestone.id.toLowerCase())
+        (task.milestone === oldName || task.milestone.toLowerCase() === milestone.id.toLowerCase())
       ) {
         await this.updateTask(task.id, { milestone: milestone.id }, parser);
       }
@@ -267,9 +267,7 @@ export class BacklogWriter {
     parser: BacklogParser
   ): Promise<void> {
     const milestones = await parser.getMilestones();
-    const milestone = milestones.find(
-      (m) => m.id.toLowerCase() === milestoneId.toLowerCase()
-    );
+    const milestone = milestones.find((m) => m.id.toLowerCase() === milestoneId.toLowerCase());
     if (!milestone) {
       throw new Error(`Milestone ${milestoneId} not found`);
     }
@@ -400,7 +398,7 @@ export class BacklogWriter {
     const { frontmatter, body } = this.extractFrontmatter(content);
     frontmatter.id = newTaskId;
     frontmatter.status = config.default_status || 'To Do';
-    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    frontmatter.updated_date = nowTimestamp();
     const updatedContent = restoreLineEndings(this.reconstructFile(frontmatter, body), hasCRLF);
     fs.writeFileSync(destPath, updatedContent, 'utf-8');
     parser.invalidateTaskCache(destPath);
@@ -448,7 +446,7 @@ export class BacklogWriter {
     const { frontmatter, body } = this.extractFrontmatter(content);
     frontmatter.id = newDraftId;
     frontmatter.status = 'Draft';
-    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    frontmatter.updated_date = nowTimestamp();
     const updatedContent = restoreLineEndings(this.reconstructFile(frontmatter, body), hasCRLF);
     fs.writeFileSync(destPath, updatedContent, 'utf-8');
     parser.invalidateTaskCache(destPath);
@@ -617,7 +615,7 @@ export class BacklogWriter {
     }
 
     // Update the updated_date
-    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    frontmatter.updated_date = nowTimestamp();
 
     // Handle body updates (description, AC, DoD are stored in body, not frontmatter)
     let updatedBody = body;
@@ -718,8 +716,8 @@ export class BacklogWriter {
       assignee: options.assignee || (config.default_assignee ? [config.default_assignee] : []),
       reporter: config.default_reporter,
       dependencies: [],
-      created_date: new Date().toISOString().split('T')[0],
-      updated_date: new Date().toISOString().split('T')[0],
+      created_date: nowTimestamp(),
+      updated_date: nowTimestamp(),
     };
 
     // Remove undefined values
@@ -778,7 +776,7 @@ export class BacklogWriter {
     const filePath = path.join(draftsDir, fileName);
 
     // Build frontmatter
-    const today = new Date().toISOString().split('T')[0];
+    const today = nowTimestamp();
     const frontmatter: FrontmatterData = {
       id: draftId,
       title: 'Untitled',
@@ -869,7 +867,7 @@ export class BacklogWriter {
     // Get config defaults
     const config = parser ? await parser.getConfig() : {};
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = nowTimestamp();
     const frontmatter: FrontmatterData = {
       id: taskId,
       title: 'Untitled',
@@ -1257,85 +1255,110 @@ export class BacklogWriter {
   }
 
   /**
-   * Reconstruct file from frontmatter and body
-   * Outputs frontmatter in a format compatible with upstream Backlog.md:
-   * - Dates as YYYY-MM-DD strings
-   * - Arrays in inline format [item1, item2]
+   * Canonical field order covering tasks, decisions, and documents.
+   * `date` sits before `status` so decisions (`id, title, date, status`) match
+   * upstream exactly. `type` precedes `created_date` so documents
+   * (`id, title, type, created_date, updated_date, tags`) also match.
+   * Tasks have none of `type`/`date`/`tags`, so those slots are harmlessly
+   * skipped and task order stays upstream-identical.
    */
-  private reconstructFile(frontmatter: FrontmatterData, body: string): string {
-    // Build YAML manually to match upstream Backlog.md format
-    const lines: string[] = [];
+  private static readonly FRONTMATTER_FIELD_ORDER: readonly string[] = [
+    'id',
+    'title',
+    'type',
+    'date',
+    'status',
+    'assignee',
+    'reporter',
+    'created_date',
+    'updated_date',
+    'labels',
+    'milestone',
+    'dependencies',
+    'references',
+    'documentation',
+    'parent_task_id',
+    'subtasks',
+    'priority',
+    'ordinal',
+    'onStatusChange',
+    'tags',
+  ];
 
-    // Define field order to match upstream convention
-    const fieldOrder = [
-      'id',
-      'title',
-      'status',
-      'priority',
-      'milestone',
-      'labels',
-      'assignee',
-      'reporter',
-      'created',
-      'created_date',
-      'updated_date',
-      'dependencies',
-      'references',
-      'documentation',
-      'parent_task_id',
-      'subtasks',
-      'ordinal',
-      'type',
-      'onStatusChange',
-    ];
+  /** Fields whose empty-array/empty-string value should be omitted entirely. */
+  private static readonly FRONTMATTER_OMIT_IF_EMPTY: ReadonlySet<string> = new Set([
+    'reporter',
+    'updated_date',
+    'milestone',
+    'references',
+    'documentation',
+    'parent_task_id',
+    'subtasks',
+    'priority',
+    'ordinal',
+    'onStatusChange',
+    'tags',
+  ]);
 
-    // First output fields in the defined order
-    for (const key of fieldOrder) {
-      if (key in frontmatter && frontmatter[key] !== undefined) {
-        lines.push(this.formatYamlField(key, frontmatter[key]));
-      }
+  /**
+   * Reconstruct file from frontmatter and body using gray-matter to match
+   * upstream Backlog.md byte-for-byte: single-quoted strings (only when needed),
+   * block-style arrays, and consistently quoted dates.
+   *
+   * Upstream only inserts a blank line between frontmatter and body in
+   * `serializeTask`; `serializeDecision` and `serializeDocument` emit the
+   * gray-matter default (single newline). Callers pass `blankLineAfterFrontmatter: false`
+   * for decisions/documents to match that divergence.
+   */
+  private reconstructFile(
+    frontmatter: FrontmatterData,
+    body: string,
+    opts: { blankLineAfterFrontmatter?: boolean } = {}
+  ): string {
+    const { blankLineAfterFrontmatter = true } = opts;
+    const ordered = this.orderFrontmatter(frontmatter);
+    // Strip leading newlines — upstream trims rawContent on parse so
+    // matter.stringify controls exactly one newline before the body. Without
+    // this, any pre-existing blank line would compound with the post-process
+    // regex to produce a double blank line.
+    const trimmedBody = body.replace(/^\n+/, '');
+    const serialized = matter.stringify(trimmedBody, ordered);
+    if (!blankLineAfterFrontmatter) return serialized;
+    return serialized.replace(/^(---\n(?:.*\n)*?---)\n(?!$)/, '$1\n\n');
+  }
+
+  /**
+   * Rebuild the frontmatter object in canonical field order and drop optional
+   * empty values so the serializer emits fields in the same order as upstream.
+   */
+  private orderFrontmatter(frontmatter: FrontmatterData): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    const order = BacklogWriter.FRONTMATTER_FIELD_ORDER;
+    const omitIfEmpty = BacklogWriter.FRONTMATTER_OMIT_IF_EMPTY;
+
+    const shouldSkip = (key: string, value: unknown): boolean => {
+      if (value === undefined || value === null) return true;
+      if (!omitIfEmpty.has(key)) return false;
+      if (typeof value === 'string' && value.trim() === '') return true;
+      if (Array.isArray(value) && value.length === 0) return true;
+      return false;
+    };
+
+    for (const key of order) {
+      if (!(key in frontmatter)) continue;
+      const value = frontmatter[key];
+      if (shouldSkip(key, value)) continue;
+      result[key] = value;
     }
-
-    // Then output any remaining fields not in the order list
     for (const key of Object.keys(frontmatter)) {
-      if (!fieldOrder.includes(key) && frontmatter[key] !== undefined) {
-        lines.push(this.formatYamlField(key, frontmatter[key]));
-      }
+      if (order.includes(key)) continue;
+      const value = frontmatter[key];
+      if (shouldSkip(key, value)) continue;
+      result[key] = value;
     }
-
-    const yamlContent = lines.join('\n') + '\n';
-    return `---\n${yamlContent}---\n${body}`;
+    return result;
   }
 
-  /**
-   * Format a single YAML field in upstream-compatible format
-   */
-  private formatYamlField(key: string, value: unknown): string {
-    if (value === null || value === undefined) {
-      return `${key}: `;
-    }
-
-    if (Array.isArray(value)) {
-      // Use inline array format [item1, item2] like upstream
-      if (value.length === 0) {
-        return `${key}: []`;
-      }
-      const items = value.map((item) => this.formatYamlValue(item)).join(', ');
-      return `${key}: [${items}]`;
-    }
-
-    if (typeof value === 'object') {
-      // For objects, use yaml.dump but inline
-      const dumped = yaml.dump(value, { flowLevel: 0 }).trim();
-      return `${key}: ${dumped}`;
-    }
-
-    return `${key}: ${this.formatYamlValue(value)}`;
-  }
-
-  /**
-   * Format a YAML value, quoting strings if necessary
-   */
   /**
    * Get the next available document ID number
    */
@@ -1409,7 +1432,7 @@ export class BacklogWriter {
     const fileName = `${docId} - ${sanitizedTitle}.md`;
     const filePath = path.join(docsDir, fileName);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = nowTimestamp();
     const frontmatter: FrontmatterData = {
       id: docId.toUpperCase(),
       title,
@@ -1422,7 +1445,7 @@ export class BacklogWriter {
     }
 
     const body = `\n${options?.content || ''}\n`;
-    const content = this.reconstructFile(frontmatter, body);
+    const content = this.reconstructFile(frontmatter, body, { blankLineAfterFrontmatter: false });
     fs.writeFileSync(filePath, content, 'utf-8');
 
     return { id: docId.toUpperCase(), filePath };
@@ -1449,11 +1472,11 @@ export class BacklogWriter {
     if (updates.title !== undefined) frontmatter.title = updates.title;
     if (updates.type !== undefined) frontmatter.type = updates.type;
     if (updates.tags !== undefined) frontmatter['tags'] = updates.tags;
-    frontmatter.updated_date = new Date().toISOString().split('T')[0];
+    frontmatter.updated_date = nowTimestamp();
 
     const updatedBody = updates.content !== undefined ? `\n${updates.content}\n` : body;
     const updatedContent = restoreLineEndings(
-      this.reconstructFile(frontmatter, updatedBody),
+      this.reconstructFile(frontmatter, updatedBody, { blankLineAfterFrontmatter: false }),
       hasCRLF
     );
     fs.writeFileSync(doc.filePath, updatedContent, 'utf-8');
@@ -1500,7 +1523,7 @@ export class BacklogWriter {
     const fileName = `${decisionId} - ${sanitizedTitle}.md`;
     const filePath = path.join(decisionsDir, fileName);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = nowTimestamp();
     const frontmatter: FrontmatterData = {
       id: decisionId.toUpperCase(),
       title,
@@ -1514,7 +1537,7 @@ export class BacklogWriter {
     body += `\n## Consequences\n\n${options?.consequences || ''}\n`;
     body += `\n## Alternatives\n\n${options?.alternatives || ''}\n`;
 
-    const content = this.reconstructFile(frontmatter, body);
+    const content = this.reconstructFile(frontmatter, body, { blankLineAfterFrontmatter: false });
     fs.writeFileSync(filePath, content, 'utf-8');
 
     return { id: decisionId.toUpperCase(), filePath };
@@ -1559,10 +1582,7 @@ export class BacklogWriter {
 
     for (const [sectionName, sectionContent] of Object.entries(sections)) {
       if (sectionContent === undefined) continue;
-      const sectionRegex = new RegExp(
-        `(## ${sectionName}\\n\\n)[\\s\\S]*?(?=\\n## |$)`,
-        'g'
-      );
+      const sectionRegex = new RegExp(`(## ${sectionName}\\n\\n)[\\s\\S]*?(?=\\n## |$)`, 'g');
       if (sectionRegex.test(updatedBody)) {
         updatedBody = updatedBody.replace(
           new RegExp(`(## ${sectionName}\\n\\n)[\\s\\S]*?(?=\\n## |$)`),
@@ -1574,7 +1594,7 @@ export class BacklogWriter {
     }
 
     const updatedContent = restoreLineEndings(
-      this.reconstructFile(frontmatter, updatedBody),
+      this.reconstructFile(frontmatter, updatedBody, { blankLineAfterFrontmatter: false }),
       hasCRLF
     );
     fs.writeFileSync(dec.filePath, updatedContent, 'utf-8');
@@ -1589,43 +1609,5 @@ export class BacklogWriter {
       throw new Error(`Decision ${decisionId} not found`);
     }
     fs.unlinkSync(dec.filePath);
-  }
-
-  private formatYamlValue(value: unknown): string {
-    if (typeof value === 'string') {
-      // Quote if contains special characters or looks like other YAML types
-      if (
-        value.includes(':') ||
-        value.includes('#') ||
-        value.includes('[') ||
-        value.includes(']') ||
-        value.includes('{') ||
-        value.includes('}') ||
-        value.includes(',') ||
-        value.includes("'") ||
-        value.includes('"') ||
-        value.includes('\n') ||
-        value.startsWith('@') ||
-        value.startsWith('*') ||
-        value.startsWith('&') ||
-        value.startsWith('!') ||
-        value === 'true' ||
-        value === 'false' ||
-        value === 'null' ||
-        value === 'yes' ||
-        value === 'no' ||
-        value === ''
-      ) {
-        // Use double quotes and escape internal quotes
-        return `"${value.replace(/"/g, '\\"')}"`;
-      }
-      return value;
-    }
-
-    if (typeof value === 'number' || typeof value === 'boolean') {
-      return String(value);
-    }
-
-    return String(value);
   }
 }

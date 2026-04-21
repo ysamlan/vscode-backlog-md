@@ -40,6 +40,11 @@ Fix behavioral deltas in local parser/writer where ported upstream tests fail, a
 - Type field name changes (createdAt vs createdDate — internal naming, not format-level)
 - Adding gray-matter dependency
 
+**Superseded by TASK-155 (2026-04-18):** The format-level "intentional
+divergence" entries above (field order, array format, gray-matter) are
+reversed. Upstream backlog.md is canonical and the extension now matches it
+byte-for-byte.
+
 **Output:** Local parser/serializer aligned with upstream on format-level behavior. All ported + existing tests green.
 <!-- SECTION:DESCRIPTION:END -->
 
