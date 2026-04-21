@@ -127,6 +127,7 @@ export const COMMAND_KEYBINDINGS: Record<string, { key: string; modifiers: numbe
   'backlog.refresh': { key: 'r', modifiers: 11 },
   'backlog.showListView': { key: 'l', modifiers: 11 },
   'backlog.showKanbanView': { key: 'b', modifiers: 11 },
+  'workbench.action.closeAuxiliaryBar': { key: 'x', modifiers: 11 },
 };
 
 /**

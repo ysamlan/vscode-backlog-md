@@ -52,6 +52,19 @@ After installing, reload any open VS Code windows
 with `code --uninstall-extension ysamlan.vscode-backlog-md` to revert to the
 Marketplace version.
 
+## Visual proof for your PR
+
+If your change affects what users see or how they interact with the
+extension, a short "before/after" or "demo" section in your PR description
+helps reviewers enormously. The repo ships a `visual-proof` Claude Code
+skill at `.claude/skills/visual-proof/` that can capture screenshots of the
+extension via CDP and assemble them into a
+[`showboat`](https://github.com/simonw/showboat) markdown doc; you can
+paste relevant screenshots from that into your PR.
+
+We highly recommend all agents use the `visual-proof` skill flow. Humans
+can also feel free to just use hand-taken screenshots.
+
 ## Project Structure
 
 ```
@@ -90,6 +103,27 @@ Run all tests:
 bun run test && bun run lint && bun run typecheck
 ```
 
+### Local CI preflight
+
+To run the exact suite GitHub Actions runs, in the same order:
+
+```bash
+bun run ci
+```
+
+This runs: `check:engines` → `lint` → `typecheck` → `depcheck` → `licenses:check` → unit tests → `build` → Playwright → CDP → e2e. It's the most reliable way to catch CI failures before pushing.
+
+Individual checks you can also run standalone:
+
+```bash
+bun run depcheck         # audit for unused / missing dependencies
+bun run licenses:check   # regenerate ThirdPartyNotices.txt and fail if it drifts
+```
+
+Depcheck configuration lives in `.depcheckrc.yml`. Each `ignores` entry is annotated with why the package looks unused to depcheck but isn't — please update those comments if you add or remove entries.
+
+A Husky `pre-push` hook (`.husky/pre-push`) also runs `bun run depcheck` and `bun run licenses:check` automatically, so dependency drift and stale license notices are caught before a push reaches CI.
+
 ## Test-Driven Development
 
 You should have comprehensive test coverage for any new features, changes, or bugs fixed.
@@ -125,7 +159,7 @@ bun run typecheck
 1. **One feature/fix per PR** — Keep changes focused and reviewable
 2. **Include tests** — New features need tests; bug fixes need regression tests
 3. **Update documentation** — If your change affects user-facing behavior
-4. **Run the full test suite** — `bun run test && bun run lint && bun run typecheck`
+4. **Run the full CI suite locally** — `bun run ci` mirrors what GitHub Actions runs (engines, lint, typecheck, depcheck, licenses, unit, build, Playwright, CDP, e2e). The `pre-push` Husky hook also runs depcheck + license verification as a fast-fail safety net.
 5. **Write a clear description** — Explain what, why, and how
 
 ### Commit Message Format

@@ -38,6 +38,9 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Dependency check
+        run: bun run depcheck
+
       - name: Unit tests
         run: bun run test
 
@@ -79,7 +82,8 @@ jobs:
           xvfb-run -a --server-args="-screen 0 1920x1080x24" \
             bunx vitest run --config vitest.cdp.config.ts
 
+      - name: Extension e2e smoke tests
+        run: bun run test:e2e
+
       - name: Verify licenses are up to date
-        run: |
-          bun run licenses:generate
-          git diff --exit-code ThirdPartyNotices.txt
+        run: bun run licenses:check

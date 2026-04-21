@@ -3,7 +3,7 @@
 
 set -e
 
-CMD="bunx vitest run --config vitest.cdp.config.ts"
+CMD="vitest run --config vitest.cdp.config.ts"
 
 # Check if we need xvfb:
 # - Not on macOS (darwin) - macOS doesn't use X11
