@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { realpath } from 'node:fs/promises';
 
 interface SluggerInstance {
   slug(value: string, maintainCase?: boolean): string;
@@ -54,11 +55,20 @@ export async function openWorkspaceFile(
   fragment: string | null,
   sourceFilePath?: string
 ): Promise<void> {
-  if (!relativePath) return;
+  if (fragment !== null && !isValidLinkString(fragment)) return;
+
+  // Anchor-only links (`#heading`) have no path component. Resolve the fragment
+  // against the source file itself so `#section` reveals the matching heading
+  // in the file the link was authored in.
+  if (!relativePath) {
+    if (fragment && sourceFilePath) {
+      await openSameFileAnchor(sourceFilePath, fragment);
+    }
+    return;
+  }
   // Defense-in-depth: providers also validate shape at the IPC boundary, but a
   // non-string slipping through would explode on `.replace`/`decodeURIComponent`.
   if (!isValidLinkString(relativePath)) return;
-  if (fragment !== null && !isValidLinkString(fragment)) return;
 
   const decodedPath = safeDecode(relativePath).replace(/\\/g, '/');
 
@@ -106,6 +116,14 @@ export async function openWorkspaceFile(
     } catch {
       continue;
     }
+    // Resolve symlinks and re-apply the workspace containment check against the
+    // realpath: a symlink inside the workspace pointing outside (e.g.
+    // `docs/leak.md -> /etc/passwd`) would otherwise pass every earlier check.
+    const realFsPath = await safeRealpath(uri.fsPath);
+    if (realFsPath && folders && !isInsideWorkspace(realFsPath, folders)) {
+      vscode.window.showWarningMessage(`Refusing to open path outside workspace: ${decodedPath}`);
+      return;
+    }
     if (stat.type === vscode.FileType.Directory) {
       vscode.window.showWarningMessage(`Link target is a directory, not a file: ${decodedPath}`);
       return;
@@ -124,6 +142,34 @@ export async function openWorkspaceFile(
   }
 
   vscode.window.showWarningMessage(`File not found in workspace: ${decodedPath}`);
+}
+
+async function openSameFileAnchor(sourceFilePath: string, fragment: string): Promise<void> {
+  const folders = vscode.workspace.workspaceFolders;
+  const uri = vscode.Uri.file(sourceFilePath);
+  if (folders && !isInsideWorkspace(uri.fsPath, folders)) return;
+  let stat: vscode.FileStat;
+  try {
+    stat = await vscode.workspace.fs.stat(uri);
+  } catch {
+    return;
+  }
+  if ((stat.type & vscode.FileType.File) === 0) return;
+  const range = await resolveRange(uri, sourceFilePath, fragment, stat.size);
+  if (range) {
+    const editor = await vscode.window.showTextDocument(uri, { selection: range });
+    editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+  } else {
+    await vscode.commands.executeCommand('vscode.open', uri);
+  }
+}
+
+async function safeRealpath(fsPath: string): Promise<string | undefined> {
+  try {
+    return await realpath(fsPath);
+  } catch {
+    return undefined;
+  }
 }
 
 function isAbsolutePath(value: string): boolean {
@@ -196,13 +242,18 @@ async function findHeadingRange(
     return undefined;
   }
   const { default: Slugger, slug: slugOnce } = await loadSlugger();
-  const target = slugOnce(decodeURIComponent(fragment));
+  // A malformed `%` escape in the fragment (`#foo%ZZ`) would otherwise throw
+  // out of the webview handler — treat it as a literal when decoding fails.
+  const target = slugOnce(safeDecode(fragment));
   const lines = content.split(/\r?\n/);
   const slugger = new Slugger();
+  // Skip a leading YAML frontmatter block: the closing `---` would otherwise
+  // be matched as a setext H2 and slug the preceding YAML key as a heading.
+  const startIdx = detectFrontmatterEnd(lines);
   let inFence = false;
   let fenceMarker = '';
   let inHtmlComment = false;
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i];
 
     if (inHtmlComment) {
@@ -230,11 +281,15 @@ async function findHeadingRange(
     }
     if (inFence) continue;
 
+    // Strip any blockquote prefix (`>`, possibly nested like `> > `) so headings
+    // authored inside a blockquote are matched the same as top-level ones.
+    const unquoted = stripBlockquotePrefix(line);
+
     // ATX heading: up to 3 spaces of indentation, then 1–6 `#` and space.
     // 4+ leading spaces already falls out (treated as indented code block).
-    const atx = line.match(/^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+    const atx = unquoted.match(/^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
     if (atx) {
-      if (slugger.slug(atx[1]) === target) {
+      if (slugger.slug(normalizeHeadingText(atx[1])) === target) {
         return new vscode.Range(new vscode.Position(i, 0), new vscode.Position(i, 0));
       }
       continue;
@@ -242,10 +297,10 @@ async function findHeadingRange(
 
     // Setext heading: current line is `===` (H1) or `---` (H2), previous line
     // holds the heading text. Require a non-blank, non-heading previous line.
-    if (i > 0 && (/^ {0,3}=+\s*$/.test(line) || /^ {0,3}-+\s*$/.test(line))) {
-      const prev = lines[i - 1];
+    if (i > startIdx && (/^ {0,3}=+\s*$/.test(unquoted) || /^ {0,3}-+\s*$/.test(unquoted))) {
+      const prev = stripBlockquotePrefix(lines[i - 1]);
       if (prev.trim() && !/^ {0,3}#{1,6}\s/.test(prev)) {
-        const text = prev.trim();
+        const text = normalizeHeadingText(prev.trim());
         if (slugger.slug(text) === target) {
           return new vscode.Range(new vscode.Position(i - 1, 0), new vscode.Position(i - 1, 0));
         }
@@ -253,4 +308,35 @@ async function findHeadingRange(
     }
   }
   return undefined;
+}
+
+function detectFrontmatterEnd(lines: readonly string[]): number {
+  if (lines.length === 0 || lines[0].trim() !== '---') return 0;
+  for (let j = 1; j < lines.length; j++) {
+    if (lines[j].trim() === '---') return j + 1;
+  }
+  return 0;
+}
+
+function stripBlockquotePrefix(line: string): string {
+  // Up to 3 spaces of indentation followed by one or more `>` markers, each
+  // optionally followed by a single space. Mirrors CommonMark's blockquote rule.
+  return line.replace(/^ {0,3}(?:>\s?)+/, '');
+}
+
+function normalizeHeadingText(text: string): string {
+  // GitHub strips inline markup from heading text before slugging. Approximate
+  // that here so `## \`foo()\` bar` slugs to `foo-bar`, not to a mangled string
+  // containing backticks. Inline images and links keep their display text.
+  return (
+    text
+      // Images first so the alt text (not a link) survives.
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\[([^\]]*)\]\[[^\]]*\]/g, '$1')
+      // Code spans: drop the delimiters but keep the content (`foo()` → foo()).
+      .replace(/`+([^`]*)`+/g, '$1')
+      // Emphasis / strong / strikethrough runs — strip the markers around text.
+      .replace(/(\*{1,3}|_{1,3}|~{1,2})([^\s*_~][\s\S]*?[^\s*_~]|[^\s*_~])\1/g, '$2')
+  );
 }

@@ -1,10 +1,10 @@
 ---
 id: TASK-158
 title: Harden openWorkspaceFile against link edge cases
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-04-20 12:00'
-updated_date: '2026-04-21 09:30'
+updated_date: '2026-04-21 12:48'
 labels: []
 dependencies:
   - TASK-153
@@ -80,10 +80,10 @@ Non-goals: changing the message contract between webview and extension host; cha
 - [x] #10 Links that resolve outside every workspace folder (via `../` traversal) are rejected with a user-visible warning and do not open files outside the workspace
 - [x] #11 The `openWorkspaceFile` message is shape-validated at each provider's webview→host handler — non-string or over-length `relativePath` / `fragment` values are dropped without reaching the resolver
 - [x] #12 Markdown heading resolution is bounded by file size: files above the configured cap fall back to a plain open (no `readFile`) instead of loading the whole document to scan for a slug
-- [ ] #13 Anchor-only links (`#heading` with no path component) reveal the matching heading in the source file the link was authored in
-- [ ] #14 YAML frontmatter at the top of a markdown file is skipped during heading scanning: the closing `---` is not matched as a setext H2, and `#` lines inside frontmatter are not treated as ATX headings
-- [ ] #15 Heading text containing inline markdown (code spans, emphasis markers, or `[text](url)` links) produces the same slug GitHub does — inline markup is stripped before slugging
-- [ ] #16 Headings authored inside a blockquote (`> ## Title`, including nested `> > ## Title`) are matched by their slug the same as top-level headings
-- [ ] #17 A symlink inside the workspace whose realpath resolves outside every workspace folder is rejected with the same "outside workspace" warning as a literal `../` escape
-- [ ] #18 A malformed percent sequence in the fragment (e.g. `#foo%ZZ`) does not throw out of the webview handler — the fragment is either decoded best-effort or treated as a literal string
+- [x] #13 Anchor-only links (`#heading` with no path component) reveal the matching heading in the source file the link was authored in
+- [x] #14 YAML frontmatter at the top of a markdown file is skipped during heading scanning: the closing `---` is not matched as a setext H2, and `#` lines inside frontmatter are not treated as ATX headings
+- [x] #15 Heading text containing inline markdown (code spans, emphasis markers, or `[text](url)` links) produces the same slug GitHub does — inline markup is stripped before slugging
+- [x] #16 Headings authored inside a blockquote (`> ## Title`, including nested `> > ## Title`) are matched by their slug the same as top-level headings
+- [x] #17 A symlink inside the workspace whose realpath resolves outside every workspace folder is rejected with the same "outside workspace" warning as a literal `../` escape
+- [x] #18 A malformed percent sequence in the fragment (e.g. `#foo%ZZ`) does not throw out of the webview handler — the fragment is either decoded best-effort or treated as a literal string
 <!-- AC:END -->

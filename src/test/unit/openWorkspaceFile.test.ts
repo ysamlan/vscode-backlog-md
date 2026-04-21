@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import * as vscode from 'vscode';
+
+// Mock node:fs/promises.realpath so tests can observe the symlink containment
+// check without depending on real filesystem entries. Default impl returns the
+// input path unchanged (behaves like a non-symlink).
+vi.mock('node:fs/promises', () => ({
+  realpath: vi.fn((p: string) => Promise.resolve(p)),
+}));
+import { realpath } from 'node:fs/promises';
+
 import {
   MAX_LINK_LENGTH,
   isValidLinkString,
@@ -33,6 +42,8 @@ describe('openWorkspaceFile', () => {
     showTextDocument.mockImplementation(() => Promise.resolve({ revealRange }));
     revealRange.mockReset();
     mockWorkspace.workspaceFolders = undefined;
+    (realpath as unknown as Mock).mockReset();
+    (realpath as unknown as Mock).mockImplementation((p: string) => Promise.resolve(p));
   });
 
   it('does nothing when relativePath is empty', async () => {
@@ -581,5 +592,222 @@ describe('openWorkspaceFile', () => {
 
     expect(vscode.workspace.fs.readFile).toHaveBeenCalledTimes(1);
     expect(showTextDocument).toHaveBeenCalledTimes(1);
+  });
+
+  // AC #13 — anchor-only links resolve against the source file
+  it('resolves an anchor-only link against the source file', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(
+      new TextEncoder().encode('# Top\n\n## Target\n\nBody.\n')
+    );
+
+    await openWorkspaceFile('', 'target', '/repo/backlog/tasks/task-153.md');
+
+    expect(vscode.workspace.fs.stat).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: '/repo/backlog/tasks/task-153.md' })
+    );
+    expect(showTextDocument).toHaveBeenCalledTimes(1);
+    const [uriArg, optionsArg] = showTextDocument.mock.calls[0];
+    expect(uriArg).toMatchObject({ fsPath: '/repo/backlog/tasks/task-153.md' });
+    expect(optionsArg.selection.start).toMatchObject({ line: 2, character: 0 });
+  });
+
+  it('does nothing for anchor-only link when no source file is provided', async () => {
+    setWorkspaceFolders(['/repo']);
+
+    await openWorkspaceFile('', 'target');
+    await openWorkspaceFile(undefined, 'target');
+
+    expect(vscode.workspace.fs.stat).not.toHaveBeenCalled();
+    expect(showTextDocument).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+  });
+
+  it('falls back to plain open when anchor-only fragment does not match a heading', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(
+      new TextEncoder().encode('# Other\n')
+    );
+
+    await openWorkspaceFile('', 'missing', '/repo/docs/guide.md');
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/docs/guide.md' })
+    );
+    expect(showTextDocument).not.toHaveBeenCalled();
+  });
+
+  // AC #14 — skip YAML frontmatter during heading scan
+  it('skips YAML frontmatter: closing --- does not become a setext H2', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = [
+      '---',
+      'title: Frontmatter Title',
+      'other: value',
+      '---',
+      '',
+      '## Real Heading',
+      'body',
+      '',
+    ].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    // Without the skip, slug `frontmatter-title` would match line 1 (the YAML
+    // key treated as setext H2). With the skip, the slug can't be found.
+    await openWorkspaceFile('docs/guide.md', 'frontmatter-title');
+
+    expect(showTextDocument).not.toHaveBeenCalled();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/docs/guide.md' })
+    );
+  });
+
+  it('skips ATX-shaped lines inside YAML frontmatter', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['---', '# not-a-heading', '---', '', '## Target', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'target');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 4, character: 0 });
+  });
+
+  // AC #15 — strip inline markup before slugging heading text
+  it('strips inline code spans from heading text before slugging', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['## `foo()` bar', 'body', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'foo-bar');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 0, character: 0 });
+  });
+
+  it('strips emphasis markers from heading text before slugging', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['## **bold** and *italic*', 'body', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'bold-and-italic');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 0, character: 0 });
+  });
+
+  it('replaces inline links with their display text when slugging a heading', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['## See [the guide](guide.md) for details', 'body', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'see-the-guide-for-details');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 0, character: 0 });
+  });
+
+  // AC #16 — blockquote-prefixed headings
+  it('matches an ATX heading authored inside a blockquote', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['> ## Quoted Heading', '> body', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'quoted-heading');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 0, character: 0 });
+  });
+
+  it('matches an ATX heading inside a nested blockquote', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['> > ### Nested Heading', '> > body', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'nested-heading');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 0, character: 0 });
+  });
+
+  it('matches a setext heading authored inside a blockquote', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    const doc = ['> Quoted Setext', '> =============', '> body', ''].join('\n');
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(new TextEncoder().encode(doc));
+
+    await openWorkspaceFile('docs/guide.md', 'quoted-setext');
+
+    const [, optionsArg] = showTextDocument.mock.calls[0];
+    expect(optionsArg.selection.start).toMatchObject({ line: 0, character: 0 });
+  });
+
+  // AC #17 — reject symlinks whose realpath escapes the workspace
+  it('rejects a symlink inside the workspace whose realpath escapes it', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    (realpath as unknown as Mock).mockResolvedValueOnce('/etc/passwd');
+
+    await openWorkspaceFile('docs/leak.md', null);
+
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+      'Refusing to open path outside workspace: docs/leak.md'
+    );
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+    expect(showTextDocument).not.toHaveBeenCalled();
+  });
+
+  it('accepts a symlink whose realpath stays inside the workspace', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    (realpath as unknown as Mock).mockResolvedValueOnce('/repo/docs/actual.md');
+
+    await openWorkspaceFile('docs/link.md', null);
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/docs/link.md' })
+    );
+  });
+
+  it('falls back to the original path when realpath is unavailable', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    (realpath as unknown as Mock).mockRejectedValueOnce(new Error('ENOENT'));
+
+    await openWorkspaceFile('docs/guide.md', null);
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/docs/guide.md' })
+    );
+  });
+
+  // AC #18 — malformed percent sequence in fragment does not throw
+  it('treats a malformed %-sequence in the fragment as a literal', async () => {
+    setWorkspaceFolders(['/repo']);
+    (vscode.workspace.fs.stat as Mock).mockResolvedValueOnce({ type: 1 });
+    (vscode.workspace.fs.readFile as Mock).mockResolvedValueOnce(
+      new TextEncoder().encode('# Only\n')
+    );
+
+    // `%ZZ` is not a valid percent-escape. Should not throw; should fall back
+    // to vscode.open rather than bubble an URIError out of the webview handler.
+    await expect(openWorkspaceFile('docs/guide.md', 'foo%ZZ')).resolves.toBeUndefined();
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.open',
+      expect.objectContaining({ fsPath: '/repo/docs/guide.md' })
+    );
   });
 });

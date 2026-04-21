@@ -45,7 +45,7 @@
     const link = target?.closest?.('a') as HTMLAnchorElement | null;
     if (!link) return;
     const href = link.getAttribute('href');
-    if (!href || /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('#')) return;
+    if (!href || /^[a-z][a-z0-9+.-]*:/i.test(href)) return;
     event.preventDefault();
     const [relativePath, fragment] = href.split('#');
     vscode.postMessage({

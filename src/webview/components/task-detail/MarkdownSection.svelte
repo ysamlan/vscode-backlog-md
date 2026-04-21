@@ -61,7 +61,7 @@
     const link = target?.closest?.('a') as HTMLAnchorElement | null;
     if (link) {
       const href = link.getAttribute('href');
-      if (href && !/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('#')) {
+      if (href && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
         event.preventDefault();
         event.stopPropagation();
         const [relativePath, fragment] = href.split('#');
