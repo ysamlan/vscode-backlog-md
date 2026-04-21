@@ -37,8 +37,7 @@
     "workspaceContains:**/.backlog/tasks/*.md",
     "workspaceContains:**/.backlog/config.yml",
     "workspaceContains:**/.backlog/config.yaml",
-    "workspaceContains:backlog.config.yml",
-    "onCommand:backlog.init"
+    "workspaceContains:backlog.config.yml"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -157,12 +156,14 @@
         {
           "type": "webview",
           "id": "backlog.kanban",
-          "name": "Tasks"
+          "name": "Tasks",
+          "icon": "images/view-kanban.svg"
         },
         {
           "type": "webview",
           "id": "backlog.taskPreview",
           "name": "Details",
+          "icon": "images/view-task-preview.svg",
           "visibility": "visible"
         }
       ]
