@@ -229,7 +229,7 @@
     "sharp": "^0.34.5",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.58.1",
+    "typescript-eslint": "^8.58.2",
     "vite": "^7.3.2",
     "vitest": "^4.1.4",
     "vscode-extension-tester": "^8.23.0"
@@ -240,7 +240,7 @@
     "js-yaml": "^4.1.1",
     "marked": "^17.0.6",
     "mermaid": "^11.14.0",
-    "svelte": "^5.55.3",
+    "svelte": "^5.55.4",
     "tiny-markdown-editor": "^0.2.25"
   }
 }
