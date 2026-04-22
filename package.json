@@ -196,6 +196,7 @@
     "update:actions": "bunx actions-up@v1.12.0 --min-age 7",
     "screenshots": "bash scripts/screenshots/run.sh",
     "screenshots:validate": "bun scripts/screenshots/validate.ts",
+    "release": "release-it",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -209,6 +210,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.59.1",
+    "@release-it/keep-a-changelog": "^7.0.1",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "@tailwindcss/cli": "^4.2.2",
     "@types/chai": "^5.2.3",
@@ -226,7 +228,8 @@
     "jsdom": "^28.1.0",
     "lint-staged": "^16.4.0",
     "oxipng-bin": "^1.0.0",
-    "prettier": "^3.8.2",
+    "prettier": "^3.8.3",
+    "release-it": "^20.0.0",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
