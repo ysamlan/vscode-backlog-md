@@ -7,8 +7,6 @@ and (from v0.3.7 onward) this project adheres to [Semantic Versioning](https://s
 
 ## [Unreleased]
 
-## [0.3.7] - 2026-04-22
-
 ### Added
 
 - **Clickable workspace links in markdown** — Relative links inside rendered task descriptions and document/decision panes (e.g. `[gitlab.py](src/autochecker/gitlab.py)` or `src/foo.ts#L10-L20`) now open the target file in a real editor tab and jump to the line range, instead of toggling edit mode or navigating the webview to a bogus localhost URL. ([#14](https://github.com/ysamlan/vscode-backlog-md/pull/14))
