@@ -30,6 +30,11 @@ ignores:
   # as a missing dependency; this ignore silences that false positive.
   - vscode
 
+  # release-it plugin, loaded dynamically at runtime via the `plugins` map in
+  # .release-it.json. Depcheck only looks at JS/TS imports and script bins,
+  # so it can't see that release-it pulls this in by name.
+  - '@release-it/keep-a-changelog'
+
 ignorePatterns:
   - dist
   - out

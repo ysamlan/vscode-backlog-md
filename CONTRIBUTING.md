@@ -210,9 +210,47 @@ Security updates from Dependabot are an exception — those PRs come in automati
 
 ## Releases
 
-When a GitHub release is created, the [release workflow](.github/workflows/release.yml) automatically builds, tests, packages a `.vsix`, and publishes it to both the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ysamlan.vscode-backlog-md) and [Open VSX](https://open-vsx.org/extension/ysamlan/vscode-backlog-md). The `.vsix` is also attached to the GitHub release as a download.
+Releases are driven by [`release-it`](https://github.com/release-it/release-it) plus the [`@release-it/keep-a-changelog`](https://github.com/release-it/keep-a-changelog) plugin. The local command bumps the version, promotes the `[Unreleased]` CHANGELOG section, commits, tags, and pushes — then a tag-triggered GitHub Actions workflow takes over and ships the `.vsix`.
 
-The version in `package.json` is automatically set from the release tag (e.g., tag `v0.3.0` sets version `0.3.0`). After publishing, the workflow pushes the version bump back to `main`. You don't need to manually update `package.json` before tagging a release.
+### Before releasing
+
+Add release notes to the `## [Unreleased]` section of `CHANGELOG.md` as you merge PRs, using the standard [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) groupings (`Added`, `Changed`, `Fixed`, `Removed`, `Deprecated`, `Security`, or our extra `Internal` bucket for no-user-impact work). If `[Unreleased]` is empty at release time there's nothing to ship — add a bullet first.
+
+### Cutting the release
+
+From a clean `main` branch:
+
+```bash
+bun run release
+```
+
+This runs [release-it](https://github.com/release-it/release-it) configured via [`.release-it.json`](../.release-it.json), which will:
+
+1. Run a fast preflight: `check:engines` → `lint` → `typecheck` → `test` → `build`. (Heavy tests — Playwright, CDP, e2e — run in CI after the tag push, not locally.)
+2. Prompt for the new version (major / minor / patch / custom).
+3. Rewrite `CHANGELOG.md`: rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, insert a fresh empty `[Unreleased]`, and update the compare-URL references at the bottom.
+4. Bump `version` in `package.json`.
+5. Show you the diff and prompt to continue.
+6. Commit `Release vX.Y.Z`, tag `vX.Y.Z`, and push both to `origin/main`.
+
+Pass `--dry-run` to preview without touching anything:
+
+```bash
+bun run release -- --dry-run
+```
+
+### What happens after the tag push
+
+Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which:
+
+1. Checks out the tag, installs, and re-runs lint/typecheck/unit tests/build in CI.
+2. Verifies `ThirdPartyNotices.txt` is current.
+3. Packages the `.vsix` via `bun run package`.
+4. Extracts the matching section from `CHANGELOG.md` as release notes.
+5. Creates the GitHub release **with the `.vsix` attached in the same API call** (`gh release create TAG --notes-file ... *.vsix`). This avoids GitHub's immutable-release restriction that blocks `gh release upload` after the fact.
+6. Publishes to the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=ysamlan.vscode-backlog-md) and [Open VSX](https://open-vsx.org/extension/ysamlan/vscode-backlog-md).
+
+If the workflow fails partway (e.g. Marketplace is down), fix the cause, delete the tag + GitHub release, and re-run `bun run release` — don't try to patch a half-shipped release manually.
 
 ## Getting Help
 

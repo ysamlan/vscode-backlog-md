@@ -3,12 +3,21 @@
 # will try to pull in):
 #
 # bun run update:actions
+#
+# Release flow:
+# 1. Locally, on a clean `main`: `bun run release` (invokes release-it).
+#    It bumps package.json, promotes the CHANGELOG's [Unreleased] section to
+#    a new version section, commits "Release vX.Y.Z", tags vX.Y.Z, and pushes.
+# 2. The push of tag vX.Y.Z triggers this workflow, which builds the .vsix,
+#    creates the GitHub release with the .vsix attached, and publishes to
+#    the VS Code Marketplace and Open VSX.
 
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build-vsix:
@@ -22,19 +31,6 @@ jobs:
       - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
         with:
           experimental: true
-
-      - name: Set version from tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
-
-      - name: Update changelog from GitHub releases
-        uses: rhysd/changelog-from-release/action@78b335bb7d059f35ad04c5428d50711726feee50 # v3.9.1
-        with:
-          file: CHANGELOG.md
-          github_token: ${{ github.token }}
-          commit: false
-          push: false
-          header: |
-            # Changelog
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -55,15 +51,41 @@ jobs:
         run: bun run build
 
       - name: Verify licenses are up to date
-        run: |
-          bun run licenses:generate
-          git diff --exit-code ThirdPartyNotices.txt
+        run: bun run licenses:check
 
       - name: Package .vsix
         run: bun run package
 
-      - name: Upload .vsix to release
-        run: gh release upload "${{ github.event.release.tag_name }}" *.vsix
+      - name: Extract release notes from CHANGELOG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Capture lines between `## [VERSION]` and the next version boundary.
+          # Version boundaries are: next `## [...]` heading, next `# ` heading
+          # (legacy rhysd-style entries), the migration comment, or a legacy
+          # `<a id="..."></a>` anchor.
+          awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (in_section) exit
+              if ($0 ~ "^## \\[" ver "\\]") { in_section=1; next }
+            }
+            /^# / { if (in_section) exit }
+            /^<a id=/ { if (in_section) exit }
+            /^<!-- Entries below/ { if (in_section) exit }
+            in_section { print }
+          ' CHANGELOG.md | awk 'NF { blank=0; print; next } { blank++; if (blank==1) print }' > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::No CHANGELOG section found for version $VERSION"
+            exit 1
+          fi
+          echo "--- release-notes.md ---"
+          cat release-notes.md
+
+      - name: Create GitHub release with .vsix attached
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            *.vsix
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -74,15 +96,3 @@ jobs:
 
       - name: Publish to Open VSX
         run: bunx "ovsx@0.10.11" publish *.vsix -p ${{ secrets.OVSX_PAT }}
-
-      - name: Push version bump to main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json CHANGELOG.md
-          if git diff --cached --quiet; then
-            echo "No version or changelog changes to commit"
-            exit 0
-          fi
-          git commit -m "Bump version to ${GITHUB_REF_NAME#v} and update changelog"
-          git push origin HEAD:main
