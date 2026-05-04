@@ -1,6 +1,5 @@
 # Backlog.md for VS Code
 
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/ysamlan.vscode-backlog-md?label=VS%20Code%20Marketplace)](https://marketplace.visualstudio.com/items?itemName=ysamlan.vscode-backlog-md)
 [![Open VSX](https://img.shields.io/open-vsx/v/ysamlan/vscode-backlog-md?label=Open%20VSX)](https://open-vsx.org/extension/ysamlan/vscode-backlog-md)
 [![VS Code 1.108+](https://img.shields.io/badge/VS%20Code-1.108%2B-blue.svg)](https://code.visualstudio.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
