@@ -7,6 +7,10 @@ and (from v0.3.7 onward) this project adheres to [Semantic Versioning](https://s
 
 ## [Unreleased]
 
+### Fixed
+
+- Removed the broken `img.shields.io/visual-studio-marketplace` badge from the README — shields.io [retired the entire `visual-studio-marketplace` service in April 2026](https://github.com/badges/shields/issues/11796), so every variant rendered as "retired badge". The Open VSX badge remains and tracks the same release cadence.
+
 ## [0.3.8] - 2026-04-22
 
 ### Added
