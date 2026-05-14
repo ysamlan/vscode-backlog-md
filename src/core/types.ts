@@ -251,7 +251,9 @@ export type WebviewMessage =
   | { type: 'openDecision'; decisionId: string }
   | { type: 'initBacklog'; mode: 'defaults' | 'customize' }
   | { type: 'setupAgentIntegration' }
-  | { type: 'dismissIntegrationBanner' };
+  | { type: 'dismissIntegrationBanner' }
+  | { type: 'selectRoot'; backlogPath: string }
+  | { type: 'initBacklogInDirectory' };
 
 /**
  * Data source mode for task viewing
@@ -321,4 +323,9 @@ export type ExtensionMessage =
   | { type: 'documentData'; document: BacklogDocument; contentHtml: string }
   | { type: 'decisionData'; decision: BacklogDecision; sections: Record<string, string> }
   | { type: 'activeEditedTaskChanged'; taskId: string | null }
-  | { type: 'integrationBannerState'; show: boolean; cliAvailable: boolean };
+  | { type: 'integrationBannerState'; show: boolean; cliAvailable: boolean }
+  | {
+      type: 'rootsUpdated';
+      roots: Array<{ label: string; backlogPath: string }>;
+      activeBacklogPath: string;
+    };
