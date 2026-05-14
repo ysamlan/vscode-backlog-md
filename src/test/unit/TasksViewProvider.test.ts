@@ -513,6 +513,69 @@ describe('TasksViewProvider', () => {
     });
   });
 
+  describe('workspace roots messaging', () => {
+    it('sendRoots posts rootsUpdated message with correct shape', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.sendRoots(
+        [
+          { label: 'jobbu', backlogPath: '/ws/jobbu/backlog' },
+          { label: 'Backlog.md-jobbu', backlogPath: '/ws/other/backlog' },
+        ],
+        '/ws/jobbu/backlog'
+      );
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'rootsUpdated',
+        roots: [
+          { label: 'jobbu', backlogPath: '/ws/jobbu/backlog' },
+          { label: 'Backlog.md-jobbu', backlogPath: '/ws/other/backlog' },
+        ],
+        activeBacklogPath: '/ws/jobbu/backlog',
+      });
+    });
+
+    it('sendRoots with empty roots posts rootsUpdated with empty array', () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      provider.sendRoots([], '');
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith({
+        type: 'rootsUpdated',
+        roots: [],
+        activeBacklogPath: '',
+      });
+    });
+
+    it('handleMessage selectRoot calls the registered handler', async () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      let capturedPath: string | undefined;
+      provider.setRootSelectionHandler((path) => {
+        capturedPath = path;
+      });
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await messageHandler({ type: 'selectRoot', backlogPath: '/ws/other/backlog' });
+
+      expect(capturedPath).toBe('/ws/other/backlog');
+    });
+
+    it('handleMessage selectRoot with no handler does not throw', async () => {
+      const provider = new TasksViewProvider(extensionUri, mockParser, mockContext);
+      resolveView(provider);
+
+      const messageHandler = (mockWebview.onDidReceiveMessage as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      await expect(
+        messageHandler({ type: 'selectRoot', backlogPath: '/any/path' })
+      ).resolves.not.toThrow();
+    });
+  });
+
   describe('handleMessage deleteTask', () => {
     it('should handle deleteTask message from webview', async () => {
       (mockParser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({

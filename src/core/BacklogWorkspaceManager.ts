@@ -1,3 +1,5 @@
+import { readdirSync } from 'fs';
+import { join } from 'path';
 import * as vscode from 'vscode';
 import { resolveBacklogDirectory } from './resolveBacklogDirectory';
 
@@ -42,9 +44,39 @@ export class BacklogWorkspaceManager implements vscode.Disposable {
           workspaceFolder: folder,
           label: folder.name,
         });
+      } else {
+        this.scanChildDirectories(folder);
       }
     }
     return this.roots;
+  }
+
+  /** Scan direct child directories of a workspace folder for backlog roots. */
+  private scanChildDirectories(folder: vscode.WorkspaceFolder): void {
+    let entries: { name: string; isDirectory: () => boolean }[];
+    try {
+      entries = readdirSync(folder.uri.fsPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+
+      const childPath = join(folder.uri.fsPath, entry.name);
+      const resolution = resolveBacklogDirectory(childPath);
+      if (!resolution.backlogPath) continue;
+      if (this.roots.some((r) => r.backlogPath === resolution.backlogPath)) continue;
+
+      this.roots.push({
+        backlogPath: resolution.backlogPath,
+        backlogDir: resolution.backlogDir!,
+        configPath: resolution.configPath ?? undefined,
+        workspaceFolder: folder,
+        label: entry.name,
+      });
+    }
   }
 
   /** Discover roots and restore or auto-select the active root. */
@@ -73,15 +105,22 @@ export class BacklogWorkspaceManager implements vscode.Disposable {
   startWatching(): void {
     const disposable = vscode.workspace.onDidChangeWorkspaceFolders(() => {
       this.discover();
-      // Validate active root still exists
-      if (
-        this.activeRoot &&
-        !this.roots.find((r) => r.backlogPath === this.activeRoot!.backlogPath)
-      ) {
-        // Active root was removed, fallback
-        const newRoot = this.roots[0];
-        this.setActiveRoot(newRoot);
+
+      if (this.roots.length === 0) return;
+
+      if (!this.activeRoot) {
+        this.setActiveRoot(this.roots[0]);
+        return;
       }
+
+      if (!this.roots.find((r) => r.backlogPath === this.activeRoot!.backlogPath)) {
+        this.setActiveRoot(this.roots[0]);
+        return;
+      }
+
+      // Roots list changed but active root still valid — notify webview
+      // without full parser/watcher recreation
+      this._onDidChangeActiveRoot.fire(this.activeRoot);
     });
     this.disposables.push(disposable);
   }

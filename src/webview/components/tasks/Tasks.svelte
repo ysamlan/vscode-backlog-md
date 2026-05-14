@@ -7,6 +7,7 @@
   import DocumentsList from '../docs/DocumentsList.svelte';
   import DecisionsList from '../decisions/DecisionsList.svelte';
   import TabBar from '../shared/TabBar.svelte';
+  import WorkspaceTabs from './WorkspaceTabs.svelte';
   import AgentSetupBanner from '../shared/AgentSetupBanner.svelte';
   import Toast from '../shared/Toast.svelte';
   import KeyboardShortcutsPopup from '../shared/KeyboardShortcutsPopup.svelte';
@@ -66,6 +67,10 @@
 
   // Active edited task (from task detail panel)
   let activeEditedTaskId = $state<string | null>(null);
+
+  // Workspace roots state
+  let roots = $state<Array<{ label: string; backlogPath: string }>>([]);
+  let activeBacklogPath = $state('');
 
   // Message handlers
   onMessage((message) => {
@@ -189,6 +194,11 @@
         integrationCliAvailable = message.cliAvailable;
         break;
 
+      case 'rootsUpdated':
+        roots = message.roots;
+        activeBacklogPath = message.activeBacklogPath;
+        break;
+
       case 'error':
         console.error('[Tasks]', message.message);
         break;
@@ -297,6 +307,10 @@
     window.addEventListener('keydown', handleGlobalKeydown);
     return () => window.removeEventListener('keydown', handleGlobalKeydown);
   });
+
+  function handleRootChange(backlogPath: string) {
+    vscode.postMessage({ type: 'selectRoot', backlogPath });
+  }
 
   function handleTabChange(tab: TabMode) {
     activeTab = tab;
@@ -438,6 +452,8 @@
     showToast(`Cannot reorder task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`);
   }
 </script>
+
+<WorkspaceTabs {roots} {activeBacklogPath} onRootChange={handleRootChange} onInitBacklog={() => vscode.postMessage({ type: 'initBacklogInDirectory' })} />
 
 <TabBar
   {activeTab}
