@@ -144,6 +144,8 @@ CDP tests (`bun run test:cdp`) are for verifying **cross-view coordination** —
 
 The test library lives in `src/test/cdp/lib/` and uses Chrome DevTools Protocol over WebSocket to drive VS Code and interact with webview iframe content. Tests run sequentially (one VS Code instance) with `vitest.cdp.config.ts`.
 
+> **CDP/Electron gotchas:** See `docs/cdp-testing-notes.md` for hard-won insights — VS Code strips `--remote-debugging-pipe` (use `--remote-debugging-port` + raw WebSocket), the webview iframe target-discovery dance, dispatching events in the inner frame's JS context so Svelte handlers fire, and VS Code 1.109+ theme detection/switching quirks.
+
 **Test fixture pattern:**
 
 - HTML fixtures load compiled Svelte bundles from `dist/webview/`
