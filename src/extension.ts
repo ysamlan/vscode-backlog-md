@@ -1,3 +1,4 @@
+import { dirname } from 'path';
 import * as vscode from 'vscode';
 import { TasksViewProvider } from './providers/TasksViewProvider';
 import { TaskDetailProvider } from './providers/TaskDetailProvider';
@@ -108,6 +109,13 @@ export function activate(context: vscode.ExtensionContext) {
   }
   console.log('[Backlog.md] Tasks view provider registered');
 
+  tasksProvider.setRootSelectionHandler((backlogPath) => {
+    const root = manager.getRoots().find((r) => r.backlogPath === backlogPath);
+    if (root) {
+      manager.setActiveRoot(root);
+    }
+  });
+
   const taskPreviewProvider = new TaskPreviewViewProvider(
     context.extensionUri,
     parser,
@@ -141,6 +149,12 @@ export function activate(context: vscode.ExtensionContext) {
   // --- switchActiveBacklog: consolidated reinit logic ---
   function switchActiveBacklog(root: BacklogRoot | undefined) {
     if (!root) return;
+
+    // Same root re-fired (e.g. roots list changed) — just update webview
+    if (parser && parser.getBacklogPath() === root.backlogPath) {
+      sendRootsToTasksProvider();
+      return;
+    }
 
     console.log('[Backlog.md] Switching active backlog to:', root.backlogPath);
 
@@ -184,11 +198,15 @@ export function activate(context: vscode.ExtensionContext) {
     // Check cross-branch config for the new root
     checkCrossBranchConfig(parser, context, tasksProvider);
 
-    // Check agent integration status for the new root
-    tasksProvider.checkAndSendIntegrationState();
+    // Only check integration when backlog is directly in workspace folder
+    // (skip for child-discovered backlogs to avoid irrelevant banner)
+    if (root.workspaceFolder && dirname(root.backlogPath) === root.workspaceFolder.uri.fsPath) {
+      tasksProvider.checkAndSendIntegrationState();
+    }
 
     // Update workspace status bar
     updateWorkspaceStatusBar(manager);
+    sendRootsToTasksProvider();
   }
 
   // Subscribe to active root changes (e.g. from selectBacklog or addRoot)
@@ -197,6 +215,13 @@ export function activate(context: vscode.ExtensionContext) {
       switchActiveBacklog(root);
     })
   );
+
+  // --- Send roots to Tasks webview ---
+  function sendRootsToTasksProvider() {
+    const roots = manager.getRoots().map((r) => ({ label: r.label, backlogPath: r.backlogPath }));
+    const activeBacklogPath = manager.getActiveRoot()?.backlogPath ?? '';
+    tasksProvider.sendRoots(roots, activeBacklogPath);
+  }
 
   // --- Workspace status bar (shown when multiple roots) ---
   function updateWorkspaceStatusBar(mgr: BacklogWorkspaceManager) {
@@ -221,6 +246,7 @@ export function activate(context: vscode.ExtensionContext) {
     workspaceStatusBarItem.show();
   }
   updateWorkspaceStatusBar(manager);
+  sendRootsToTasksProvider();
 
   // Register commands
   context.subscriptions.push(
@@ -381,213 +407,146 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register backlog init command
   context.subscriptions.push(
-    vscode.commands.registerCommand('backlog.init', async (args?: { defaults?: boolean }) => {
-      // Get workspace root
+    vscode.commands.registerCommand(
+      'backlog.init',
+      async (args?: { defaults?: boolean; directory?: string }) => {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders || workspaceFolders.length === 0) {
+          vscode.window.showErrorMessage('No workspace folder open. Please open a folder first.');
+          return;
+        }
+
+        let selectedFolder: vscode.WorkspaceFolder;
+        let workspaceRoot: string;
+
+        if (args?.directory) {
+          selectedFolder = workspaceFolders[0];
+          workspaceRoot = args.directory;
+        } else {
+          if (workspaceFolders.length === 1) {
+            selectedFolder = workspaceFolders[0];
+          } else {
+            const picked = await vscode.window.showWorkspaceFolderPick({
+              placeHolder: 'Select workspace folder to initialize backlog in',
+            });
+            if (!picked) return;
+            selectedFolder = picked;
+          }
+          workspaceRoot = selectedFolder.uri.fsPath;
+        }
+
+        // Check if this specific folder already has a backlog
+        const { resolveBacklogDirectory } = await import('./core/resolveBacklogDirectory.js');
+        const existingResolution = resolveBacklogDirectory(workspaceRoot);
+        if (existingResolution.backlogPath) {
+          const { existsSync } = await import('fs');
+          if (existsSync(existingResolution.backlogPath)) {
+            vscode.window.showInformationMessage(
+              `A backlog folder already exists in ${workspaceRoot.split(/[\\/]/).pop()} at ${existingResolution.backlogDir}/.`
+            );
+            return;
+          }
+        }
+
+        const options = await getInitOptions(workspaceRoot, args?.defaults);
+        if (!options) return;
+
+        try {
+          const newBacklogPath = initializeBacklog(workspaceRoot, options);
+          console.log('[Backlog.md] Backlog initialized at:', newBacklogPath);
+
+          const label = args?.directory
+            ? workspaceRoot.split(/[\\/]/).pop() || selectedFolder.name
+            : selectedFolder.name;
+
+          manager.addRoot({
+            backlogPath: newBacklogPath,
+            backlogDir: 'backlog',
+            workspaceFolder: selectedFolder,
+            label,
+          });
+
+          vscode.window.showInformationMessage(`Backlog initialized in ${newBacklogPath}`);
+          if (dirname(newBacklogPath) === selectedFolder.uri.fsPath) {
+            tasksProvider.checkAndSendIntegrationState();
+          }
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to initialize backlog: ${error}`);
+        }
+      }
+    )
+  );
+
+  // Register backlog init in directory command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('backlog.initInDirectory', async () => {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {
         vscode.window.showErrorMessage('No workspace folder open. Please open a folder first.');
         return;
       }
 
-      let selectedFolder: vscode.WorkspaceFolder;
-      if (workspaceFolders.length === 1) {
-        selectedFolder = workspaceFolders[0];
-      } else {
-        const picked = await vscode.window.showWorkspaceFolderPick({
-          placeHolder: 'Select workspace folder to initialize backlog in',
-        });
-        if (!picked) return;
-        selectedFolder = picked;
-      }
-
-      // Check if this specific folder already has a backlog
+      const firstFolder = workspaceFolders[0];
       const { resolveBacklogDirectory } = await import('./core/resolveBacklogDirectory.js');
-      const existingResolution = resolveBacklogDirectory(selectedFolder.uri.fsPath);
-      if (existingResolution.backlogPath) {
-        const { existsSync } = await import('fs');
-        if (existsSync(existingResolution.backlogPath)) {
-          vscode.window.showInformationMessage(
-            `A backlog folder already exists in ${selectedFolder.name} at ${existingResolution.backlogDir}/.`
-          );
-          return;
-        }
-      }
+      const { readdirSync } = await import('fs');
+      const { join } = await import('path');
 
-      const workspaceRoot = selectedFolder.uri.fsPath;
-      let options: InitBacklogOptions;
-
-      if (args?.defaults) {
-        // Quick init with defaults
-        const folderName = workspaceRoot.split(/[\\/]/).pop() || 'My Project';
-        options = {
-          projectName: folderName,
-          taskPrefix: 'task',
-          statuses: ['To Do', 'In Progress', 'Done'],
-        };
-      } else {
-        // Customization wizard
-        const folderName = workspaceRoot.split(/[\\/]/).pop() || 'My Project';
-
-        const projectName = await vscode.window.showInputBox({
-          prompt: 'Project name',
-          value: folderName,
-          validateInput: (value) => (value.trim() ? null : 'Project name cannot be empty'),
-        });
-        if (projectName === undefined) return;
-
-        const taskPrefix = await vscode.window.showInputBox({
-          prompt: 'Task ID prefix (letters only, e.g. "task" → TASK-1)',
-          value: 'task',
-          validateInput: (value) =>
-            /^[a-zA-Z]+$/.test(value) ? null : 'Prefix must contain only letters (a-z, A-Z)',
-        });
-        if (taskPrefix === undefined) return;
-
-        const statusesInput = await vscode.window.showInputBox({
-          prompt: 'Statuses (comma-separated)',
-          value: 'To Do, In Progress, Done',
-          validateInput: (value) => {
-            const items = value
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean);
-            return items.length >= 2 ? null : 'At least 2 statuses required';
-          },
-        });
-        if (statusesInput === undefined) return;
-
-        options = {
-          projectName: projectName.trim(),
-          taskPrefix: taskPrefix.trim(),
-          statuses: statusesInput
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean),
-        };
-
-        // Advanced settings wizard (matches upstream advanced-config-wizard flow)
-        const advancedChoice = await vscode.window.showQuickPick(['No', 'Yes'], {
-          placeHolder: 'Configure advanced settings now?',
-        });
-        if (advancedChoice === undefined) return;
-
-        if (advancedChoice === 'Yes') {
-          // Cross-branch tracking
-          const crossBranch = await vscode.window.showQuickPick(['Yes', 'No'], {
-            placeHolder: 'Check task states across active branches?',
-          });
-          if (crossBranch === undefined) return;
-          options.checkActiveBranches = crossBranch === 'Yes';
-
-          if (options.checkActiveBranches) {
-            const remoteOps = await vscode.window.showQuickPick(['Yes', 'No'], {
-              placeHolder: 'Check task states in remote branches?',
-            });
-            if (remoteOps === undefined) return;
-            options.remoteOperations = remoteOps === 'Yes';
-
-            const branchDays = await vscode.window.showInputBox({
-              prompt: 'How many days should a branch be considered active?',
-              value: '30',
-              validateInput: (value) => {
-                const n = parseInt(value, 10);
-                return n >= 1 && n <= 365 ? null : 'Enter a number between 1 and 365';
-              },
-            });
-            if (branchDays === undefined) return;
-            options.activeBranchDays = parseInt(branchDays, 10);
-          }
-
-          // Git settings
-          const bypassHooks = await vscode.window.showQuickPick(['No', 'Yes'], {
-            placeHolder: 'Bypass git hooks when committing?',
-          });
-          if (bypassHooks === undefined) return;
-          options.bypassGitHooks = bypassHooks === 'Yes';
-
-          const autoCommit = await vscode.window.showQuickPick(['No', 'Yes'], {
-            placeHolder: 'Enable automatic commits for Backlog operations?',
-          });
-          if (autoCommit === undefined) return;
-          options.autoCommit = autoCommit === 'Yes';
-
-          // Zero-padded IDs
-          const zeroPadded = await vscode.window.showQuickPick(['No', 'Yes'], {
-            placeHolder: 'Enable zero-padded IDs for consistent formatting? (e.g. TASK-001)',
-          });
-          if (zeroPadded === undefined) return;
-
-          if (zeroPadded === 'Yes') {
-            const padWidth = await vscode.window.showInputBox({
-              prompt: 'Number of digits for zero-padding (e.g. 3 → TASK-001)',
-              value: '3',
-              validateInput: (value) => {
-                const n = parseInt(value, 10);
-                return n >= 1 && n <= 10 ? null : 'Enter a number between 1 and 10';
-              },
-            });
-            if (padWidth === undefined) return;
-            options.zeroPaddedIds = parseInt(padWidth, 10);
-          }
-
-          // Editor
-          const editorCmd = await vscode.window.showInputBox({
-            prompt: 'Default editor command (leave blank to use system default)',
-            placeHolder: "e.g. 'code --wait', 'vim', 'nano'",
-            value: '',
-          });
-          if (editorCmd === undefined) return;
-          if (editorCmd.trim()) {
-            options.defaultEditor = editorCmd.trim();
-          }
-
-          // Web UI settings
-          const webUi = await vscode.window.showQuickPick(['No', 'Yes'], {
-            placeHolder: 'Configure web UI settings now?',
-          });
-          if (webUi === undefined) return;
-
-          if (webUi === 'Yes') {
-            const port = await vscode.window.showInputBox({
-              prompt: 'Default web UI port',
-              value: '6420',
-              validateInput: (value) => {
-                const n = parseInt(value, 10);
-                return n >= 1 && n <= 65535 ? null : 'Enter a port between 1 and 65535';
-              },
-            });
-            if (port === undefined) return;
-            options.defaultPort = parseInt(port, 10);
-
-            const autoOpen = await vscode.window.showQuickPick(['Yes', 'No'], {
-              placeHolder: 'Automatically open browser when starting web UI?',
-            });
-            if (autoOpen === undefined) return;
-            options.autoOpenBrowser = autoOpen === 'Yes';
-          }
-        }
-      }
-
+      const entries: string[] = [];
       try {
-        const newBacklogPath = initializeBacklog(workspaceRoot, options);
-        console.log('[Backlog.md] Backlog initialized at:', newBacklogPath);
-
-        // Add the new root to the manager — this fires onDidChangeActiveRoot → switchActiveBacklog
-        manager.addRoot({
-          backlogPath: newBacklogPath,
-          backlogDir: 'backlog', // init always creates backlog/
-          workspaceFolder: selectedFolder,
-          label: selectedFolder.name,
-        });
-
-        vscode.window.showInformationMessage(`Backlog initialized in ${newBacklogPath}`);
-
-        // Check agent integration after init (switchActiveBacklog already fires,
-        // but we also need to check in case the view was already resolved)
-        tasksProvider.checkAndSendIntegrationState();
-      } catch (error) {
-        vscode.window.showErrorMessage(`Failed to initialize backlog: ${error}`);
+        const dirEntries = readdirSync(firstFolder.uri.fsPath, { withFileTypes: true });
+        for (const entry of dirEntries) {
+          if (!entry.isDirectory()) continue;
+          if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+          const childPath = join(firstFolder.uri.fsPath, entry.name);
+          const resolution = resolveBacklogDirectory(childPath);
+          if (!resolution.backlogPath) {
+            entries.push(entry.name);
+          }
+        }
+      } catch {
+        /* ignore */
       }
+
+      entries.sort();
+
+      const items: vscode.QuickPickItem[] = entries.map((name) => ({
+        label: name,
+        description: join(firstFolder.uri.fsPath, name),
+      }));
+      items.push({ label: '$(folder) Browse for folder...', alwaysShow: true });
+
+      const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select a directory to initialize backlog in',
+      });
+      if (!picked) return;
+
+      let selectedDir: string;
+      if (picked === items[items.length - 1]) {
+        const result = await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          canSelectMany: false,
+          defaultUri: firstFolder.uri,
+          openLabel: 'Select directory',
+        });
+        if (!result || result.length === 0) return;
+        selectedDir = result[0].fsPath;
+
+        const dirResolution = resolveBacklogDirectory(selectedDir);
+        if (dirResolution.backlogPath) {
+          const { existsSync } = await import('fs');
+          if (existsSync(dirResolution.backlogPath)) {
+            vscode.window.showInformationMessage(
+              `A backlog folder already exists in ${selectedDir.split(/[\\/]/).pop()}.`
+            );
+            return;
+          }
+        }
+      } else {
+        selectedDir = join(firstFolder.uri.fsPath, picked.label);
+      }
+
+      vscode.commands.executeCommand('backlog.init', { directory: selectedDir });
     })
   );
 
@@ -704,9 +663,11 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   // Check for cross-branch feature configuration and CLI availability
-  if (parser) {
+  if (parser && activeRoot?.workspaceFolder) {
     checkCrossBranchConfig(parser, context, tasksProvider);
-    tasksProvider.checkAndSendIntegrationState();
+    if (dirname(activeRoot.backlogPath) === activeRoot.workspaceFolder.uri.fsPath) {
+      tasksProvider.checkAndSendIntegrationState();
+    }
   }
 
   console.log('[Backlog.md] Extension activation complete!');
@@ -729,6 +690,161 @@ export function deactivate() {
  * Now uses native git support instead of external CLI.
  * Shows appropriate status bar indicators.
  */
+/**
+ * Collect init options from the user via the customization wizard,
+ * or return defaults when requested.
+ * Returns undefined if the user cancels at any point.
+ */
+async function getInitOptions(
+  workspaceRoot: string,
+  defaults?: boolean
+): Promise<InitBacklogOptions | undefined> {
+  const folderName = workspaceRoot.split(/[\\/]/).pop() || 'My Project';
+
+  if (defaults) {
+    return {
+      projectName: folderName,
+      taskPrefix: 'task',
+      statuses: ['To Do', 'In Progress', 'Done'],
+    };
+  }
+
+  const projectName = await vscode.window.showInputBox({
+    prompt: 'Project name',
+    value: folderName,
+    validateInput: (value) => (value.trim() ? null : 'Project name cannot be empty'),
+  });
+  if (projectName === undefined) return;
+
+  const taskPrefix = await vscode.window.showInputBox({
+    prompt: 'Task ID prefix (letters only, e.g. "task" → TASK-1)',
+    value: 'task',
+    validateInput: (value) =>
+      /^[a-zA-Z]+$/.test(value) ? null : 'Prefix must contain only letters (a-z, A-Z)',
+  });
+  if (taskPrefix === undefined) return;
+
+  const statusesInput = await vscode.window.showInputBox({
+    prompt: 'Statuses (comma-separated)',
+    value: 'To Do, In Progress, Done',
+    validateInput: (value) => {
+      const items = value
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return items.length >= 2 ? null : 'At least 2 statuses required';
+    },
+  });
+  if (statusesInput === undefined) return;
+
+  const options: InitBacklogOptions = {
+    projectName: projectName.trim(),
+    taskPrefix: taskPrefix.trim(),
+    statuses: statusesInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  };
+
+  const advancedChoice = await vscode.window.showQuickPick(['No', 'Yes'], {
+    placeHolder: 'Configure advanced settings now?',
+  });
+  if (advancedChoice === undefined) return;
+
+  if (advancedChoice === 'Yes') {
+    const crossBranch = await vscode.window.showQuickPick(['Yes', 'No'], {
+      placeHolder: 'Check task states across active branches?',
+    });
+    if (crossBranch === undefined) return;
+    options.checkActiveBranches = crossBranch === 'Yes';
+
+    if (options.checkActiveBranches) {
+      const remoteOps = await vscode.window.showQuickPick(['Yes', 'No'], {
+        placeHolder: 'Check task states in remote branches?',
+      });
+      if (remoteOps === undefined) return;
+      options.remoteOperations = remoteOps === 'Yes';
+
+      const branchDays = await vscode.window.showInputBox({
+        prompt: 'How many days should a branch be considered active?',
+        value: '30',
+        validateInput: (value) => {
+          const n = parseInt(value, 10);
+          return n >= 1 && n <= 365 ? null : 'Enter a number between 1 and 365';
+        },
+      });
+      if (branchDays === undefined) return;
+      options.activeBranchDays = parseInt(branchDays, 10);
+    }
+
+    const bypassHooks = await vscode.window.showQuickPick(['No', 'Yes'], {
+      placeHolder: 'Bypass git hooks when committing?',
+    });
+    if (bypassHooks === undefined) return;
+    options.bypassGitHooks = bypassHooks === 'Yes';
+
+    const autoCommit = await vscode.window.showQuickPick(['No', 'Yes'], {
+      placeHolder: 'Enable automatic commits for Backlog operations?',
+    });
+    if (autoCommit === undefined) return;
+    options.autoCommit = autoCommit === 'Yes';
+
+    const zeroPadded = await vscode.window.showQuickPick(['No', 'Yes'], {
+      placeHolder: 'Enable zero-padded IDs for consistent formatting? (e.g. TASK-001)',
+    });
+    if (zeroPadded === undefined) return;
+
+    if (zeroPadded === 'Yes') {
+      const padWidth = await vscode.window.showInputBox({
+        prompt: 'Number of digits for zero-padding (e.g. 3 → TASK-001)',
+        value: '3',
+        validateInput: (value) => {
+          const n = parseInt(value, 10);
+          return n >= 1 && n <= 10 ? null : 'Enter a number between 1 and 10';
+        },
+      });
+      if (padWidth === undefined) return;
+      options.zeroPaddedIds = parseInt(padWidth, 10);
+    }
+
+    const editorCmd = await vscode.window.showInputBox({
+      prompt: 'Default editor command (leave blank to use system default)',
+      placeHolder: "e.g. 'code --wait', 'vim', 'nano'",
+      value: '',
+    });
+    if (editorCmd === undefined) return;
+    if (editorCmd.trim()) {
+      options.defaultEditor = editorCmd.trim();
+    }
+
+    const webUi = await vscode.window.showQuickPick(['No', 'Yes'], {
+      placeHolder: 'Configure web UI settings now?',
+    });
+    if (webUi === undefined) return;
+
+    if (webUi === 'Yes') {
+      const port = await vscode.window.showInputBox({
+        prompt: 'Default web UI port',
+        value: '6420',
+        validateInput: (value) => {
+          const n = parseInt(value, 10);
+          return n >= 1 && n <= 65535 ? null : 'Enter a port between 1 and 65535';
+        },
+      });
+      if (port === undefined) return;
+      options.defaultPort = parseInt(port, 10);
+
+      const autoOpen = await vscode.window.showQuickPick(['Yes', 'No'], {
+        placeHolder: 'Automatically open browser when starting web UI?',
+      });
+      if (autoOpen === undefined) return;
+      options.autoOpenBrowser = autoOpen === 'Yes';
+    }
+  }
+
+  return options;
+}
+
 async function checkCrossBranchConfig(
   parser: BacklogParser,
   context: vscode.ExtensionContext,

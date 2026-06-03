@@ -2,14 +2,20 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import * as vscode from 'vscode';
 import { BacklogWorkspaceManager } from '../../core/BacklogWorkspaceManager';
 import type { BacklogDirectoryResolution } from '../../core/resolveBacklogDirectory';
+import { readdirSync } from 'fs';
 
 vi.mock('../../core/resolveBacklogDirectory', () => ({
   resolveBacklogDirectory: vi.fn(),
 }));
 
+vi.mock('fs', () => ({
+  readdirSync: vi.fn(),
+}));
+
 import { resolveBacklogDirectory } from '../../core/resolveBacklogDirectory';
 
 const mockResolve = resolveBacklogDirectory as Mock;
+const mockReaddirSync = readdirSync as Mock;
 
 // The vscode mock has a mutable workspaceFolders, but TS types it as readonly.
 // Cast to allow assignment in tests.
@@ -76,6 +82,7 @@ describe('BacklogWorkspaceManager', () => {
     vi.clearAllMocks();
     memento = createMockMemento();
     mockWorkspace.workspaceFolders = undefined;
+    mockReaddirSync.mockReturnValue([]);
   });
 
   describe('discover()', () => {
@@ -152,6 +159,141 @@ describe('BacklogWorkspaceManager', () => {
       expect(roots).toHaveLength(2);
       expect(roots[0].label).toBe('projectA');
       expect(roots[1].label).toBe('projectC');
+    });
+  });
+
+  describe('discover() with child directory scanning', () => {
+    beforeEach(() => {
+      mockReaddirSync.mockReset();
+    });
+
+    it('scans child dirs when parent has no backlog — finds one', () => {
+      mockWorkspace.workspaceFolders = [makeFolder('root', '/workspace')];
+      mockResolve.mockImplementation((p: string) =>
+        p === '/workspace' ? notFoundResolution('/workspace') : foundResolution(p)
+      );
+      mockReaddirSync.mockReturnValue([{ name: 'jobbu', isDirectory: () => true }] as any);
+
+      const manager = new BacklogWorkspaceManager(memento);
+      const roots = manager.discover();
+      expect(roots).toHaveLength(1);
+      expect(roots[0].label).toBe('jobbu');
+      expect(roots[0].backlogPath).toBe('/workspace/jobbu/backlog');
+    });
+
+    it('scans child dirs when parent has no backlog — finds multiple', () => {
+      mockWorkspace.workspaceFolders = [makeFolder('root', '/workspace')];
+      mockResolve.mockImplementation((p: string) =>
+        p === '/workspace' ? notFoundResolution('/workspace') : foundResolution(p)
+      );
+      mockReaddirSync.mockReturnValue([
+        { name: 'jobbu', isDirectory: () => true },
+        { name: 'Backlog.md-jobbu', isDirectory: () => true },
+      ] as any);
+
+      const manager = new BacklogWorkspaceManager(memento);
+      const roots = manager.discover();
+      expect(roots).toHaveLength(2);
+      expect(roots[0].label).toBe('jobbu');
+      expect(roots[1].label).toBe('Backlog.md-jobbu');
+    });
+
+    it('skips children when parent already has a backlog', () => {
+      mockWorkspace.workspaceFolders = [makeFolder('root', '/workspace')];
+      mockResolve.mockImplementation((p: string) =>
+        p === '/workspace' ? foundResolution('/workspace') : notFoundResolution(p)
+      );
+      mockReaddirSync.mockReturnValue([{ name: 'jobbu', isDirectory: () => true }] as any);
+
+      const manager = new BacklogWorkspaceManager(memento);
+      const roots = manager.discover();
+      expect(roots).toHaveLength(1);
+      expect(roots[0].label).toBe('root');
+    });
+
+    it('returns empty when no child has backlog', () => {
+      mockWorkspace.workspaceFolders = [makeFolder('root', '/workspace')];
+      mockResolve.mockReturnValue(notFoundResolution('/workspace'));
+      mockReaddirSync.mockReturnValue([{ name: 'jobbu', isDirectory: () => true }] as any);
+
+      const manager = new BacklogWorkspaceManager(memento);
+      const roots = manager.discover();
+      expect(roots).toHaveLength(0);
+    });
+
+    it('skips dot-prefixed directories', () => {
+      mockWorkspace.workspaceFolders = [makeFolder('root', '/workspace')];
+      mockResolve.mockImplementation((p: string) =>
+        p === '/workspace' ? notFoundResolution('/workspace') : foundResolution(p)
+      );
+      mockReaddirSync.mockReturnValue([
+        { name: '.git', isDirectory: () => true },
+        { name: '.vscode', isDirectory: () => true },
+      ] as any);
+
+      const manager = new BacklogWorkspaceManager(memento);
+      const roots = manager.discover();
+      expect(roots).toHaveLength(0);
+      expect(mockResolve).not.toHaveBeenCalledWith(expect.stringMatching(/\/\.(git|vscode)$/));
+    });
+
+    it('skips node_modules directory', () => {
+      mockWorkspace.workspaceFolders = [makeFolder('root', '/workspace')];
+      mockResolve.mockImplementation((p: string) =>
+        p === '/workspace' ? notFoundResolution('/workspace') : foundResolution(p)
+      );
+      mockReaddirSync.mockReturnValue([{ name: 'node_modules', isDirectory: () => true }] as any);
+
+      const manager = new BacklogWorkspaceManager(memento);
+      const roots = manager.discover();
+      expect(roots).toHaveLength(0);
+      expect(mockResolve).not.toHaveBeenCalledWith('/workspace/node_modules');
+    });
+
+    it('skips non-directory entries', () => {
+      mockWorkspace.workspaceFolders = [makeFolder('root', '/workspace')];
+      mockResolve.mockReturnValue(notFoundResolution('/workspace'));
+      mockReaddirSync.mockReturnValue([
+        { name: 'file.txt', isDirectory: () => false },
+        { name: 'data.json', isDirectory: () => false },
+      ] as any);
+
+      const manager = new BacklogWorkspaceManager(memento);
+      const roots = manager.discover();
+      expect(roots).toHaveLength(0);
+    });
+
+    it('does not duplicate already-discovered root', () => {
+      mockWorkspace.workspaceFolders = [
+        makeFolder('projectA', '/workspace/projectA'),
+        makeFolder('root', '/workspace'),
+      ];
+      mockResolve.mockImplementation((p: string) =>
+        p === '/workspace' ? notFoundResolution('/workspace') : foundResolution(p)
+      );
+      mockReaddirSync.mockReturnValue([
+        { name: 'projectA', isDirectory: () => true },
+        { name: 'Backlog.md-jobbu', isDirectory: () => true },
+      ] as any);
+
+      const manager = new BacklogWorkspaceManager(memento);
+      const roots = manager.discover();
+      // projectA from workspace folder, Backlog.md-jobbu from child scan = 2 (not 3)
+      expect(roots).toHaveLength(2);
+      expect(roots[0].label).toBe('projectA');
+      expect(roots[1].label).toBe('Backlog.md-jobbu');
+    });
+
+    it('handles readdirSync error gracefully', () => {
+      mockWorkspace.workspaceFolders = [makeFolder('root', '/workspace')];
+      mockResolve.mockReturnValue(notFoundResolution('/workspace'));
+      mockReaddirSync.mockImplementation(() => {
+        throw new Error('permission denied');
+      });
+
+      const manager = new BacklogWorkspaceManager(memento);
+      expect(() => manager.discover()).not.toThrow();
+      expect(manager.discover()).toHaveLength(0);
     });
   });
 

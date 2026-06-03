@@ -38,6 +38,9 @@ export class TasksViewProvider extends BaseViewProvider {
   private collapsedMilestones: Set<string> = new Set();
   private activeEditedTaskId: string | null = null;
   private readonly writer = new BacklogWriter();
+  private backlogRoots: Array<{ label: string; backlogPath: string }> = [];
+  private activeRootPath: string = '';
+  private rootSelectionHandler?: (backlogPath: string) => void;
   private workspaceRoot: string | undefined;
   private onSelectTask?: (taskRef: {
     taskId: string;
@@ -83,6 +86,16 @@ export class TasksViewProvider extends BaseViewProvider {
   /**
    * Set the workspace root path for integration detection
    */
+  setRootSelectionHandler(handler: (backlogPath: string) => void): void {
+    this.rootSelectionHandler = handler;
+  }
+
+  sendRoots(roots: Array<{ label: string; backlogPath: string }>, activeBacklogPath: string): void {
+    this.backlogRoots = roots;
+    this.activeRootPath = activeBacklogPath;
+    this.postMessage({ type: 'rootsUpdated', roots, activeBacklogPath });
+  }
+
   setWorkspaceRoot(root: string): void {
     this.workspaceRoot = root;
   }
@@ -182,6 +195,15 @@ export class TasksViewProvider extends BaseViewProvider {
     }
 
     try {
+      // Always re-send roots so the webview has current data after any refresh
+      if (this.backlogRoots.length > 0) {
+        this.postMessage({
+          type: 'rootsUpdated',
+          roots: this.backlogRoots,
+          activeBacklogPath: this.activeRootPath,
+        });
+      }
+
       // Determine which tasks to load based on mode
       if (this.viewMode === 'dashboard') {
         await this.refreshDashboard();
@@ -390,17 +412,12 @@ export class TasksViewProvider extends BaseViewProvider {
             const taskContent = task.filePath ? fs.readFileSync(task.filePath, 'utf-8') : '';
             const taskFm = taskContent.match(/onStatusChange:\s*(.+)/);
             const taskCallback = taskFm?.[1]?.trim().replace(/^['"]|['"]$/g, '');
-            await StatusCallbackRunner.run(
-              backlogPath,
-              taskCallback,
-              config.on_status_change,
-              {
-                taskId,
-                oldStatus: originalStatus,
-                newStatus: message.status,
-                taskTitle: task.title,
-              }
-            );
+            await StatusCallbackRunner.run(backlogPath, taskCallback, config.on_status_change, {
+              taskId,
+              oldStatus: originalStatus,
+              newStatus: message.status,
+              taskTitle: task.title,
+            });
           }
 
           // Also update any additional cards that needed ordinals assigned
@@ -754,6 +771,14 @@ export class TasksViewProvider extends BaseViewProvider {
         vscode.commands.executeCommand('backlog.setupAgentIntegration');
         break;
       }
+
+      case 'selectRoot':
+        this.rootSelectionHandler?.(message.backlogPath);
+        break;
+
+      case 'initBacklogInDirectory':
+        vscode.commands.executeCommand('backlog.initInDirectory');
+        break;
 
       case 'dismissIntegrationBanner': {
         if (this.context && this.workspaceRoot) {
