@@ -7,9 +7,13 @@ and (from v0.3.7 onward) this project adheres to [Semantic Versioning](https://s
 
 ## [Unreleased]
 
+### Added
+
+- **Acceptance Criteria & Definition of Done in the preview panel** — The Kanban/List preview panel now renders a task's Acceptance Criteria and Definition of Done as interactive checklists. Toggling a checkbox writes the change straight to the task file; read-only views stay read-only. Toggles match by section and index (so a same-numbered item in the other checklist is never affected) and target the originating task (no wrong-task mutation when clicking a stale checkbox after switching selection). ([#31](https://github.com/ysamlan/vscode-backlog-md/pull/31))
+
 ### Fixed
 
-- Removed the broken `img.shields.io/visual-studio-marketplace` badge from the README — shields.io [retired the entire `visual-studio-marketplace` service in April 2026](https://github.com/badges/shields/issues/11796), so every variant rendered as "retired badge". The Open VSX badge remains and tracks the same release cadence.
+- Removed the broken `img.shields.io/visual-studio-marketplace` badge from the README — shields.io [retired the entire `visual-studio-marketplace` service in April 2026](https://github.com/badges/shields/issues/11796), so every variant rendered as "retired badge". The Open VSX badge remains and tracks the same release cadence. ([#26](https://github.com/ysamlan/vscode-backlog-md/pull/26))
 
 ## [0.3.8] - 2026-04-22
 
