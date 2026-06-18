@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude-opus'
 created_date: '2026-06-18 16:29'
-updated_date: '2026-06-18 17:18'
+updated_date: '2026-06-18 18:53'
 labels:
   - feature
   - ui
@@ -23,7 +23,10 @@ modified_files:
   - src/test/unit/TasksController.test.ts
   - src/test/unit/TasksPanelProvider.test.ts
   - src/test/cdp/lib/webview-helpers.ts
+  - src/test/cdp/lib/cdp-helpers.ts
+  - src/test/cdp/lib/vscode-launcher.ts
   - src/test/cdp/cross-view.test.ts
+  - scripts/run-cdp-tests.sh
   - README.md
 parent_task_id: TASK-164
 priority: medium
@@ -96,4 +99,6 @@ Per-host view state: sidebar and panel are separate controller instances with th
 Tests: extended TasksController.test.ts (editor peek-beside, editor open-beside-focus, sidebar select still drives preview, sidebar open without beside); new TasksPanelProvider.test.ts (singleton reveal, html marker, message routing, dispose, closed-panel no-ops, active-task forwarding); CDP webview-helpers gained a `tasksEditor` role with an exclude-class so `tasks` resolves to the sidebar only; two new CDP cross-view tests (editor tab opens + syncs with sidebar+disk; single-click peeks detail beside).
 
 VERIFICATION GAP — read before merge: unit suite (919) + lint + typecheck + esbuild compile all pass locally. The two new CDP tests are written to the existing harness patterns but were NOT executed locally: this machine has no VS Code binary and `test:cdp` launches a real VS Code (Darwin, no xvfb), so CDP must be validated in CI / the dedicated CDP environment. AC#8 is checked on the basis that the test artifacts exist and unit coverage is green; the CDP portion is pending a real run.
+
+VERIFICATION GAP RESOLVED — CDP tests now run and pass locally on macOS. Enabled local CDP testing without affecting CI (CI curls its own linux-x64 binary and invokes vitest directly, bypassing run-cdp-tests.sh): (1) scripts/run-cdp-tests.sh now self-provisions a VS Code binary on macOS when .vscode-test/ is empty (curl latest stable darwin-<arch> + ditto), idempotent and mac-only; (2) running it surfaced a real bug the unit tests could not — the CDP executeCommand helper triggers commands via registered keybindings, and the new backlog.openTasksInEditor command had none, so I added it to COMMAND_KEYBINDINGS (ctrl+shift+alt+e) and made the launcher derive keybindings.json from the shared KEYBINDINGS_JSON (single source of truth, prevents future drift). Full CDP suite now green locally: 12/12 (10 existing + the 2 new editor-tab tests), VS Code 1.124.2 on darwin-arm64. AC#8 fully verified.
 <!-- SECTION:NOTES:END -->

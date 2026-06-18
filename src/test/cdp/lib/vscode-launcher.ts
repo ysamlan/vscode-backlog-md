@@ -10,7 +10,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { CdpClient } from './CdpClient';
-import { sleep } from './cdp-helpers';
+import { sleep, KEYBINDINGS_JSON } from './cdp-helpers';
 
 const PROJECT_ROOT = path.resolve(__dirname, '../../../..');
 
@@ -253,20 +253,12 @@ export async function launchVsCode(opts: LaunchOptions): Promise<VsCodeInstance>
     )
   );
 
-  // Register keybindings for commands used in tests (avoids slow command palette typing)
+  // Register keybindings for commands used in tests (avoids slow command palette
+  // typing). Derived from COMMAND_KEYBINDINGS so the registered bindings and the
+  // executeCommand() lookup table can never drift apart.
   fs.writeFileSync(
     path.join(userDir, 'keybindings.json'),
-    JSON.stringify(
-      [
-        { key: 'ctrl+shift+alt+k', command: 'backlog.openKanban' },
-        { key: 'ctrl+shift+alt+r', command: 'backlog.refresh' },
-        { key: 'ctrl+shift+alt+l', command: 'backlog.showListView' },
-        { key: 'ctrl+shift+alt+b', command: 'backlog.showKanbanView' },
-        { key: 'ctrl+shift+alt+x', command: 'workbench.action.closeAuxiliaryBar' },
-      ],
-      null,
-      2
-    )
+    JSON.stringify(KEYBINDINGS_JSON, null, 2)
   );
 
   const env: Record<string, string> = { ...(process.env as Record<string, string>) };
