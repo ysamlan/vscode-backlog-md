@@ -89,6 +89,13 @@
     vscode.postMessage({ type: 'openWorkspaceFile', relativePath, fragment });
   }
 
+  function handleToggleChecklistItem(
+    listType: 'acceptanceCriteria' | 'definitionOfDone',
+    itemId: number
+  ) {
+    vscode.postMessage({ type: 'toggleChecklistItem', listType, itemId });
+  }
+
   onMount(() => {
     vscode.postMessage({ type: 'refresh' });
   });
@@ -108,4 +115,5 @@
   onUpdateStatus={handleUpdateStatus}
   onUpdatePriority={handleUpdatePriority}
   onOpenWorkspaceFile={handleOpenWorkspaceFile}
+  onToggleChecklistItem={handleToggleChecklistItem}
 />

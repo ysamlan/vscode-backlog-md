@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { getReadOnlyTaskContext, isReadOnlyTask, type Task, type TaskPriority } from '../../lib/types';
+  import {
+    getReadOnlyTaskContext,
+    isReadOnlyTask,
+    type ChecklistItem,
+    type Task,
+    type TaskPriority,
+  } from '../../lib/types';
   import { formatStoredUtcDateForDisplay } from '../../lib/date-display';
   import { renderMermaidAction } from '../../lib/mermaidAction';
 
@@ -27,6 +33,10 @@
     onUpdateStatus: (task: TaskWithBlocks, status: string) => void;
     onUpdatePriority: (task: TaskWithBlocks, priority: TaskPriority | undefined) => void;
     onOpenWorkspaceFile: (relativePath: string, fragment: string | null) => void;
+    onToggleChecklistItem: (
+      listType: 'acceptanceCriteria' | 'definitionOfDone',
+      itemId: number
+    ) => void;
   }
 
   let {
@@ -43,6 +53,7 @@
     onUpdateStatus,
     onUpdatePriority,
     onOpenWorkspaceFile,
+    onToggleChecklistItem,
   }: Props = $props();
 
   function handleMarkdownClick(event: MouseEvent) {
@@ -233,6 +244,46 @@
         <span class="compact-muted">No description.</span>
       {/if}
     </div>
+
+    {#snippet checklist(
+      title: string,
+      listType: 'acceptanceCriteria' | 'definitionOfDone',
+      items: ChecklistItem[]
+    )}
+      {@const checkedCount = items.filter((item) => item.checked).length}
+      <div class="compact-checklist-heading">
+        <span>{title}</span>
+        <span class="compact-checklist-progress" data-testid="compact-{listType}-progress">
+          {checkedCount} of {items.length} complete
+        </span>
+      </div>
+      <ul class="compact-checklist" data-testid="compact-{listType}">
+        {#each items as item (item.id)}
+          <li class="compact-checklist-item" class:checked={item.checked}>
+            <button
+              type="button"
+              class="compact-checklist-checkbox"
+              data-testid="compact-{listType}-toggle-{item.id}"
+              aria-pressed={item.checked}
+              disabled={isReadOnly}
+              title={isReadOnly ? 'Read-only task' : 'Toggle item'}
+              onclick={() => !isReadOnly && onToggleChecklistItem(listType, item.id)}
+            >
+              <span class="compact-checkbox">{item.checked ? '☑' : '☐'}</span>
+            </button>
+            <span class="compact-checklist-text">{item.text}</span>
+          </li>
+        {/each}
+      </ul>
+    {/snippet}
+
+    {#if task.acceptanceCriteria?.length}
+      {@render checklist('Acceptance Criteria', 'acceptanceCriteria', task.acceptanceCriteria)}
+    {/if}
+
+    {#if task.definitionOfDone?.length}
+      {@render checklist('Definition of Done', 'definitionOfDone', task.definitionOfDone)}
+    {/if}
 
     {#if planHtml}
       <div class="compact-description-heading">Implementation Plan</div>
@@ -488,6 +539,75 @@
 
   .compact-muted {
     color: var(--vscode-descriptionForeground);
+  }
+
+  .compact-checklist-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--vscode-descriptionForeground);
+    margin: 10px 0 5px;
+  }
+
+  .compact-checklist-progress {
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+  }
+
+  .compact-checklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .compact-checklist-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--vscode-foreground);
+  }
+
+  .compact-checklist-checkbox {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    color: var(--vscode-foreground);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .compact-checklist-checkbox:disabled {
+    cursor: default;
+    opacity: 0.7;
+  }
+
+  .compact-checklist-checkbox:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder, #007fd4);
+    outline-offset: 1px;
+  }
+
+  .compact-checklist-item.checked .compact-checklist-text {
+    text-decoration: line-through;
+    color: var(--vscode-descriptionForeground);
+  }
+
+  .compact-checklist-text {
+    overflow-wrap: anywhere;
   }
 
   .compact-subtasks-heading {

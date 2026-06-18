@@ -65,10 +65,35 @@ const readOnlyPreviewData = {
     source: 'local-branch' as const,
     branch: 'feature/other-work',
     filePath: '/workspace/.backlog/branches/feature/backlog/tasks/task-remote-5.md',
+    acceptanceCriteria: [{ id: 1, text: 'Read-only criterion', checked: false }],
   },
   statuses: ['To Do', 'In Progress', 'Done'],
   isReadOnly: true,
   readOnlyReason: 'Task is from feature/other-work and is read-only.',
+  subtaskSummaries: [],
+};
+
+// Mirrors a subtask whose only body content is a Description plus AC/DoD checklists
+// (the scenario from GitHub issue #30 where AC/DoD were missing from the preview).
+const checklistPreviewData = {
+  type: 'taskPreviewData' as const,
+  task: {
+    ...sampleTask,
+    id: 'TASK-10.1',
+    title: 'Subtask with checklists',
+    parentTaskId: 'TASK-10',
+    acceptanceCriteria: [
+      { id: 1, text: 'Scripts standardized', checked: true },
+      { id: 2, text: 'Campaign executed', checked: false },
+    ],
+    definitionOfDone: [{ id: 1, text: 'Tests pass', checked: false }],
+  },
+  descriptionHtml: '<p>A detailed description of the task.</p>',
+  planHtml: '',
+  notesHtml: '',
+  finalSummaryHtml: '',
+  statuses: ['To Do', 'In Progress', 'Done'],
+  isReadOnly: false,
   subtaskSummaries: [],
 };
 
@@ -339,6 +364,80 @@ test.describe('Task Preview Panel', () => {
 
     test('priority select is disabled', async ({ page }) => {
       await expect(page.locator('[data-testid="compact-priority-select"]')).toBeDisabled();
+    });
+  });
+
+  test.describe('Acceptance Criteria / Definition of Done checklists', () => {
+    test.beforeEach(async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/task-preview.html');
+      await page.waitForTimeout(100);
+      await postMessageToWebview(page, checklistPreviewData);
+      await page.waitForTimeout(50);
+    });
+
+    test('renders the Acceptance Criteria checklist with items and progress', async ({ page }) => {
+      const list = page.locator('[data-testid="compact-acceptanceCriteria"]');
+      await expect(list).toBeVisible();
+      await expect(list).toContainText('Scripts standardized');
+      await expect(list).toContainText('Campaign executed');
+      await expect(page.locator('[data-testid="compact-acceptanceCriteria-progress"]')).toHaveText(
+        '1 of 2 complete'
+      );
+    });
+
+    test('renders the Definition of Done checklist with items', async ({ page }) => {
+      const list = page.locator('[data-testid="compact-definitionOfDone"]');
+      await expect(list).toBeVisible();
+      await expect(list).toContainText('Tests pass');
+    });
+
+    test('hides AC and DoD sections when the task has no items', async ({ page }) => {
+      await postMessageToWebview(page, samplePreviewData);
+      await page.waitForTimeout(50);
+
+      await expect(page.locator('[data-testid="compact-acceptanceCriteria"]')).toHaveCount(0);
+      await expect(page.locator('[data-testid="compact-definitionOfDone"]')).toHaveCount(0);
+    });
+
+    test('clicking a checklist checkbox posts a toggleChecklistItem message', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      await page.locator('[data-testid="compact-acceptanceCriteria-toggle-2"]').click();
+
+      const message = await getLastPostedMessage(page);
+      expect(message).toMatchObject({
+        type: 'toggleChecklistItem',
+        listType: 'acceptanceCriteria',
+        itemId: 2,
+      });
+    });
+  });
+
+  test.describe('Read-only checklists', () => {
+    test.beforeEach(async ({ page }) => {
+      await installVsCodeMock(page);
+      await page.goto('/task-preview.html');
+      await page.waitForTimeout(100);
+      await postMessageToWebview(page, readOnlyPreviewData);
+      await page.waitForTimeout(50);
+    });
+
+    test('checklist checkbox is disabled for read-only tasks', async ({ page }) => {
+      await expect(
+        page.locator('[data-testid="compact-acceptanceCriteria-toggle-1"]')
+      ).toBeDisabled();
+    });
+
+    test('clicking a disabled checklist checkbox posts no message', async ({ page }) => {
+      await clearPostedMessages(page);
+
+      await page
+        .locator('[data-testid="compact-acceptanceCriteria-toggle-1"]')
+        .click({ force: true });
+
+      const messages = await getPostedMessages(page);
+      expect(messages.some((m) => m.type === 'toggleChecklistItem')).toBe(false);
     });
   });
 

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { TaskPreviewViewProvider } from '../../providers/TaskPreviewViewProvider';
 import { BacklogParser } from '../../core/BacklogParser';
+import { BacklogWriter } from '../../core/BacklogWriter';
 import { createMockExtensionContext } from '../mocks/vscode';
 
 describe('TaskPreviewViewProvider', () => {
@@ -422,6 +423,152 @@ describe('TaskPreviewViewProvider', () => {
         ]),
       })
     );
+  });
+
+  it('includes acceptanceCriteria and definitionOfDone in the preview task payload', async () => {
+    (parser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'TASK-9',
+      title: 'Task with checklists',
+      status: 'To Do',
+      assignee: [],
+      labels: [],
+      dependencies: [],
+      acceptanceCriteria: [
+        { id: 1, text: 'First criterion', checked: false },
+        { id: 2, text: 'Second criterion', checked: true },
+      ],
+      definitionOfDone: [{ id: 1, text: 'Tests pass', checked: false }],
+    });
+
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    webview.postMessage.mockClear();
+    await provider.selectTask({ taskId: 'TASK-9' });
+
+    expect(webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'taskPreviewData',
+        task: expect.objectContaining({
+          acceptanceCriteria: expect.arrayContaining([
+            expect.objectContaining({ id: 2, text: 'Second criterion', checked: true }),
+          ]),
+          definitionOfDone: expect.arrayContaining([
+            expect.objectContaining({ id: 1, text: 'Tests pass', checked: false }),
+          ]),
+        }),
+      })
+    );
+  });
+
+  it('persists a checklist toggle via the writer and refreshes the preview', async () => {
+    const toggleSpy = vi
+      .spyOn(BacklogWriter.prototype, 'toggleChecklistItem')
+      .mockResolvedValue(undefined);
+    const onTaskUpdated = vi.fn();
+
+    (parser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'TASK-1',
+      title: 'Test task',
+      status: 'To Do',
+      assignee: [],
+      labels: [],
+      dependencies: [],
+      filePath: '/repo/backlog/tasks/task-1.md',
+      acceptanceCriteria: [{ id: 1, text: 'First criterion', checked: false }],
+      definitionOfDone: [],
+    });
+
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext,
+      onTaskUpdated
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    await provider.selectTask({ taskId: 'TASK-1' });
+
+    const handler = webview.onDidReceiveMessage.mock.calls[0]?.[0];
+    expect(typeof handler).toBe('function');
+    webview.postMessage.mockClear();
+
+    await handler({ type: 'toggleChecklistItem', listType: 'acceptanceCriteria', itemId: 1 });
+
+    expect(toggleSpy).toHaveBeenCalledWith('TASK-1', 'acceptanceCriteria', 1, parser);
+    expect(onTaskUpdated).toHaveBeenCalled();
+    expect(webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'taskPreviewData',
+        task: expect.objectContaining({ id: 'TASK-1' }),
+      })
+    );
+
+    toggleSpy.mockRestore();
+  });
+
+  it('does not toggle checklist items for read-only cross-branch tasks', async () => {
+    const toggleSpy = vi
+      .spyOn(BacklogWriter.prototype, 'toggleChecklistItem')
+      .mockResolvedValue(undefined);
+
+    (parser.getTask as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'TASK-REMOTE-1',
+      title: 'Cross branch task',
+      status: 'To Do',
+      assignee: [],
+      labels: [],
+      dependencies: [],
+      source: 'local-branch',
+      branch: 'feature/other-work',
+      filePath: '/repo/.backlog/branches/feature/backlog/tasks/task-remote-1.md',
+      acceptanceCriteria: [{ id: 1, text: 'First criterion', checked: false }],
+      definitionOfDone: [],
+    });
+
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    await provider.selectTask({ taskId: 'TASK-REMOTE-1' });
+
+    const handler = webview.onDidReceiveMessage.mock.calls[0]?.[0];
+    await handler({ type: 'toggleChecklistItem', listType: 'acceptanceCriteria', itemId: 1 });
+
+    expect(toggleSpy).not.toHaveBeenCalled();
+
+    toggleSpy.mockRestore();
   });
 
   it('includes reverse dependency blocksTaskIds in preview task payload', async () => {
