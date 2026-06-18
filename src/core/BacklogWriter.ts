@@ -1191,7 +1191,7 @@ export class BacklogWriter {
    */
   async toggleChecklistItem(
     taskId: string,
-    _listType: 'acceptanceCriteria' | 'definitionOfDone',
+    listType: 'acceptanceCriteria' | 'definitionOfDone',
     itemId: number,
     parser: BacklogParser
   ): Promise<void> {
@@ -1204,16 +1204,64 @@ export class BacklogWriter {
     const hasCRLF = detectCRLF(rawContent);
     let content = normalizeToLF(rawContent);
 
-    // Find and toggle the specific checklist item by its #id
-    // This is in the markdown body, not YAML, so regex is appropriate here
+    // Find and toggle the specific checklist item by its #id.
+    // This is in the markdown body, not YAML, so regex is appropriate here.
     const regex = new RegExp(`^(- \\[)([ xX])(\\]\\s*#${itemId}\\s+.*)$`, 'gm');
-    content = content.replace(regex, (_match, prefix, check, suffix) => {
-      const newCheck = check === ' ' ? 'x' : ' ';
-      return `${prefix}${newCheck}${suffix}`;
-    });
+    const toggle = (_match: string, prefix: string, check: string, suffix: string) =>
+      `${prefix}${check === ' ' ? 'x' : ' '}${suffix}`;
+
+    // Scope the replace to the targeted section so that, e.g., toggling Acceptance
+    // Criteria #1 never flips Definition of Done #1 (both lists number from #1).
+    const range = this.findChecklistSectionRange(content, listType);
+    if (range) {
+      const before = content.slice(0, range.start);
+      const section = content.slice(range.start, range.end);
+      const after = content.slice(range.end);
+      content = before + section.replace(regex, toggle) + after;
+    } else {
+      content = content.replace(regex, toggle);
+    }
 
     fs.writeFileSync(task.filePath, restoreLineEndings(content, hasCRLF), 'utf-8');
     parser.invalidateTaskCache(task.filePath);
+  }
+
+  /**
+   * Locate the body range that holds a given checklist's items, so a toggle can be
+   * scoped to that section. Mirrors updateChecklistInBody's boundary logic:
+   *  1. Between the AC/DOD BEGIN/END markers when present
+   *  2. Otherwise from the section header to the next "## " heading (legacy files)
+   *  3. Returns null when neither is found (caller falls back to whole-document)
+   */
+  private findChecklistSectionRange(
+    content: string,
+    listType: 'acceptanceCriteria' | 'definitionOfDone'
+  ): { start: number; end: number } | null {
+    const isAC = listType === 'acceptanceCriteria';
+    const beginMarker = isAC ? '<!-- AC:BEGIN -->' : '<!-- DOD:BEGIN -->';
+    const endMarker = isAC ? '<!-- AC:END -->' : '<!-- DOD:END -->';
+    const sectionHeader = isAC ? '## Acceptance Criteria' : '## Definition of Done';
+
+    const beginIndex = content.indexOf(beginMarker);
+    const endIndex = content.indexOf(endMarker);
+    if (beginIndex !== -1 && endIndex !== -1 && endIndex > beginIndex) {
+      return { start: beginIndex + beginMarker.length, end: endIndex };
+    }
+
+    const headerRegex = new RegExp(
+      `^${sectionHeader.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
+      'm'
+    );
+    const match = content.match(headerRegex);
+    if (match && match.index !== undefined) {
+      const start = match.index + match[0].length;
+      const afterHeader = content.substring(start);
+      const nextSectionMatch = afterHeader.match(/^## /m);
+      const end = start + (nextSectionMatch?.index ?? afterHeader.length);
+      return { start, end };
+    }
+
+    return null;
   }
 
   /**

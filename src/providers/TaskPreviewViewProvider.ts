@@ -164,13 +164,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
       case 'updateTask': {
         const task = await this.parser.getTask(message.taskId);
         if (!task) return;
-
-        if (isReadOnlyTask(task)) {
-          vscode.window.showErrorMessage(
-            `Cannot update task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
-          );
-          return;
-        }
+        if (this.blockReadOnlyMutation(task, 'update task')) return;
 
         const updates: Partial<Task> = {};
         if (typeof message.updates.status === 'string') {
@@ -192,7 +186,37 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
         await this.refresh();
         return;
       }
+      case 'toggleChecklistItem': {
+        // Resolve the task carried in the message (the one whose checkbox was clicked),
+        // not selectedTaskRef, which may have changed before this message was handled.
+        const task = await this.resolveTask({
+          taskId: message.taskId,
+          filePath: message.filePath,
+          source: message.source,
+          branch: message.branch,
+        });
+        if (!task) return;
+        if (this.blockReadOnlyMutation(task, 'update checklist items')) return;
+
+        try {
+          const writer = new BacklogWriter();
+          await writer.toggleChecklistItem(task.id, message.listType, message.itemId, this.parser);
+          this.onTaskUpdated?.();
+          await this.refresh();
+        } catch (error) {
+          vscode.window.showErrorMessage(`Failed to toggle checklist item: ${error}`);
+        }
+        return;
+      }
     }
+  }
+
+  private blockReadOnlyMutation(task: Task | undefined, action: string): boolean {
+    if (!task || !isReadOnlyTask(task)) return false;
+    vscode.window.showErrorMessage(
+      `Cannot ${action}: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
+    );
+    return true;
   }
 
   private async resolveTask(taskRef: TaskSelectionRef): Promise<Task | undefined> {

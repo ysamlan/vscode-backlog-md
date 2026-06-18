@@ -144,6 +144,85 @@ status: To Do
       const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
       expect(writtenContent).toContain('- [ ] #1 First item');
     });
+
+    it('toggles only the targeted list when AC and DoD share an item number', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 AC first
+- [ ] #2 AC second
+<!-- AC:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [ ] #1 DoD first
+<!-- DOD:END -->
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.toggleChecklistItem('TASK-1', 'acceptanceCriteria', 1, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('- [x] #1 AC first');
+      expect(writtenContent).toContain('- [ ] #1 DoD first');
+    });
+
+    it('toggles the DoD item without affecting the AC item of the same number', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 AC first
+<!-- AC:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [ ] #1 DoD first
+- [ ] #2 DoD second
+<!-- DOD:END -->
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.toggleChecklistItem('TASK-1', 'definitionOfDone', 1, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('- [ ] #1 AC first');
+      expect(writtenContent).toContain('- [x] #1 DoD first');
+    });
+
+    it('scopes the toggle by section for legacy files without AC/DoD markers', async () => {
+      const content = `---
+id: TASK-1
+title: Test
+status: To Do
+---
+
+## Acceptance Criteria
+- [ ] #1 AC first
+
+## Definition of Done
+- [ ] #1 DoD first
+`;
+      vi.mocked(fs.readFileSync).mockReturnValue(content);
+      mockReaddirSync(['task-1.md']);
+
+      await writer.toggleChecklistItem('TASK-1', 'acceptanceCriteria', 1, mockParser);
+
+      const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+      expect(writtenContent).toContain('- [x] #1 AC first');
+      expect(writtenContent).toContain('- [ ] #1 DoD first');
+    });
   });
 
   describe('updateTask', () => {
