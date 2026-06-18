@@ -34,6 +34,7 @@ describe('TasksController', () => {
   }
 
   beforeEach(() => {
+    vi.clearAllMocks();
     posted = [];
     ready = true;
     mockContext = createMockExtensionContext() as unknown as vscode.ExtensionContext;
@@ -107,10 +108,10 @@ describe('TasksController', () => {
     expect(posted).toContainEqual({ type: 'activeEditedTaskChanged', taskId: 'TASK-7' });
   });
 
-  it('forwards selectTask to the registered selection handler', async () => {
+  it('sidebar host: selectTask drives the Details preview via the selection handler', async () => {
     vi.spyOn(TaskDetailProvider, 'hasActivePanel').mockReturnValue(false);
     const onSelect = vi.fn().mockResolvedValue(undefined);
-    const controller = new TasksController(host, mockParser, mockContext);
+    const controller = new TasksController(createHost('sidebar'), mockParser, mockContext);
     controller.setTaskSelectionHandler(onSelect);
 
     await controller.handleMessage({
@@ -126,6 +127,78 @@ describe('TasksController', () => {
       filePath: '/fake/backlog/tasks/task-42.md',
       source: 'local',
       branch: 'main',
+    });
+    // Sidebar single-click must not open a detail editor beside the board.
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
+      'backlog.openTaskDetail',
+      expect.anything(),
+      expect.objectContaining({ beside: true })
+    );
+  });
+
+  it('editor host: single-click peeks the detail beside, keeping focus on the board', async () => {
+    const onSelect = vi.fn().mockResolvedValue(undefined);
+    const controller = new TasksController(createHost('editor'), mockParser, mockContext);
+    controller.setTaskSelectionHandler(onSelect);
+
+    await controller.handleMessage({
+      type: 'selectTask',
+      taskId: 'TASK-42',
+      filePath: '/fake/backlog/tasks/task-42.md',
+      source: 'local',
+      branch: 'main',
+    });
+
+    // No sidebar preview handler from the editor host...
+    expect(onSelect).not.toHaveBeenCalled();
+    // ...instead the detail opens beside with focus retained on the board.
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'backlog.openTaskDetail',
+      {
+        taskId: 'TASK-42',
+        filePath: '/fake/backlog/tasks/task-42.md',
+        source: 'local',
+        branch: 'main',
+      },
+      { preserveFocus: true, beside: true }
+    );
+  });
+
+  it('editor host: double-click opens the detail beside and takes focus', async () => {
+    const controller = new TasksController(createHost('editor'), mockParser, mockContext);
+
+    await controller.handleMessage({
+      type: 'openTask',
+      taskId: 'TASK-9',
+      filePath: '/fake/backlog/tasks/task-9.md',
+    });
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'backlog.openTaskDetail',
+      {
+        taskId: 'TASK-9',
+        filePath: '/fake/backlog/tasks/task-9.md',
+        source: undefined,
+        branch: undefined,
+      },
+      { beside: true }
+    );
+  });
+
+  it('sidebar host: double-click opens the detail without the beside hint', async () => {
+    const controller = new TasksController(createHost('sidebar'), mockParser, mockContext);
+
+    await controller.handleMessage({
+      type: 'openTask',
+      taskId: 'TASK-9',
+      filePath: '/fake/backlog/tasks/task-9.md',
+    });
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith('backlog.openTaskDetail', {
+      taskId: 'TASK-9',
+      filePath: '/fake/backlog/tasks/task-9.md',
+      source: undefined,
+      branch: undefined,
     });
   });
 

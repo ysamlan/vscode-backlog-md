@@ -8,13 +8,21 @@ import * as vscode from 'vscode';
  * Both load the same compiled Svelte bundle (`dist/webview/tasks.js`) and mount
  * it into `#app`, so the markup is identical regardless of host.
  */
-export function getTasksWebviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
+export function getTasksWebviewHtml(
+  webview: vscode.Webview,
+  extensionUri: vscode.Uri,
+  options?: { extraBodyClass?: string }
+): string {
   const resourceUri = (file: string) =>
     webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', 'webview', file));
 
   const styleUri = resourceUri('styles.css');
   const componentStyleUri = resourceUri('tasks.css');
   const scriptUri = resourceUri('tasks.js');
+
+  // The sidebar host stays `tasks-page`; the editor-tab host adds an exclusive
+  // marker so tooling (e.g. CDP tests) can distinguish the two identical boards.
+  const bodyClass = options?.extraBodyClass ? `tasks-page ${options.extraBodyClass}` : 'tasks-page';
 
   // CSP allows our script and ES module imports from the same origin
   return `<!DOCTYPE html>
@@ -27,7 +35,7 @@ export function getTasksWebviewHtml(webview: vscode.Webview, extensionUri: vscod
     <link href="${componentStyleUri}" rel="stylesheet">
     <title>Tasks</title>
 </head>
-<body class="tasks-page">
+<body class="${bodyClass}">
     <div id="app"></div>
     <script type="module" src="${scriptUri}"></script>
 </body>

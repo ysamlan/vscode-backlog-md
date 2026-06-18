@@ -14,12 +14,22 @@
 import { CdpClient } from './CdpClient';
 
 /** Webview role corresponds to the body class set by each provider */
-export type WebviewRole = 'tasks' | 'preview' | 'detail';
+export type WebviewRole = 'tasks' | 'tasksEditor' | 'preview' | 'detail';
 
 const ROLE_CLASS_MAP: Record<WebviewRole, string> = {
   tasks: 'tasks-page',
+  tasksEditor: 'tasks-editor-page',
   preview: 'task-preview-page',
   detail: 'task-detail-page',
+};
+
+/**
+ * Classes that must be ABSENT for a role to match. The sidebar and editor-tab
+ * boards share `tasks-page`; this keeps the `tasks` role matching the sidebar
+ * only, even when both boards are open at once.
+ */
+const ROLE_EXCLUDE_CLASS_MAP: Partial<Record<WebviewRole, string>> = {
+  tasks: 'tasks-editor-page',
 };
 
 /**
@@ -119,6 +129,7 @@ export async function findWebviewByRole(cdp: CdpClient, role: WebviewRole): Prom
   // Discover and attach
   const targets = await discoverWebviewTargets(cdp);
   const bodyClass = ROLE_CLASS_MAP[role];
+  const excludeClass = ROLE_EXCLUDE_CLASS_MAP[role];
 
   for (const target of targets) {
     let sessionId: string;
@@ -132,7 +143,11 @@ export async function findWebviewByRole(cdp: CdpClient, role: WebviewRole): Prom
       const hasClass = await evaluateInWebview(
         cdp,
         sessionId,
-        `return doc.body?.classList?.contains(${JSON.stringify(bodyClass)}) ?? false;`
+        `return (doc.body?.classList?.contains(${JSON.stringify(bodyClass)}) ?? false)${
+          excludeClass
+            ? ` && !(doc.body?.classList?.contains(${JSON.stringify(excludeClass)}) ?? false)`
+            : ''
+        };`
       );
 
       if (hasClass) {

@@ -325,12 +325,19 @@ export class TasksController {
         break;
 
       case 'openTask': {
-        vscode.commands.executeCommand('backlog.openTaskDetail', {
+        const ref = {
           taskId: message.taskId,
           filePath: message.filePath,
           source: message.source,
           branch: message.branch,
-        });
+        };
+        // From the editor-tab board, a double-click opens the detail in the
+        // editor group beside the board and moves focus into it.
+        if (this.host.kind === 'editor') {
+          vscode.commands.executeCommand('backlog.openTaskDetail', ref, { beside: true });
+        } else {
+          vscode.commands.executeCommand('backlog.openTaskDetail', ref);
+        }
         break;
       }
 
@@ -341,9 +348,18 @@ export class TasksController {
           source: message.source,
           branch: message.branch,
         };
-        // Always update the sidebar preview
+        // From the editor-tab board, a single-click peeks: open/update the
+        // detail in the group beside the board while keeping focus on the board.
+        if (this.host.kind === 'editor') {
+          vscode.commands.executeCommand('backlog.openTaskDetail', taskRef, {
+            preserveFocus: true,
+            beside: true,
+          });
+          break;
+        }
+        // Sidebar: drive the Details preview pane...
         await this.onSelectTask?.(taskRef);
-        // Also update the full edit view when a detail panel is already active
+        // ...and also update the full edit view when a detail panel is already active.
         if (TaskDetailProvider.hasActivePanel()) {
           vscode.commands.executeCommand('backlog.openTaskDetail', taskRef, {
             preserveFocus: true,

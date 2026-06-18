@@ -518,6 +518,52 @@ describe('Cross-view CDP tests', () => {
     );
     expect(value).toContain('New description content for testing debounce');
   }, 60_000);
+
+  it('editor-tab board opens and stays in sync with the sidebar and disk', async () => {
+    // 1. Open the sidebar board, then the editor-tab board.
+    await executeCommand(instance.cdp, 'backlog.openKanban');
+    await waitForWebviewContent(instance.cdp, 'tasks', 'TASK-', { timeoutMs: 10_000 });
+
+    await executeCommand(instance.cdp, 'backlog.openTasksInEditor');
+    await waitForWebviewContent(instance.cdp, 'tasksEditor', 'TASK-', { timeoutMs: 10_000 });
+
+    // 2. The editor-tab board shows the same tasks as the sidebar.
+    const editorText = await getWebviewTextContent(instance.cdp, 'tasksEditor');
+    expect(editorText).toContain('Test task for e2e');
+
+    // 3. Edit TASK-1's title on disk, then refresh.
+    const taskFile = taskFilePath(workspacePath, 'task-1 - Test-task-for-e2e.md');
+    const sentinel = 'Synced editor-tab title';
+    const original = fs.readFileSync(taskFile, 'utf-8');
+    fs.writeFileSync(taskFile, original.replace('title: Test task for e2e', `title: ${sentinel}`));
+    await executeCommand(instance.cdp, 'backlog.refresh');
+
+    // 4. BOTH the sidebar and the editor-tab board reflect the change.
+    const sidebarAfter = await waitForWebviewContent(instance.cdp, 'tasks', sentinel, {
+      timeoutMs: 10_000,
+    });
+    const editorAfter = await waitForWebviewContent(instance.cdp, 'tasksEditor', sentinel, {
+      timeoutMs: 10_000,
+    });
+    expect(sidebarAfter).toContain(sentinel);
+    expect(editorAfter).toContain(sentinel);
+  }, 60_000);
+
+  it('single-click in the editor-tab board peeks the task detail beside it', async () => {
+    // 1. Open the editor-tab board.
+    await executeCommand(instance.cdp, 'backlog.openTasksInEditor');
+    await waitForWebviewContent(instance.cdp, 'tasksEditor', 'TASK-', { timeoutMs: 10_000 });
+
+    // 2. Single-click a card — from the editor host this opens the detail beside.
+    const clicked = await clickInWebview(instance.cdp, 'tasksEditor', '[data-task-id="TASK-2"]');
+    expect(clicked).toBe(true);
+
+    // 3. The full detail panel opens showing the clicked task.
+    const detailText = await waitForWebviewContent(instance.cdp, 'detail', 'TASK-2', {
+      timeoutMs: 10_000,
+    });
+    expect(detailText).toContain('TASK-2');
+  }, 45_000);
 });
 
 /**
