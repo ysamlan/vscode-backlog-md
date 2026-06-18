@@ -93,7 +93,18 @@
     listType: 'acceptanceCriteria' | 'definitionOfDone',
     itemId: number
   ) {
-    vscode.postMessage({ type: 'toggleChecklistItem', listType, itemId });
+    if (!task) return;
+    // Send the displayed task's identity so the extension toggles the task whose
+    // checkbox was clicked, not whatever happens to be selected when the message lands.
+    vscode.postMessage({
+      type: 'toggleChecklistItem',
+      taskId: task.id,
+      filePath: task.filePath,
+      source: task.source,
+      branch: task.branch,
+      listType,
+      itemId,
+    });
   }
 
   onMount(() => {

@@ -408,6 +408,7 @@ test.describe('Task Preview Panel', () => {
       const message = await getLastPostedMessage(page);
       expect(message).toMatchObject({
         type: 'toggleChecklistItem',
+        taskId: 'TASK-10.1',
         listType: 'acceptanceCriteria',
         itemId: 2,
       });

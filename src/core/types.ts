@@ -224,6 +224,9 @@ export type WebviewMessage =
       taskId: string;
       listType: 'acceptanceCriteria' | 'definitionOfDone';
       itemId: number;
+      filePath?: string;
+      source?: TaskSource;
+      branch?: string;
     }
   | { type: 'toggleColumnCollapse'; status: string }
   | { type: 'toggleMilestoneGrouping'; enabled: boolean }

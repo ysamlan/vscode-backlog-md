@@ -513,7 +513,12 @@ describe('TaskPreviewViewProvider', () => {
     expect(typeof handler).toBe('function');
     webview.postMessage.mockClear();
 
-    await handler({ type: 'toggleChecklistItem', listType: 'acceptanceCriteria', itemId: 1 });
+    await handler({
+      type: 'toggleChecklistItem',
+      taskId: 'TASK-1',
+      listType: 'acceptanceCriteria',
+      itemId: 1,
+    });
 
     expect(toggleSpy).toHaveBeenCalledWith('TASK-1', 'acceptanceCriteria', 1, parser);
     expect(onTaskUpdated).toHaveBeenCalled();
@@ -523,6 +528,56 @@ describe('TaskPreviewViewProvider', () => {
         task: expect.objectContaining({ id: 'TASK-1' }),
       })
     );
+
+    toggleSpy.mockRestore();
+  });
+
+  it('toggles the task carried in the message, not the currently selected task', async () => {
+    const toggleSpy = vi
+      .spyOn(BacklogWriter.prototype, 'toggleChecklistItem')
+      .mockResolvedValue(undefined);
+
+    (parser.getTask as ReturnType<typeof vi.fn>).mockImplementation(async (taskId: string) => ({
+      id: taskId,
+      title: `Task ${taskId}`,
+      status: 'To Do',
+      assignee: [],
+      labels: [],
+      dependencies: [],
+      filePath: `/repo/backlog/tasks/${taskId}.md`,
+      acceptanceCriteria: [{ id: 1, text: 'First criterion', checked: false }],
+      definitionOfDone: [],
+    }));
+
+    const provider = new TaskPreviewViewProvider(
+      extensionUri,
+      parser,
+      createMockExtensionContext() as unknown as vscode.ExtensionContext
+    );
+
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {
+        isCancellationRequested: false,
+        onCancellationRequested: vi.fn(),
+      } as vscode.CancellationToken
+    );
+
+    // The panel last selected TASK-B, but the user clicked a checkbox on TASK-A
+    // (still rendered) before the refresh landed.
+    await provider.selectTask({ taskId: 'TASK-B' });
+
+    const handler = webview.onDidReceiveMessage.mock.calls[0]?.[0];
+    await handler({
+      type: 'toggleChecklistItem',
+      taskId: 'TASK-A',
+      listType: 'acceptanceCriteria',
+      itemId: 1,
+    });
+
+    expect(toggleSpy).toHaveBeenCalledWith('TASK-A', 'acceptanceCriteria', 1, parser);
+    expect(toggleSpy).not.toHaveBeenCalledWith('TASK-B', 'acceptanceCriteria', 1, parser);
 
     toggleSpy.mockRestore();
   });
@@ -564,7 +619,12 @@ describe('TaskPreviewViewProvider', () => {
     await provider.selectTask({ taskId: 'TASK-REMOTE-1' });
 
     const handler = webview.onDidReceiveMessage.mock.calls[0]?.[0];
-    await handler({ type: 'toggleChecklistItem', listType: 'acceptanceCriteria', itemId: 1 });
+    await handler({
+      type: 'toggleChecklistItem',
+      taskId: 'TASK-REMOTE-1',
+      listType: 'acceptanceCriteria',
+      itemId: 1,
+    });
 
     expect(toggleSpy).not.toHaveBeenCalled();
 

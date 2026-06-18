@@ -187,8 +187,14 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
         return;
       }
       case 'toggleChecklistItem': {
-        if (!this.selectedTaskRef) return;
-        const task = await this.resolveTask(this.selectedTaskRef);
+        // Resolve the task carried in the message (the one whose checkbox was clicked),
+        // not selectedTaskRef, which may have changed before this message was handled.
+        const task = await this.resolveTask({
+          taskId: message.taskId,
+          filePath: message.filePath,
+          source: message.source,
+          branch: message.branch,
+        });
         if (!task) return;
         if (this.blockReadOnlyMutation(task, 'update checklist items')) return;
 
