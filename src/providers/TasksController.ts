@@ -331,15 +331,11 @@ export class TasksController {
           source: message.source,
           branch: message.branch,
         };
-        // From the editor-tab board, a double-click opens the detail as a tab in
-        // the board's own editor group and moves focus into it.
-        if (this.host.kind === 'editor') {
-          vscode.commands.executeCommand('backlog.openTaskDetail', ref, {
-            viewColumn: vscode.ViewColumn.Active,
-          });
-        } else {
-          vscode.commands.executeCommand('backlog.openTaskDetail', ref);
-        }
+        // From the editor-tab board, open the detail as a tab in the board's own
+        // editor group (and focus it); the sidebar opens it in the default column.
+        const options =
+          this.host.kind === 'editor' ? { viewColumn: vscode.ViewColumn.Active } : undefined;
+        vscode.commands.executeCommand('backlog.openTaskDetail', ref, options);
         break;
       }
 

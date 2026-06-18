@@ -10,7 +10,7 @@ import { TaskCreatePanel } from './providers/TaskCreatePanel';
 import { FileWatcher } from './core/FileWatcher';
 import { BacklogCli } from './core/BacklogCli';
 import { createDebouncedHandler } from './core/debounce';
-import type { TaskSource } from './core/types';
+import type { TaskSource, DataSourceMode } from './core/types';
 import { createBacklogDocumentSelector } from './language/documentSelector';
 import { BacklogCompletionProvider } from './language/BacklogCompletionProvider';
 import { BacklogDocumentLinkProvider } from './language/BacklogDocumentLinkProvider';
@@ -22,6 +22,20 @@ import { detectPackageManager } from './core/AgentIntegrationDetector';
 let fileWatcher: FileWatcher | undefined;
 let crossBranchStatusBarItem: vscode.StatusBarItem | undefined;
 let workspaceStatusBarItem: vscode.StatusBarItem | undefined;
+
+/**
+ * The cross-cutting surface both Tasks board hosts (sidebar `TasksViewProvider`
+ * and editor-tab `TasksPanelProvider`) expose, so activation can fan updates out
+ * to all of them at once instead of poking each by name.
+ */
+interface TasksBoardSurface {
+  refresh(): Promise<void>;
+  setParser(parser: BacklogParser): void;
+  setWorkspaceRoot(root: string): void;
+  setDataSourceMode(mode: DataSourceMode, reason?: string): void;
+  setActiveEditedTaskId(taskId: string | null): void;
+  checkAndSendIntegrationState(): Promise<void>;
+}
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('[Backlog.md] Extension activating...');
@@ -103,17 +117,18 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('backlog.kanban', tasksProvider)
   );
-  // Set workspace root for integration detection
-  if (activeRoot?.workspaceFolder) {
-    tasksProvider.setWorkspaceRoot(activeRoot.workspaceFolder.uri.fsPath);
-  }
   console.log('[Backlog.md] Tasks view provider registered');
 
   // Editor-tab host for the same Tasks board (opened on demand, synced via disk)
   const tasksPanelProvider = new TasksPanelProvider(context.extensionUri, parser, context);
   context.subscriptions.push(tasksPanelProvider);
-  if (activeRoot?.workspaceFolder) {
-    tasksPanelProvider.setWorkspaceRoot(activeRoot.workspaceFolder.uri.fsPath);
+
+  // Both Tasks board surfaces (sidebar + editor tab) are driven together — fan
+  // every cross-cutting update out to all of them so they stay in sync.
+  const tasksHosts: TasksBoardSurface[] = [tasksProvider, tasksPanelProvider];
+  const workspaceRootPath = activeRoot?.workspaceFolder?.uri.fsPath;
+  if (workspaceRootPath) {
+    tasksHosts.forEach((host) => host.setWorkspaceRoot(workspaceRootPath));
   }
 
   const taskPreviewProvider = new TaskPreviewViewProvider(
@@ -137,10 +152,9 @@ export function activate(context: vscode.ExtensionContext) {
   }
   console.log('[Backlog.md] Task detail provider created');
 
-  // Track active edited task for sidebar highlighting and routing
+  // Track active edited task for board highlighting and routing
   TaskDetailProvider.onActiveTaskChanged((taskId) => {
-    tasksProvider.setActiveEditedTaskId(taskId);
-    tasksPanelProvider.setActiveEditedTaskId(taskId);
+    tasksHosts.forEach((host) => host.setActiveEditedTaskId(taskId));
   });
 
   // Create Content Detail provider for opening docs/decisions in editor
@@ -166,8 +180,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Wire debounced refresh
     const debouncedRefresh = createDebouncedHandler((uri: vscode.Uri) => {
       console.log('[Backlog.md] Debounced refresh triggered');
-      tasksProvider.refresh();
-      tasksPanelProvider.refresh();
+      tasksHosts.forEach((host) => host.refresh());
       taskPreviewProvider.refresh();
       TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
     }, 300);
@@ -177,11 +190,10 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Update all view providers
     if (root.workspaceFolder) {
-      tasksProvider.setWorkspaceRoot(root.workspaceFolder.uri.fsPath);
-      tasksPanelProvider.setWorkspaceRoot(root.workspaceFolder.uri.fsPath);
+      const fsPath = root.workspaceFolder.uri.fsPath;
+      tasksHosts.forEach((host) => host.setWorkspaceRoot(fsPath));
     }
-    tasksProvider.setParser(parser);
-    tasksPanelProvider.setParser(parser);
+    tasksHosts.forEach((host) => host.setParser(parser!));
     taskPreviewProvider.setParser(parser);
     taskDetailProvider.setParser(parser);
     taskDetailProvider.setBacklogPath(root.backlogPath);
@@ -191,15 +203,13 @@ export function activate(context: vscode.ExtensionContext) {
     registerLanguageProviders(parser, root.backlogDir);
 
     // Refresh views
-    tasksProvider.refresh();
-    tasksPanelProvider.refresh();
+    tasksHosts.forEach((host) => host.refresh());
 
     // Check cross-branch config for the new root
-    checkCrossBranchConfig(parser, context, tasksProvider, tasksPanelProvider);
+    checkCrossBranchConfig(parser, context, tasksHosts);
 
     // Check agent integration status for the new root
-    tasksProvider.checkAndSendIntegrationState();
-    tasksPanelProvider.checkAndSendIntegrationState();
+    tasksHosts.forEach((host) => host.checkAndSendIntegrationState());
 
     // Update workspace status bar
     updateWorkspaceStatusBar(manager);
@@ -706,8 +716,7 @@ export function activate(context: vscode.ExtensionContext) {
   if (fileWatcher) {
     const debouncedRefresh = createDebouncedHandler((uri: vscode.Uri) => {
       console.log('[Backlog.md] Debounced refresh triggered');
-      tasksProvider.refresh();
-      tasksPanelProvider.refresh();
+      tasksHosts.forEach((host) => host.refresh());
       taskPreviewProvider.refresh();
       TaskDetailProvider.onFileChanged(uri, taskDetailProvider);
     }, 300);
@@ -720,17 +729,15 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration('backlog.taskIdDisplay')) {
-        tasksProvider.refresh();
-        tasksPanelProvider.refresh();
+        tasksHosts.forEach((host) => host.refresh());
       }
     })
   );
 
   // Check for cross-branch feature configuration and CLI availability
   if (parser) {
-    checkCrossBranchConfig(parser, context, tasksProvider, tasksPanelProvider);
-    tasksProvider.checkAndSendIntegrationState();
-    tasksPanelProvider.checkAndSendIntegrationState();
+    checkCrossBranchConfig(parser, context, tasksHosts);
+    tasksHosts.forEach((host) => host.checkAndSendIntegrationState());
   }
 
   console.log('[Backlog.md] Extension activation complete!');
@@ -756,8 +763,7 @@ export function deactivate() {
 async function checkCrossBranchConfig(
   parser: BacklogParser,
   context: vscode.ExtensionContext,
-  tasksProvider: TasksViewProvider,
-  tasksPanelProvider: TasksPanelProvider
+  tasksHosts: TasksBoardSurface[]
 ): Promise<void> {
   try {
     const config = await parser.getConfig();
@@ -779,9 +785,8 @@ async function checkCrossBranchConfig(
     // Update to show cross-branch mode
     BacklogCli.updateStatusBarItem(crossBranchStatusBarItem, 'cross-branch');
 
-    // Notify the tasks providers about the data source mode
-    tasksProvider.setDataSourceMode('cross-branch');
-    tasksPanelProvider.setDataSourceMode('cross-branch');
+    // Notify the tasks boards about the data source mode
+    tasksHosts.forEach((host) => host.setDataSourceMode('cross-branch'));
   } catch (error) {
     console.error('[Backlog.md] Error checking cross-branch config:', error);
   }

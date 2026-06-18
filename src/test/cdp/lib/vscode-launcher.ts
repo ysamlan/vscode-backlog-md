@@ -156,6 +156,38 @@ export function ensureCompatibleVsCodeBinary(
   return redownloadLinuxVsCode();
 }
 
+/**
+ * Download latest stable VS Code for macOS into `.vscode-test/`. Mirrors
+ * `redownloadLinuxVsCode` (uses `ditto` to preserve the .app bundle). Used to
+ * auto-provision a binary on a fresh Mac, since `bun run test:cdp` and direct
+ * vitest runs both reach here via `findVsCodeBinary`.
+ */
+function downloadMacVsCode(): string {
+  const slug = process.arch === 'arm64' ? 'darwin-arm64' : 'darwin';
+  const extractTo = path.join(PROJECT_ROOT, '.vscode-test');
+  const tmpArchive = path.join(os.tmpdir(), `vscode-mac-${slug}-${process.pid}.zip`);
+
+  console.log(`[vscode-launcher] downloading latest-stable VS Code for ${slug}...`);
+  fs.mkdirSync(extractTo, { recursive: true });
+  execSync(
+    `curl -fsSL "https://update.code.visualstudio.com/latest/${slug}/stable" -o "${tmpArchive}"`,
+    { stdio: ['ignore', 'inherit', 'inherit'] }
+  );
+  // ditto preserves the .app bundle's symlinks/permissions; unzip mangles them.
+  execSync(`ditto -x -k "${tmpArchive}" "${extractTo}"`, {
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
+  fs.rmSync(tmpArchive, { force: true });
+
+  const newBin = path.join(extractTo, 'Visual Studio Code.app/Contents/MacOS/Electron');
+  if (!fs.existsSync(newBin)) {
+    throw new Error(`mac download produced no binary at ${newBin}`);
+  }
+  const newVersion = readVsCodeBinaryVersion(newBin) ?? 'unknown';
+  console.log(`[vscode-launcher] fresh VS Code ${newVersion} installed at ${newBin}`);
+  return newBin;
+}
+
 /** Find the VS Code / Code binary for the current platform */
 export function findVsCodeBinary(): string {
   const isMac = process.platform === 'darwin';
@@ -167,6 +199,9 @@ export function findVsCodeBinary(): string {
       '.vscode-test/Visual Studio Code.app/Contents/MacOS/Electron'
     );
     if (fs.existsSync(macBin)) return macBin;
+    // No managed binary yet — provision one (the Homebrew `code` shim is
+    // unreliable for an isolated --remote-debugging-port launch).
+    return downloadMacVsCode();
   }
 
   if (isLinux) {

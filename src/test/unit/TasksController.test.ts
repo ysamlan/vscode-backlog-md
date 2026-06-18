@@ -194,12 +194,17 @@ describe('TasksController', () => {
       filePath: '/fake/backlog/tasks/task-9.md',
     });
 
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith('backlog.openTaskDetail', {
-      taskId: 'TASK-9',
-      filePath: '/fake/backlog/tasks/task-9.md',
-      source: undefined,
-      branch: undefined,
-    });
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'backlog.openTaskDetail',
+      {
+        taskId: 'TASK-9',
+        filePath: '/fake/backlog/tasks/task-9.md',
+        source: undefined,
+        branch: undefined,
+      },
+      // Sidebar passes no placement options (opens in the default column).
+      undefined
+    );
   });
 
   it('blocks status updates for read-only cross-branch tasks', async () => {

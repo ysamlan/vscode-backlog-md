@@ -103,9 +103,7 @@ export class TasksPanelProvider {
     if (this.workspaceRoot) {
       controller.setWorkspaceRoot(this.workspaceRoot);
     }
-    if (this.dataSourceMode !== 'local-only') {
-      controller.setDataSourceMode(this.dataSourceMode, this.dataSourceReason);
-    }
+    controller.setDataSourceMode(this.dataSourceMode, this.dataSourceReason);
 
     panel.webview.html = getTasksWebviewHtml(panel.webview, this.extensionUri, {
       extraBodyClass: 'tasks-editor-page',
