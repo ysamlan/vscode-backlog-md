@@ -549,12 +549,13 @@ describe('Cross-view CDP tests', () => {
     expect(editorAfter).toContain(sentinel);
   }, 60_000);
 
-  it('single-click in the editor-tab board peeks the task detail beside it', async () => {
+  it('single-click in the editor-tab board opens the task detail', async () => {
     // 1. Open the editor-tab board.
     await executeCommand(instance.cdp, 'backlog.openTasksInEditor');
     await waitForWebviewContent(instance.cdp, 'tasksEditor', 'TASK-', { timeoutMs: 10_000 });
 
-    // 2. Single-click a card — from the editor host this opens the detail beside.
+    // 2. Single-click a card — from the editor host this opens the detail as a
+    //    tab in the board's own editor group.
     const clicked = await clickInWebview(instance.cdp, 'tasksEditor', '[data-task-id="TASK-2"]');
     expect(clicked).toBe(true);
 

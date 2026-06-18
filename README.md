@@ -18,7 +18,7 @@ You can think of it as Trello or a lightweight Jira - but that lives right in yo
 
 - **Kanban Board** — Drag-and-drop tasks between status columns (Draft, To Do, In Progress, Done)
 - **Task List** — Sortable, filterable table view with search and column customization
-- **Open in an editor tab** — View the board full-width in the editor area, not just the sidebar (the "Open Board in Editor Tab" toolbar button or command). The editor tab and sidebar stay in sync; clicking a task there opens its details in a pane beside the board.
+- **Open in an editor tab** — View the board full-width in the editor area, not just the sidebar (the "Open Board in Editor Tab" toolbar button or command). The editor tab and sidebar stay in sync; clicking a task there opens its details as an editor tab (the board is a tab-click away).
 - **Rich Markdown rendering** — Including styling and [Mermaid.js](https://mermaid.js.org/) diagrams
 - **Format-aware editing** — Status dropdowns, quick linking of dependencies, Markdown shortcuts in descriptions, and checklist management for acceptance criteria / definition-of-done
 - **Real-time Sync** — File watcher automatically syncs changes from disk

@@ -331,10 +331,12 @@ export class TasksController {
           source: message.source,
           branch: message.branch,
         };
-        // From the editor-tab board, a double-click opens the detail in the
-        // editor group beside the board and moves focus into it.
+        // From the editor-tab board, a double-click opens the detail as a tab in
+        // the board's own editor group and moves focus into it.
         if (this.host.kind === 'editor') {
-          vscode.commands.executeCommand('backlog.openTaskDetail', ref, { beside: true });
+          vscode.commands.executeCommand('backlog.openTaskDetail', ref, {
+            viewColumn: vscode.ViewColumn.Active,
+          });
         } else {
           vscode.commands.executeCommand('backlog.openTaskDetail', ref);
         }
@@ -348,12 +350,13 @@ export class TasksController {
           source: message.source,
           branch: message.branch,
         };
-        // From the editor-tab board, a single-click peeks: open/update the
-        // detail in the group beside the board while keeping focus on the board.
+        // From the editor-tab board, a single-click opens/updates the detail as a
+        // tab in the board's own editor group (reusing one detail tab), keeping
+        // focus on the board so quick card-to-card browsing stays fluid.
         if (this.host.kind === 'editor') {
           vscode.commands.executeCommand('backlog.openTaskDetail', taskRef, {
             preserveFocus: true,
-            beside: true,
+            viewColumn: vscode.ViewColumn.Active,
           });
           break;
         }

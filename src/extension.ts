@@ -360,7 +360,7 @@ export function activate(context: vscode.ExtensionContext) {
       'backlog.openTaskDetail',
       (
         task: string | { taskId: string; filePath?: string; source?: TaskSource; branch?: string },
-        options?: { preserveFocus?: boolean }
+        options?: { preserveFocus?: boolean; viewColumn?: vscode.ViewColumn }
       ) => {
         taskDetailProvider.openTask(task, options);
       }

@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude-opus'
 created_date: '2026-06-18 16:29'
-updated_date: '2026-06-18 18:53'
+updated_date: '2026-06-18 19:51'
 labels:
   - feature
   - ui
@@ -55,7 +55,7 @@ Local context for the implementer:
 - [x] #2 The editor-tab board supports the same views and interactions as the sidebar: kanban/list/drafts/archived/dashboard/docs/decisions, drag-and-drop, status change, reorder, column collapse, and milestone grouping.
 - [x] #3 Editing a task (on disk, via either board, or via the detail editor) live-updates BOTH the sidebar board and the editor-tab board when both are open.
 - [x] #4 Each board independently remembers its own view mode, filters, and collapsed columns; changing one does not change the other.
-- [x] #5 Single-click in the editor-tab board opens/updates the task detail in an editor group beside the board with focus retained on the board; double-click opens beside and moves focus into the detail.
+- [x] #5 Clicking a task in the editor-tab board opens/updates the task detail as an editor tab in the board's own group (reusing a single detail tab, not a split); double-click also moves focus into the detail.
 - [x] #6 Sidebar board single-click behavior (Details preview pane) is unchanged.
 - [x] #7 There is a discoverable way to open the editor tab (command palette entry at minimum).
 - [x] #8 Tests cover the new panel/controller wiring and cross-view sync: unit coverage where possible, plus a CDP cross-view test for sidebar↔tab↔disk sync per the project testing strategy.
@@ -80,6 +80,8 @@ Steps:
 7. Tests: extend TasksController.test.ts (editor-host select=peek-beside, open=focus-beside; sidebar select still calls onSelectTask) + new TasksPanelProvider unit test (mock createWebviewPanel) + a CDP cross-view test for sidebar↔tab↔disk sync (assess harness; may require the CDP env to run). Update README.
 
 Per-host view state is satisfied at runtime: sidebar and panel controllers each hold their own viewMode/filters/collapsed in memory (globalState is shared as the initial default, last-writer-wins on restart) — runtime independence holds since neither broadcasts to the other.
+
+UX revision (maintainer feedback after trying it): the always-on side-by-side split felt heavy. Change the editor-tab board to open the task detail as a normal editor tab in the board's OWN group (ViewColumn.Active), reusing the single detail panel, instead of ViewColumn.Beside. No setting (declined). Keep single-click opens / double-click opens+focus. Impl: replace the `beside` option on TaskDetailProvider.openTask with `viewColumn?` (default ViewColumn.One = sidebar behavior unchanged); controller editor branch passes ViewColumn.Active. Update unit tests (expect viewColumn Active, not beside), CDP test name/comment (same-group, not beside), and README wording ("editor tab", not "pane beside").
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -101,4 +103,6 @@ Tests: extended TasksController.test.ts (editor peek-beside, editor open-beside-
 VERIFICATION GAP — read before merge: unit suite (919) + lint + typecheck + esbuild compile all pass locally. The two new CDP tests are written to the existing harness patterns but were NOT executed locally: this machine has no VS Code binary and `test:cdp` launches a real VS Code (Darwin, no xvfb), so CDP must be validated in CI / the dedicated CDP environment. AC#8 is checked on the basis that the test artifacts exist and unit coverage is green; the CDP portion is pending a real run.
 
 VERIFICATION GAP RESOLVED — CDP tests now run and pass locally on macOS. Enabled local CDP testing without affecting CI (CI curls its own linux-x64 binary and invokes vitest directly, bypassing run-cdp-tests.sh): (1) scripts/run-cdp-tests.sh now self-provisions a VS Code binary on macOS when .vscode-test/ is empty (curl latest stable darwin-<arch> + ditto), idempotent and mac-only; (2) running it surfaced a real bug the unit tests could not — the CDP executeCommand helper triggers commands via registered keybindings, and the new backlog.openTasksInEditor command had none, so I added it to COMMAND_KEYBINDINGS (ctrl+shift+alt+e) and made the launcher derive keybindings.json from the shared KEYBINDINGS_JSON (single source of truth, prevents future drift). Full CDP suite now green locally: 12/12 (10 existing + the 2 new editor-tab tests), VS Code 1.124.2 on darwin-arm64. AC#8 fully verified.
+
+UX revision applied (same-group tab, not split). Replaced the `beside` option on TaskDetailProvider.openTask with `viewColumn?` (default ViewColumn.One = sidebar unchanged); the editor-host branch of TasksController now passes ViewColumn.Active so the detail opens as a tab in the board's own editor group, reusing the single detail panel. Single-click opens with preserveFocus (board keeps focus); double-click opens + focuses. Updated backlog.openTaskDetail command option type, controller unit tests (assert viewColumn: Active), the CDP test name/comment, and README wording ("editor tab", not "pane beside"). Re-verified: full unit suite 919 + lint + typecheck + build green; full CDP suite 12/12 green locally.
 <!-- SECTION:NOTES:END -->

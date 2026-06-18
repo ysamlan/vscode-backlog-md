@@ -128,7 +128,7 @@ export class TaskDetailProvider {
    */
   async openTask(
     taskRef: string | OpenTaskRequest,
-    options?: { preserveFocus?: boolean; beside?: boolean }
+    options?: { preserveFocus?: boolean; viewColumn?: vscode.ViewColumn }
   ): Promise<void> {
     if (!this.parser) {
       vscode.window.showErrorMessage('No backlog folder found');
@@ -153,8 +153,9 @@ export class TaskDetailProvider {
     }
 
     // Default placement is the first editor column (sidebar-originated opens).
-    // Editor-tab board opens pass `beside: true` to peek/open alongside the board.
-    const column = options?.beside ? vscode.ViewColumn.Beside : vscode.ViewColumn.One;
+    // The editor-tab board passes ViewColumn.Active so the detail opens as a tab
+    // in the board's own editor group rather than a split.
+    const column = options?.viewColumn ?? vscode.ViewColumn.One;
 
     // If we already have a panel, show it and update content
     if (TaskDetailProvider.currentPanel) {

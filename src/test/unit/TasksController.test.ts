@@ -128,15 +128,15 @@ describe('TasksController', () => {
       source: 'local',
       branch: 'main',
     });
-    // Sidebar single-click must not open a detail editor beside the board.
+    // Sidebar single-click must not open a detail editor in a specific column.
     expect(vscode.commands.executeCommand).not.toHaveBeenCalledWith(
       'backlog.openTaskDetail',
       expect.anything(),
-      expect.objectContaining({ beside: true })
+      expect.objectContaining({ viewColumn: vscode.ViewColumn.Active })
     );
   });
 
-  it('editor host: single-click peeks the detail beside, keeping focus on the board', async () => {
+  it('editor host: single-click opens the detail as a tab in the board group, focus kept on board', async () => {
     const onSelect = vi.fn().mockResolvedValue(undefined);
     const controller = new TasksController(createHost('editor'), mockParser, mockContext);
     controller.setTaskSelectionHandler(onSelect);
@@ -151,7 +151,7 @@ describe('TasksController', () => {
 
     // No sidebar preview handler from the editor host...
     expect(onSelect).not.toHaveBeenCalled();
-    // ...instead the detail opens beside with focus retained on the board.
+    // ...instead the detail opens in the board's own group, focus retained on the board.
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       'backlog.openTaskDetail',
       {
@@ -160,11 +160,11 @@ describe('TasksController', () => {
         source: 'local',
         branch: 'main',
       },
-      { preserveFocus: true, beside: true }
+      { preserveFocus: true, viewColumn: vscode.ViewColumn.Active }
     );
   });
 
-  it('editor host: double-click opens the detail beside and takes focus', async () => {
+  it('editor host: double-click opens the detail in the board group and takes focus', async () => {
     const controller = new TasksController(createHost('editor'), mockParser, mockContext);
 
     await controller.handleMessage({
@@ -181,7 +181,7 @@ describe('TasksController', () => {
         source: undefined,
         branch: undefined,
       },
-      { beside: true }
+      { viewColumn: vscode.ViewColumn.Active }
     );
   });
 
