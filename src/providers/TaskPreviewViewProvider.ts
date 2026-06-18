@@ -164,13 +164,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
       case 'updateTask': {
         const task = await this.parser.getTask(message.taskId);
         if (!task) return;
-
-        if (isReadOnlyTask(task)) {
-          vscode.window.showErrorMessage(
-            `Cannot update task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
-          );
-          return;
-        }
+        if (this.blockReadOnlyMutation(task, 'update task')) return;
 
         const updates: Partial<Task> = {};
         if (typeof message.updates.status === 'string') {
@@ -196,13 +190,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
         if (!this.selectedTaskRef) return;
         const task = await this.resolveTask(this.selectedTaskRef);
         if (!task) return;
-
-        if (isReadOnlyTask(task)) {
-          vscode.window.showErrorMessage(
-            `Cannot update task: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
-          );
-          return;
-        }
+        if (this.blockReadOnlyMutation(task, 'update checklist items')) return;
 
         try {
           const writer = new BacklogWriter();
@@ -215,6 +203,14 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
         return;
       }
     }
+  }
+
+  private blockReadOnlyMutation(task: Task | undefined, action: string): boolean {
+    if (!task || !isReadOnlyTask(task)) return false;
+    vscode.window.showErrorMessage(
+      `Cannot ${action}: ${task.id} is read-only from ${getReadOnlyTaskContext(task)}.`
+    );
+    return true;
   }
 
   private async resolveTask(taskRef: TaskSelectionRef): Promise<Task | undefined> {
