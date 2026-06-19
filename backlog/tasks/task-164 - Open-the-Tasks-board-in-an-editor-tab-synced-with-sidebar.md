@@ -4,7 +4,7 @@ title: Open the Tasks board in an editor tab (synced with sidebar)
 status: Done
 assignee: []
 created_date: '2026-06-18 16:28'
-updated_date: '2026-06-18 17:19'
+updated_date: '2026-06-19 01:20'
 labels:
   - feature
   - ui
@@ -44,11 +44,13 @@ Existing src/test/unit/TasksViewProvider.test.ts is the regression net for step 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Shipped the editor-tab Tasks board (GitHub issue #28) on branch feat/issue-28-tasks-editor-tab as two commits.
+Shipped the editor-tab Tasks board (GitHub issue #28) on branch feat/issue-28-tasks-editor-tab.
 
 TASK-164.1 (refactor, no behavior change): extracted all Tasks-board logic into a host-agnostic `TasksController` talking to a minimal `TasksHost` ({ kind, postMessage, isReady }); `TasksViewProvider` became a thin sidebar adapter; shared `getTasksWebviewHtml()`.
 
-TASK-164.2 (feature): added `TasksPanelProvider` (singleton editor WebviewPanel, kind 'editor'), the `backlog.openTasksInEditor` command + view/title button, and threaded a `beside` hint into `TaskDetailProvider.openTask()`. extension.ts fans refresh/parser/workspace/data-source/integration/active-task out to the panel so it stays in sync with the sidebar via disk. Click UX as agreed: single-click peeks the detail beside (focus stays on board), double-click opens beside and focuses. Per-host view state (independent controller instances; globalState as shared default).
+TASK-164.2 (feature): added `TasksPanelProvider` (singleton editor WebviewPanel, kind 'editor'), the `backlog.openTasksInEditor` command + view/title button, and threaded a `viewColumn` hint into `TaskDetailProvider.openTask()`. extension.ts fans refresh/parser/workspace/data-source/integration/active-task out to all Tasks board hosts (a `tasksHosts` array) so the editor tab and sidebar stay in sync via disk.
 
-Quality: unit suite 919 passing, lint, typecheck, esbuild compile all green. New unit tests for the controller's editor/sidebar branching and the panel lifecycle. Two CDP cross-view tests added (sidebar↔tab↔disk sync; peek-beside) plus a `tasksEditor` CDP role — written to existing harness patterns but pending a run in the CDP environment/CI (no VS Code binary available locally on Darwin). Delivered as one PR per maintainer request.
+Click UX (final, after maintainer review of the first beside-split version): clicking a task in the editor-tab board opens the detail as a normal editor tab in the board's OWN editor group (ViewColumn.Active), reusing a single detail tab — NOT a side-by-side split. Single-click opens/updates it keeping focus on the board; double-click opens and focuses it. Sidebar click behavior (Details preview pane) unchanged. Per-host view state (independent controller instances).
+
+Quality: unit suite (920) + lint + typecheck + esbuild compile green; full CDP suite 12/12 green locally on macOS (binary auto-provisioned by the launcher). Local CDP runs were enabled on macOS without affecting CI. A `/simplify` pass collapsed the extension.ts fan-out into a shared `TasksBoardSurface` array and de-duplicated the macOS VS Code provisioning. A Codex review caught two real bugs (preserveFocus dropped on first detail open; backlog.refresh refreshed only the sidebar) — both fixed and regression-tested.
 <!-- SECTION:FINAL_SUMMARY:END -->
