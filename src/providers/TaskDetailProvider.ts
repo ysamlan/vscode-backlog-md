@@ -176,11 +176,13 @@ export class TaskDetailProvider {
       return;
     }
 
-    // Otherwise, create a new panel
+    // Otherwise, create a new panel. Honor preserveFocus here too (not just on
+    // the reveal path above), so the first single-click from the editor-tab
+    // board keeps focus on the board like subsequent clicks do.
     const panel = vscode.window.createWebviewPanel(
       'backlog.taskDetail',
       `${task.id}: ${task.title}`,
-      column,
+      { viewColumn: column, preserveFocus: options?.preserveFocus },
       {
         enableScripts: true,
         localResourceRoots: [this.extensionUri],

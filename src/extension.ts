@@ -135,7 +135,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.extensionUri,
     parser,
     context,
-    () => tasksProvider.refresh()
+    () => tasksHosts.forEach((host) => host.refresh())
   );
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('backlog.taskPreview', taskPreviewProvider, {
@@ -275,7 +275,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('backlog.refresh', () => {
-      tasksProvider.refresh();
+      tasksHosts.forEach((host) => host.refresh());
     })
   );
 
