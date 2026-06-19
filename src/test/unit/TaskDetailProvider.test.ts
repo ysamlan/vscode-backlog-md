@@ -266,6 +266,36 @@ describe('TaskDetailProvider', () => {
       expect(TaskDetailProvider['currentFilePath']).toBe(filePath);
     });
 
+    it('honors viewColumn and preserveFocus when creating the first panel', async () => {
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Test Task',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        acceptanceCriteria: [],
+        definitionOfDone: [],
+        filePath: '/test/backlog/tasks/task-1.md',
+      });
+
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+
+      await provider.openTask('TASK-1', {
+        preserveFocus: true,
+        viewColumn: vscode.ViewColumn.Active,
+      });
+
+      // The create path must pass the column + preserveFocus through (not a bare
+      // ViewColumn), so the first open keeps focus on the originating board.
+      expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
+        'backlog.taskDetail',
+        expect.any(String),
+        { viewColumn: vscode.ViewColumn.Active, preserveFocus: true },
+        expect.objectContaining({ enableScripts: true })
+      );
+    });
+
     it('should clear currentFilePath when task has no file path', async () => {
       (mockParser.getTask as Mock).mockResolvedValue({
         id: 'TASK-1',

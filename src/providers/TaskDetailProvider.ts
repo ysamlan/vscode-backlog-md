@@ -128,7 +128,7 @@ export class TaskDetailProvider {
    */
   async openTask(
     taskRef: string | OpenTaskRequest,
-    options?: { preserveFocus?: boolean }
+    options?: { preserveFocus?: boolean; viewColumn?: vscode.ViewColumn }
   ): Promise<void> {
     if (!this.parser) {
       vscode.window.showErrorMessage('No backlog folder found');
@@ -152,11 +152,17 @@ export class TaskDetailProvider {
       TaskDetailProvider.currentFilePath = undefined;
     }
 
-    const column = vscode.ViewColumn.One;
+    // Default placement is the first editor column (sidebar-originated opens).
+    // The editor-tab board passes ViewColumn.Active so the detail opens as a tab
+    // in the board's own editor group rather than a split.
+    const column = options?.viewColumn ?? vscode.ViewColumn.One;
 
     // If we already have a panel, show it and update content
     if (TaskDetailProvider.currentPanel) {
-      TaskDetailProvider.currentPanel.reveal(column, options?.preserveFocus);
+      // Keep an existing detail panel where the user has it (don't yank it to a
+      // new column on every peek); only fall back to `column` if it has none.
+      const revealColumn = TaskDetailProvider.currentPanel.viewColumn ?? column;
+      TaskDetailProvider.currentPanel.reveal(revealColumn, options?.preserveFocus);
       TaskDetailProvider.currentPanel.title = `${task.id}: ${task.title}`;
       TaskDetailProvider.currentTaskId = task.id;
       TaskDetailProvider.currentTaskRef = {
@@ -170,11 +176,13 @@ export class TaskDetailProvider {
       return;
     }
 
-    // Otherwise, create a new panel
+    // Otherwise, create a new panel. Honor preserveFocus here too (not just on
+    // the reveal path above), so the first single-click from the editor-tab
+    // board keeps focus on the board like subsequent clicks do.
     const panel = vscode.window.createWebviewPanel(
       'backlog.taskDetail',
       `${task.id}: ${task.title}`,
-      column,
+      { viewColumn: column, preserveFocus: options?.preserveFocus },
       {
         enableScripts: true,
         localResourceRoots: [this.extensionUri],

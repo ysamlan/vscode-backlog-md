@@ -66,6 +66,11 @@
         "title": "Backlog: Open Kanban Board"
       },
       {
+        "command": "backlog.openTasksInEditor",
+        "title": "Backlog: Open Board in Editor Tab",
+        "icon": "$(link-external)"
+      },
+      {
         "command": "backlog.openTaskList",
         "title": "Backlog: Open Task List"
       },
@@ -141,7 +146,15 @@
         "title": "Backlog: Set Up Agent Integration"
       }
     ],
-    "menus": {},
+    "menus": {
+      "view/title": [
+        {
+          "command": "backlog.openTasksInEditor",
+          "when": "view == backlog.kanban",
+          "group": "navigation@1"
+        }
+      ]
+    },
     "viewsContainers": {
       "activitybar": [
         {

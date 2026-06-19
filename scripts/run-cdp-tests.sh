@@ -1,5 +1,10 @@
 #!/bin/bash
 # Run CDP cross-view tests, using xvfb-run in headless environments (CI, devcontainer on Linux)
+#
+# The VS Code binary is provisioned by the test launcher itself
+# (src/test/cdp/lib/vscode-launcher.ts): on macOS it downloads the latest stable
+# build into .vscode-test/ on first run; CI downloads its own linux-x64 binary
+# before invoking vitest.
 
 set -e
 
