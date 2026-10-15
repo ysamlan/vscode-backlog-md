@@ -79,6 +79,48 @@ describe('TaskPreviewViewProvider', () => {
 
     expect(calledPaths.some((path) => path.endsWith('/task-preview.css'))).toBe(true);
     expect(calledPaths.some((path) => path.endsWith('/task-preview.js'))).toBe(true);
+    expect(webview.html).toContain('img-src test-csp https: data:;');
+    expect(webview.html).toContain("default-src 'none';");
+  });
+
+  it('resolves local images in every preview section', async () => {
+    const image = '![Mockup](../assets/mockup.png)';
+    vi.mocked(parser.getTask).mockResolvedValue({
+      id: 'TASK-1',
+      title: 'Images',
+      status: 'To Do',
+      assignee: [],
+      labels: [],
+      dependencies: [],
+      acceptanceCriteria: [],
+      definitionOfDone: [],
+      description: image,
+      implementationPlan: image,
+      implementationNotes: image,
+      finalSummary: image,
+      filePath: '/repo/backlog/tasks/task-1.md',
+    });
+    webview.asWebviewUri.mockImplementation((uri: vscode.Uri) => ({
+      toString: () => `https://webview.test${uri.fsPath}`,
+    }));
+    const provider = new TaskPreviewViewProvider(extensionUri, parser);
+    provider.resolveWebviewView(
+      webviewView as unknown as vscode.WebviewView,
+      {} as vscode.WebviewViewResolveContext,
+      {} as vscode.CancellationToken
+    );
+    await provider.selectTask({ taskId: 'TASK-1' });
+    expect(webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'taskPreviewData',
+        ...Object.fromEntries(
+          ['descriptionHtml', 'planHtml', 'notesHtml', 'finalSummaryHtml'].map((field) => [
+            field,
+            expect.stringContaining('src="https://webview.test/repo/backlog/assets/mockup.png"'),
+          ])
+        ),
+      })
+    );
   });
 
   it('forwards openTask messages from preview to backlog.openTaskDetail command', async () => {

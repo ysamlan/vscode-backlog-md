@@ -1,8 +1,10 @@
 import { sanitizeMarkdownSource } from './sanitizeMarkdown';
+import type { MarkedOptions } from 'marked' with { 'resolution-mode': 'import' };
 
-let markedParse: ((markdown: string) => string | Promise<string>) | null = null;
+type MarkdownParser = (markdown: string, options?: MarkedOptions) => string | Promise<string>;
+let markedParse: MarkdownParser | null = null;
 
-async function getMarkedParse(): Promise<(markdown: string) => string | Promise<string>> {
+async function getMarkedParse(): Promise<MarkdownParser> {
   if (!markedParse) {
     const { marked } = await import('marked');
     marked.setOptions({ gfm: true, breaks: true });
@@ -25,10 +27,19 @@ export function addLinkTitles(html: string): string {
   });
 }
 
-export async function parseMarkdown(markdown: string): Promise<string> {
+export async function parseMarkdown(
+  markdown: string,
+  resolveImageSource?: (source: string) => string
+): Promise<string> {
   const parse = await getMarkedParse();
   const safe = sanitizeMarkdownSource(markdown);
-  const result = parse(safe);
+  const result = parse(safe, {
+    walkTokens(token) {
+      if (token.type === 'image' && resolveImageSource) {
+        token.href = resolveImageSource(token.href);
+      }
+    },
+  });
   const html = typeof result === 'string' ? result : await result;
   return addLinkTitles(html);
 }

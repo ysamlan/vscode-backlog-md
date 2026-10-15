@@ -11,7 +11,7 @@ import {
 import { BacklogWriter } from '../core/BacklogWriter';
 import { computeSubtasks } from '../core/BacklogParser';
 import { openWorkspaceFile, isValidLinkString } from '../core/openWorkspaceFile';
-import { parseMarkdown } from '../core/parseMarkdown';
+import { createMarkdownRenderer } from './webviewMarkdown';
 
 type TaskSelectionRef = {
   taskId: string;
@@ -55,7 +55,7 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource};">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource};">
     <link href="${styleUri}" rel="stylesheet">
     <link href="${componentStyleUri}" rel="stylesheet">
     <title>Task Preview</title>
@@ -100,6 +100,11 @@ export class TaskPreviewViewProvider extends BaseViewProvider {
       this.selectedTaskRef
     );
     const statuses = await this.parser.getStatuses();
+    const parseMarkdown = createMarkdownRenderer(
+      this._view.webview,
+      this.extensionUri,
+      taskWithBlocks.filePath
+    );
     const descriptionHtml = taskWithBlocks.description
       ? await parseMarkdown(taskWithBlocks.description)
       : '';

@@ -38,6 +38,25 @@ describe('addLinkTitles', () => {
 });
 
 describe('parseMarkdown', () => {
+  it('resolves inline and reference images without rewriting links or code', async () => {
+    const html = await parseMarkdown(
+      '![inline](../assets/image.png "Preview")\n\n![reference][image]\n\n' +
+        '[image]: ../assets/other.png\n\n[link](../assets/image.png)\n\n' +
+        '`![code](../assets/image.png)`',
+      (src) => `https://webview.test/${src}`
+    );
+    expect(html).toContain('src="https://webview.test/../assets/image.png"');
+    expect(html).toContain('src="https://webview.test/../assets/other.png"');
+    expect(html).toContain('title="Preview"');
+    expect(html).toContain('href="../assets/image.png"');
+    expect(html).toContain('<code>![code](../assets/image.png)</code>');
+  });
+
+  it('does not leak image resolvers between renders', async () => {
+    await parseMarkdown('![image](image.png)', () => 'https://webview.test/image.png');
+    expect(await parseMarkdown('![image](image.png)')).toContain('src="image.png"');
+  });
+
   it('renders markdown link with title attribute set to href', async () => {
     const html = await parseMarkdown('See [the doc](../docs/spec.md) here.');
     expect(html).toContain('href="../docs/spec.md"');

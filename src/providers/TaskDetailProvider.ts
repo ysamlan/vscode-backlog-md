@@ -6,7 +6,7 @@ import { BacklogWriter, computeContentHash, FileConflictError } from '../core/Ba
 import { isReadOnlyTask, getReadOnlyTaskContext, type Task, type TaskSource } from '../core/types';
 import { StatusCallbackRunner } from '../core/StatusCallbackRunner';
 import { openWorkspaceFile, isValidLinkString } from '../core/openWorkspaceFile';
-import { parseMarkdown } from '../core/parseMarkdown';
+import { createMarkdownRenderer } from './webviewMarkdown';
 
 /**
  * Task detail data structure sent to the webview
@@ -289,7 +289,7 @@ export class TaskDetailProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource};">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource};">
     <link href="${styleUri}" rel="stylesheet">
     <title>${this.escapeHtml(taskTitle)}</title>
 </head>
@@ -380,6 +380,7 @@ export class TaskDetailProvider {
       const isBlocked = blockingDependencyIds.length > 0;
 
       // Parse body section markdown
+      const parseMarkdown = createMarkdownRenderer(webview, this.extensionUri, task.filePath);
       const descriptionHtml = task.description ? await parseMarkdown(task.description) : '';
       const planHtml = task.implementationPlan ? await parseMarkdown(task.implementationPlan) : '';
       const notesHtml = task.implementationNotes

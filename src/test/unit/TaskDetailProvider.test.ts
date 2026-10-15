@@ -13,14 +13,6 @@ vi.mock('fs', () => ({
   unlinkSync: vi.fn(),
 }));
 
-// Mock marked module
-vi.mock('marked', () => ({
-  marked: {
-    setOptions: vi.fn(),
-    parse: vi.fn((markdown: string) => `<p>${markdown}</p>`),
-  },
-}));
-
 // Mock BacklogWriter
 const mockWriter = {
   updateTask: vi.fn().mockResolvedValue(undefined),
@@ -877,6 +869,49 @@ describe('TaskDetailProvider', () => {
   });
 
   describe('sendTaskData body section HTML', () => {
+    it('renders local images in every section and allows them through CSP', async () => {
+      const image = '![Mockup](../assets/mockup.png)';
+      (mockParser.getTask as Mock).mockResolvedValue({
+        id: 'TASK-1',
+        title: 'Images',
+        status: 'To Do',
+        labels: [],
+        assignee: [],
+        dependencies: [],
+        description: image,
+        implementationPlan: image,
+        implementationNotes: image,
+        finalSummary: image,
+        filePath: '/test/backlog/tasks/task-1.md',
+      });
+      mockWebview.asWebviewUri = vi.fn((uri: vscode.Uri) =>
+        Object.assign(uri, {
+          toString: () => `https://webview.test${uri.fsPath}`,
+        })
+      );
+      const provider = new TaskDetailProvider(extensionUri, mockParser);
+      await provider.openTask('TASK-1');
+      await vi.waitFor(() => {
+        expect(mockWebview.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'taskData',
+            data: expect.objectContaining(
+              Object.fromEntries(
+                ['descriptionHtml', 'planHtml', 'notesHtml', 'finalSummaryHtml'].map((field) => [
+                  field,
+                  expect.stringContaining(
+                    'src="https://webview.test/test/backlog/assets/mockup.png"'
+                  ),
+                ])
+              )
+            ),
+          })
+        );
+      });
+      expect(mockWebview.html).toContain('img-src test-csp https: data:;');
+      expect(mockWebview.html).toContain("default-src 'none';");
+    });
+
     it('should include planHtml when task has a plan', async () => {
       const filePath = '/test/backlog/tasks/task-1.md';
 

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { BacklogParser } from '../core/BacklogParser';
 import { openWorkspaceFile, isValidLinkString } from '../core/openWorkspaceFile';
-import { parseMarkdown } from '../core/parseMarkdown';
+import { createMarkdownRenderer } from './webviewMarkdown';
 
 /**
  * Provides a webview panel for displaying read-only document and decision details.
@@ -45,6 +45,7 @@ export class ContentDetailProvider {
     ContentDetailProvider.currentEntityId = docId;
     ContentDetailProvider.currentEntityFilePath = doc.filePath;
 
+    const parseMarkdown = createMarkdownRenderer(panel.webview, this.extensionUri, doc.filePath);
     const contentHtml = doc.content ? await parseMarkdown(doc.content) : '';
     panel.webview.postMessage({ type: 'documentData', document: doc, contentHtml });
   }
@@ -69,6 +70,11 @@ export class ContentDetailProvider {
     ContentDetailProvider.currentEntityFilePath = decision.filePath;
 
     // Render each section to HTML
+    const parseMarkdown = createMarkdownRenderer(
+      panel.webview,
+      this.extensionUri,
+      decision.filePath
+    );
     const sections: Record<string, string> = {};
     if (decision.context) sections.context = await parseMarkdown(decision.context);
     if (decision.decision) sections.decision = await parseMarkdown(decision.decision);
@@ -144,7 +150,7 @@ export class ContentDetailProvider {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource};">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource};">
     <link href="${styleUri}" rel="stylesheet">
     <title>Content Detail</title>
 </head>
